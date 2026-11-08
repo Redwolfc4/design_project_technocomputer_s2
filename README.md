@@ -126,7 +126,7 @@ DokumenAI Enterprise mengintegrasikan seluruh rantai pemrosesan dokumen:
 
 Berikut adalah diagram alur kerja terpadu DokumenAI Enterprise dari fase penerimaan berkas, penilaian skor AI, verifikasi *human-in-the-loop*, hingga posting ke sistem ERP dan pencatatan audit forensik:
 
-![Diagram Alur Kerja Sistem](/public/illustrations/system-workflow-diagram.svg)
+![Diagram Alur Kerja Sistem](docs/screenshots/00_system_workflow_diagram.png)
 
 ### Rincian Tahapan Alur Kerja:
 1. **Dokumen Masuk**: Berkas PDF atau scan gambar (e-Faktur, Invoice AP, Purchase Order) diterima sistem.
@@ -147,27 +147,27 @@ Seluruh tangkapan layar di bawah ini diambil secara otomatis dari aplikasi nyata
 
 ### 1. Halaman Beranda Publik (Marketing Home)
 *Menampilkan nilai bisnis, ilustrasi aliran dokumen orisinal tanpa AI-slop, dan tier harga lisensi.*
-![Halaman Beranda](/docs/screenshots/01_homepage.png)
+![Halaman Beranda](docs/screenshots/01_homepage.png)
 
 ### 2. Dashboard Operasional Utama
 *Pusat kendali metrik real-time: total dokumen, antrean verifikasi, nilai transaksi, dan tombol aksi cepat.*
-![Dashboard Utama](/docs/screenshots/02_dashboard.png)
+![Dashboard Utama](docs/screenshots/02_dashboard.png)
 
 ### 3. Human-in-the-Loop Verification Workspace
 *Fitur kunci: Pratinjau berdampingan dengan penyorotan koordinat (bounding box) dan formulir koreksi nilai.*
-![Verification Workspace](/docs/screenshots/03_verification_workspace.png)
+![Verification Workspace](docs/screenshots/03_verification_workspace.png)
 
 ### 4. Batch Upload & Simulasi Ekstraksi AI
 *Fasilitas unggah berkas massal dengan pilihan profil ekstraksi (e-Faktur, PO, Kontrak, Kuitansi).*
-![Upload Batch](/docs/screenshots/04_upload_batch.png)
+![Upload Batch](docs/screenshots/04_upload_batch.png)
 
 ### 5. Repositori Dokumen Terpadu
 *Pencarian global, filter status verifikasi, dan filter jenis dokumen dengan aksi cepat ke workspace.*
-![Repositori Dokumen](/docs/screenshots/05_document_repository.png)
+![Repositori Dokumen](docs/screenshots/05_document_repository.png)
 
 ### 6. Ekspor Data & Integrasi ERP
 *Konfigurasi unduhan data siap-impor untuk SAP S/4HANA, Oracle Cloud, dan format SPT Pajak DJP.*
-![Ekspor Data](/docs/screenshots/06_export_integrations.png)
+![Ekspor Data](docs/screenshots/06_export_integrations.png)
 
 ---
 

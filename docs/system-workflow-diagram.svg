@@ -46,8 +46,8 @@
     <rect x="320" y="80" width="220" height="56" rx="10" fill="#F8FAFC" stroke="#CBD5E1" stroke-width="1.5"/>
     <circle cx="345" cy="108" r="14" fill="#EEF2FF"/>
     <text x="341" y="112" font-family="system-ui, sans-serif" font-size="12" font-weight="800" fill="#4F46E5">2</text>
-    <text x="370" y="102" font-family="system-ui, sans-serif" font-size="11" font-weight="700" fill="#0F172A">Batch Upload & Profiling</text>
-    <text x="370" y="118" font-family="system-ui, sans-serif" font-size="10" fill="#64748B">Validasi tipe & profiling skema</text>
+    <text x="370" y="102" font-family="system-ui, sans-serif" font-size="11" font-weight="700" fill="#0F172A">Batch Upload &amp; Profiling</text>
+    <text x="370" y="118" font-family="system-ui, sans-serif" font-size="10" fill="#64748B">Validasi tipe &amp; profiling skema</text>
   </g>
 
   <!-- Arrow 2 to 3 -->
@@ -59,7 +59,7 @@
     <rect x="600" y="80" width="220" height="56" rx="10" fill="url(#primaryGrad)"/>
     <circle cx="625" cy="108" r="14" fill="#FFFFFF"/>
     <text x="621" y="112" font-family="system-ui, sans-serif" font-size="12" font-weight="800" fill="#4F46E5">3</text>
-    <text x="650" y="102" font-family="system-ui, sans-serif" font-size="11" font-weight="700" fill="#FFFFFF">OCR & Field Extraction</text>
+    <text x="650" y="102" font-family="system-ui, sans-serif" font-size="11" font-weight="700" fill="#FFFFFF">OCR &amp; Field Extraction</text>
     <text x="650" y="118" font-family="system-ui, sans-serif" font-size="10" fill="#E0E7FF">Ekstraksi pasangan Key-Value</text>
   </g>
 
@@ -70,8 +70,8 @@
   <!-- Decision Node: Threshold & Arithmetic Check -->
   <g filter="url(#shadow)">
     <rect x="250" y="210" width="360" height="74" rx="12" fill="#FFFBEB" stroke="#F59E0B" stroke-width="1.5"/>
-    <text x="430" y="238" font-family="system-ui, sans-serif" font-size="12" font-weight="800" fill="#92400E" text-anchor="middle">Evaluasi Aturan & Ambang Batas Akurasi</text>
-    <text x="430" y="258" font-family="system-ui, sans-serif" font-size="11" fill="#B45309" text-anchor="middle">Skor Keyakinan ≥ 95% & Formula DPP + PPN 11% Cocok?</text>
+    <text x="430" y="238" font-family="system-ui, sans-serif" font-size="12" font-weight="800" fill="#92400E" text-anchor="middle">Evaluasi Aturan &amp; Ambang Batas Akurasi</text>
+    <text x="430" y="258" font-family="system-ui, sans-serif" font-size="11" fill="#B45309" text-anchor="middle">Skor Keyakinan ≥ 95% &amp; Formula DPP + PPN 11% Cocok?</text>
   </g>
 
   <!-- Branch YES (Left Side: Auto-Approved) -->
@@ -98,7 +98,7 @@
     <rect x="580" y="340" width="260" height="84" rx="10" fill="#FFFFFF" stroke="#F59E0B" stroke-width="1.5"/>
     <text x="710" y="366" font-family="system-ui, sans-serif" font-size="12" font-weight="800" fill="#B45309" text-anchor="middle">Human-in-the-Loop Workspace</text>
     <text x="710" y="386" font-family="system-ui, sans-serif" font-size="10" fill="#475569" text-anchor="middle">Reviewer menginspeksi lembar berkas</text>
-    <text x="710" y="402" font-family="system-ui, sans-serif" font-size="10" fill="#475569" text-anchor="middle">& mengoreksi nilai bounding-box</text>
+    <text x="710" y="402" font-family="system-ui, sans-serif" font-size="10" fill="#475569" text-anchor="middle">&amp; mengoreksi nilai bounding-box</text>
   </g>
 
   <!-- Decisions from Human Review -->
@@ -106,7 +106,7 @@
   <path d="M 580 395 L 340 395 L 340 372 L 270 372" stroke="#059669" stroke-width="2" stroke-linecap="round"/>
   <polygon points="265,372 273,367 273,377" fill="#059669"/>
   <rect x="360" y="382" width="130" height="20" rx="4" fill="#ECFDF5" stroke="#A7F3D0"/>
-  <text x="425" y="396" font-family="system-ui, sans-serif" font-size="9" font-weight="800" fill="#059669" text-anchor="middle">Dikoreksi & Disetujui</text>
+  <text x="425" y="396" font-family="system-ui, sans-serif" font-size="9" font-weight="800" fill="#059669" text-anchor="middle">Dikoreksi &amp; Disetujui</text>
 
   <!-- Decision 2: Reviewer Rejects -->
   <path d="M 710 424 L 710 480" stroke="#E11D48" stroke-width="2" stroke-linecap="round"/>
@@ -128,8 +128,8 @@
   <!-- Step 5: Export & Integration -->
   <g filter="url(#shadow)">
     <rect x="40" y="500" width="220" height="64" rx="10" fill="#FFFFFF" stroke="#059669" stroke-width="1.5"/>
-    <text x="150" y="527" font-family="system-ui, sans-serif" font-size="12" font-weight="800" fill="#065F46" text-anchor="middle">Ekspor & Sinkronisasi ERP</text>
-    <text x="150" y="545" font-family="system-ui, sans-serif" font-size="10" fill="#64748B" text-anchor="middle">SAP, Oracle, Webhook & SPT DJP</text>
+    <text x="150" y="527" font-family="system-ui, sans-serif" font-size="12" font-weight="800" fill="#065F46" text-anchor="middle">Ekspor &amp; Sinkronisasi ERP</text>
+    <text x="150" y="545" font-family="system-ui, sans-serif" font-size="10" fill="#64748B" text-anchor="middle">SAP, Oracle, Webhook &amp; SPT DJP</text>
   </g>
 
   <!-- Connectors into Forensic Audit Trail -->
@@ -145,6 +145,6 @@
     <circle cx="280" cy="612" r="14" fill="#EEF2FF"/>
     <path d="M 276 612 L 279 615 L 286 607" stroke="#4F46E5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
     <text x="440" y="606" font-family="system-ui, sans-serif" font-size="12" font-weight="800" fill="#1E1B4B" text-anchor="middle">Audit Trail Forensik Tercatat Permanen</text>
-    <text x="440" y="624" font-family="system-ui, sans-serif" font-size="10" fill="#64748B" text-anchor="middle">Stempel Waktu ISO, Nama Aktor, IP Address & Riwayat Status</text>
+    <text x="440" y="624" font-family="system-ui, sans-serif" font-size="10" fill="#64748B" text-anchor="middle">Stempel Waktu ISO, Nama Aktor, IP Address &amp; Riwayat Status</text>
   </g>
 </svg>
