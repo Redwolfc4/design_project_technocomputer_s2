@@ -35,6 +35,19 @@ export interface UserPersona {
   permissions: string[];
 }
 
+export interface RBACMember {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  roleTitle: string;
+  avatar?: string;
+  department: string;
+  permissions: string[];
+  status: 'Aktif' | 'Nonaktif';
+  createdAt: string;
+}
+
 export interface BoundingBox {
   page: number;
   x: number; // percentage (0-100)
