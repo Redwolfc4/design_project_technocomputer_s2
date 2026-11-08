@@ -13,8 +13,8 @@ interface MarketingPageProps {
 export function MarketingPageTemplate({ title, subtitle, description, points }: MarketingPageProps) {
   return (
     <div className="min-h-screen bg-[#FAFAFF] flex flex-col font-sans">
-      <header className="border-b border-[#E2E8F0] bg-white sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-6 h-18 flex items-center justify-between">
+      <header className="border-b border-[#E2E8F0] bg-white sticky top-0 z-50 py-3 sm:py-4">
+        <div className="max-w-screen-2xl mx-auto px-6 lg:px-12 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-lg bg-[#4F46E5] flex items-center justify-center text-white font-black text-lg">
               D
@@ -35,7 +35,7 @@ export function MarketingPageTemplate({ title, subtitle, description, points }: 
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-6 py-16 space-y-12 flex-1">
+      <main className="max-w-screen-2xl mx-auto px-6 lg:px-12 py-16 space-y-12 flex-1">
         <div className="space-y-4 text-center max-w-3xl mx-auto">
           <span className="text-xs uppercase font-extrabold tracking-widest text-[#4F46E5]">
             {subtitle}

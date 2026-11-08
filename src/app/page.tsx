@@ -14,8 +14,8 @@ export default function MarketingHomePage() {
   return (
     <div className="min-h-screen bg-[#FAFAFF] flex flex-col font-sans selection:bg-[#4F46E5]/10 selection:text-[#4F46E5]">
       {/* Navigation Bar */}
-      <header className="border-b border-[#E2E8F0] bg-white/95 backdrop-blur-md sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-6 h-18 flex items-center justify-between">
+      <header className="border-b border-[#E2E8F0] bg-white/95 backdrop-blur-md sticky top-0 z-50 py-3 sm:py-4">
+        <div className="max-w-screen-2xl mx-auto px-6 lg:px-12 flex items-center justify-between">
           <div className="flex items-center gap-10">
             <Link href="/" className="flex items-center gap-2.5">
               <div className="w-8 h-8 rounded-lg bg-[#4F46E5] flex items-center justify-center text-white font-black text-lg shadow-sm">
@@ -61,7 +61,7 @@ export default function MarketingHomePage() {
 
       {/* Hero Section */}
       <section className="pt-16 pb-20 border-b border-[#E2E8F0] relative overflow-hidden bg-gradient-to-b from-white to-[#FAFAFF]">
-        <div className="max-w-7xl mx-auto px-6">
+        <div className="max-w-screen-2xl mx-auto px-6 lg:px-12">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
             <div className="lg:col-span-6 space-y-6">
               <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#EEF2FF] border border-[#CBD5E1] text-[#4F46E5] text-xs font-semibold">
@@ -125,7 +125,7 @@ export default function MarketingHomePage() {
 
       {/* Feature Showcase Grid */}
       <section className="py-20 bg-white border-b border-[#E2E8F0]">
-        <div className="max-w-7xl mx-auto px-6">
+        <div className="max-w-screen-2xl mx-auto px-6 lg:px-12">
           <div className="text-center max-w-2xl mx-auto mb-16 space-y-3">
             <h2 className="text-xs uppercase font-extrabold tracking-widest text-[#4F46E5]">
               Arsitektur Sistem Terpercaya
@@ -171,7 +171,7 @@ export default function MarketingHomePage() {
 
       {/* Human Verification Workspace Showcase */}
       <section className="py-20 bg-[#FAFAFF] border-b border-[#E2E8F0]">
-        <div className="max-w-7xl mx-auto px-6">
+        <div className="max-w-screen-2xl mx-auto px-6 lg:px-12">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
             <div className="lg:col-span-6 relative">
               <div className="rounded-2xl border border-[#CBD5E1] bg-white p-2 shadow-xl">
@@ -225,7 +225,7 @@ export default function MarketingHomePage() {
 
       {/* Enterprise Integration & Security Section */}
       <section className="py-20 bg-white border-b border-[#E2E8F0]">
-        <div className="max-w-7xl mx-auto px-6">
+        <div className="max-w-screen-2xl mx-auto px-6 lg:px-12">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
             <div className="lg:col-span-6 space-y-5">
               <span className="text-xs uppercase font-extrabold tracking-widest text-[#4F46E5]">
@@ -266,7 +266,7 @@ export default function MarketingHomePage() {
 
       {/* Pricing / Demo Tiers */}
       <section className="py-20 bg-[#FAFAFF] border-b border-[#E2E8F0]">
-        <div className="max-w-7xl mx-auto px-6">
+        <div className="max-w-screen-2xl mx-auto px-6 lg:px-12">
           <div className="text-center max-w-2xl mx-auto mb-16 space-y-3">
             <h2 className="text-xs uppercase font-extrabold tracking-widest text-[#4F46E5]">
               Paket Lisensi Perusahaan
@@ -343,7 +343,7 @@ export default function MarketingHomePage() {
 
       {/* Footer */}
       <footer className="bg-white border-t border-[#E2E8F0] py-12">
-        <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-6">
+        <div className="max-w-screen-2xl mx-auto px-6 lg:px-12 flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="flex items-center gap-2.5">
             <div className="w-7 h-7 rounded-lg bg-[#4F46E5] flex items-center justify-center text-white font-bold text-sm">
               D

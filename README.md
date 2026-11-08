@@ -126,7 +126,32 @@ DokumenAI Enterprise mengintegrasikan seluruh rantai pemrosesan dokumen:
 
 Berikut adalah diagram alur kerja terpadu DokumenAI Enterprise dari fase penerimaan berkas, penilaian skor AI, verifikasi *human-in-the-loop*, hingga posting ke sistem ERP dan pencatatan audit forensik:
 
-![Diagram Alur Kerja Sistem](docs/screenshots/00_system_workflow_diagram.png)
+```mermaid
+flowchart TD
+    A["Mulai: Dokumen Diterima (PDF/Scan)"] --> B["Batch Upload & Profiling"]
+    B --> C["Preprocessing & OCR Pipeline"]
+    C --> D["Ekstraksi Bidang & Penilaian Skor Keyakinan"]
+    D --> E{"Skor >= Ambang Batas (misal: 95%) & Aritmatika Sesuai?"}
+    
+    E -- "Ya (Auto-Match)" --> F["Disetujui Otomatis (Approved)"]
+    E -- "Tidak (Perlu Verifikasi)" --> G["Masuk Antrean Human-in-the-Loop"]
+    
+    G --> H["Reviewer Memeriksa Dokumen & Bounding Box"]
+    H --> I{"Keputusan Reviewer"}
+    
+    I -- "Nilai Dikoreksi & Disetujui" --> F
+    I -- "Berkas Buram / Data Cacat" --> J["Ditolak (Rejected) + Catatan Koreksi"]
+    
+    F --> K["Generate Ekspor Terpetakan (SAP / Oracle / CSV DJP)"]
+    K --> L["Pengiriman Webhook / Posting ke ERP Core"]
+    F --> M["Pencatatan Permanen di Audit Trail Forensik"]
+    J --> M
+    L --> N["Selesai: Arsip Terekonsiliasi"]
+```
+
+<div align="center">
+  <img src="docs/screenshots/00_system_workflow_diagram.png" alt="Diagram Alur Kerja Sistem" width="850" />
+</div>
 
 ### Rincian Tahapan Alur Kerja:
 1. **Dokumen Masuk**: Berkas PDF atau scan gambar (e-Faktur, Invoice AP, Purchase Order) diterima sistem.
