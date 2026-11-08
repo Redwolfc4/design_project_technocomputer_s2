@@ -1,0 +1,84 @@
+- generic [active] [ref=f17e1]:
+  - generic [ref=f17e2]:
+    - complementary [ref=f17e3]:
+      - link "D DokumenAIEnterpriseDocument Intelligence" [ref=f17e5] [cursor=pointer]:
+        - /url: /
+        - generic [ref=f17e6]: D
+        - generic [ref=f17e7]:
+          - generic [ref=f17e8]: DokumenAIEnterprise
+          - text: Document Intelligence
+      - generic [ref=f17e9]:
+        - generic [ref=f17e10]: Peran Pengguna DemoSimulasi Aktif
+        - combobox [ref=f17e11]:
+          - option "Finance & Tax Supervisor (Dewi)" [selected]
+          - option "Super Admin / CISO (Budi)"
+          - option "Document Specialist (Rizky)"
+          - option "Compliance Auditor (Siti)"
+      - navigation [ref=f17e12]:
+        - link "Ringkasan Utama" [ref=f17e13] [cursor=pointer]:
+          - /url: /dashboard
+        - link "Unggah Batch" [ref=f17e17] [cursor=pointer]:
+          - /url: /dashboard/upload
+        - link [ref=f17e22] [cursor=pointer]:
+          - /url: /dashboard/verification
+          - generic [ref=f17e23]: Antrean Verifikasi
+          - text: "3"
+        - link "Repositori Dokumen" [ref=f17e27] [cursor=pointer]:
+          - /url: /dashboard/documents
+        - link "Ekspor & Integrasi" [ref=f17e32] [cursor=pointer]:
+          - /url: /dashboard/export
+        - link "Analisis Operasional" [ref=f17e37] [cursor=pointer]:
+          - /url: /dashboard/analytics
+        - link "Audit Trail Forensik" [ref=f17e43] [cursor=pointer]:
+          - /url: /dashboard/audit
+        - link "Tim & Hak Akses" [ref=f17e48] [cursor=pointer]:
+          - /url: /dashboard/users
+        - link "Pengaturan Workspace" [ref=f17e55] [cursor=pointer]:
+          - /url: /dashboard/settings
+      - generic [ref=f17e61]:
+        - generic [ref=f17e62]: D
+        - generic [ref=f17e63]: Dewi Lestari, S.E., Ak., CAFinance & Tax Operations Supervisor
+    - generic [ref=f17e65]:
+      - banner [ref=f17e66]:
+        - generic [ref=f17e67]:
+          - heading "Ekspor Data & Integrasi Enterprise ERP" [level=1] [ref=f17e68]
+          - paragraph [ref=f17e69]: Unduh hasil verifikasi tervalidasi dalam format siap posting akuntansi dan rekonsiliasi pajak
+        - generic [ref=f17e70]:
+          - textbox "Cari nomor faktur, vendor, atau tag..." [ref=f17e75]
+          - button "Reset Demo Data" [ref=f17e76]
+      - main [ref=f17e82]:
+        - generic [ref=f17e83]:
+          - generic [ref=f17e84]:
+            - heading "Konfigurasi Ekspor Dokumen Terverifikasi" [level=2] [ref=f17e85]
+            - paragraph [ref=f17e86]:
+              - text: Tersedia
+              - strong [ref=f17e87]: 2 berkas
+              - text: siap ekspor dengan status Terverifikasi (Approved).
+          - generic [ref=f17e88]:
+            - generic [ref=f17e89]:
+              - text: Format Berkas Unduhan
+              - combobox [ref=f17e90]:
+                - option "CSV (Comma-Separated Values)" [selected]
+                - option "JSON API Payload"
+                - option "Excel Spreadsheet (XLSX)"
+            - generic [ref=f17e91]:
+              - text: Profil Pemetaan Sistem Target
+              - combobox [ref=f17e92]:
+                - option "SAP S/4HANA (Accounts Payable Schema)" [selected]
+                - option "Oracle Financials Cloud Mapping"
+                - option "DJP e-Faktur Pajak SPT PPN Schema"
+                - option "Generic General Ledger CSV"
+          - generic [ref=f17e93]:
+            - text: Pratinjau Berkas Siap Diunduh
+            - generic [ref=f17e94]:
+              - generic [ref=f17e95]:
+                - text: "• Jumlah baris dokumen:"
+                - strong [ref=f17e96]: 2 entitas
+              - generic [ref=f17e97]:
+                - text: "• Total nominal transaksi:"
+                - strong [ref=f17e98]: Rp 94.035.000
+              - generic [ref=f17e99]:
+                - text: "• Format ekstensi:"
+                - strong [ref=f17e100]: .csv
+          - button "Generate & Download Export" [ref=f17e102]
+  - alert [ref=f17e106]

@@ -1,0 +1,47 @@
+<svg width="600" height="380" viewBox="0 0 600 380" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="600" height="380" rx="14" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1.5"/>
+
+  <!-- Left: DokumenAI Node -->
+  <rect x="50" y="140" width="130" height="100" rx="10" fill="#4F46E5"/>
+  <rect x="65" y="160" width="100" height="20" rx="4" fill="#6366F1"/>
+  <text x="75" y="174" font-family="system-ui, sans-serif" font-size="10" font-weight="700" fill="#FFFFFF">DOKUMENAI</text>
+  <text x="68" y="210" font-family="system-ui, sans-serif" font-size="11" font-weight="600" fill="#E0E7FF">Intelligence Engine</text>
+
+  <!-- Connectors -->
+  <path d="M 180 190 L 260 190" stroke="#4F46E5" stroke-width="2" stroke-dasharray="4 4"/>
+  <circle cx="220" cy="190" r="14" fill="#EEF2FF" stroke="#4F46E5" stroke-width="1.5"/>
+  <text x="214" y="194" font-family="system-ui, sans-serif" font-size="9" font-weight="700" fill="#4F46E5">API</text>
+
+  <!-- Central Webhook / Mapping Router -->
+  <rect x="260" y="80" width="110" height="220" rx="10" fill="#F8FAFC" stroke="#CBD5E1" stroke-width="1.5"/>
+  <text x="274" y="110" font-family="system-ui, sans-serif" font-size="10" font-weight="700" fill="#334155">INTEGRATION</text>
+  <text x="284" y="126" font-family="system-ui, sans-serif" font-size="9" fill="#64748B">PIPELINE</text>
+  <rect x="272" y="145" width="86" height="30" rx="4" fill="#FFFFFF" stroke="#E2E8F0"/>
+  <text x="282" y="164" font-family="system-ui, sans-serif" font-size="9" font-weight="600" fill="#4F46E5">JSON Schema</text>
+  <rect x="272" y="185" width="86" height="30" rx="4" fill="#FFFFFF" stroke="#E2E8F0"/>
+  <text x="282" y="204" font-family="system-ui, sans-serif" font-size="9" font-weight="600" fill="#4F46E5">Webhook Push</text>
+  <rect x="272" y="225" width="86" height="30" rx="4" fill="#FFFFFF" stroke="#E2E8F0"/>
+  <text x="280" y="244" font-family="system-ui, sans-serif" font-size="9" font-weight="600" fill="#4F46E5">CSV / Excel Tax</text>
+
+  <!-- Connectors Out -->
+  <path d="M 370 160 L 430 110" stroke="#94A3B8" stroke-width="1.5"/>
+  <path d="M 370 190 L 430 190" stroke="#94A3B8" stroke-width="1.5"/>
+  <path d="M 370 220 L 430 270" stroke="#94A3B8" stroke-width="1.5"/>
+
+  <!-- Enterprise Targets -->
+  <!-- Target 1: SAP ERP -->
+  <rect x="430" y="85" width="120" height="50" rx="8" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1.5"/>
+  <text x="444" y="108" font-family="system-ui, sans-serif" font-size="11" font-weight="700" fill="#0F172A">SAP ERP S/4HANA</text>
+  <text x="444" y="124" font-family="system-ui, sans-serif" font-size="9" fill="#64748B">Posting Otomatis AP</text>
+
+  <!-- Target 2: Oracle / Dynamics -->
+  <rect x="430" y="165" width="120" height="50" rx="8" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1.5"/>
+  <text x="444" y="188" font-family="system-ui, sans-serif" font-size="11" font-weight="700" fill="#0F172A">Oracle Cloud Fin</text>
+  <text x="444" y="204" font-family="system-ui, sans-serif" font-size="9" fill="#64748B">Rekonsiliasi Bank & PO</text>
+
+  <!-- Target 3: DJP Tax / e-Faktur -->
+  <rect x="430" y="245" width="120" height="50" rx="8" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1.5"/>
+  <text x="444" y="268" font-family="system-ui, sans-serif" font-size="11" font-weight="700" fill="#0F172A">DJP e-Faktur Pajak</text>
+  <text x="444" y="284" font-family="system-ui, sans-serif" font-size="9" fill="#059669">Validasi NSFP Resmi</text>
+</svg>
+

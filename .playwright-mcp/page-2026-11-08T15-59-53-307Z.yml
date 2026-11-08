@@ -1,0 +1,168 @@
+- generic [active] [ref=f13e1]:
+  - generic [ref=f13e2]:
+    - complementary [ref=f13e3]:
+      - link "D DokumenAIEnterpriseDocument Intelligence" [ref=f13e5] [cursor=pointer]:
+        - /url: /
+        - generic [ref=f13e6]: D
+        - generic [ref=f13e7]:
+          - generic [ref=f13e8]: DokumenAIEnterprise
+          - text: Document Intelligence
+      - generic [ref=f13e9]:
+        - generic [ref=f13e10]: Peran Pengguna DemoSimulasi Aktif
+        - combobox [ref=f13e11]:
+          - option "Finance & Tax Supervisor (Dewi)" [selected]
+          - option "Super Admin / CISO (Budi)"
+          - option "Document Specialist (Rizky)"
+          - option "Compliance Auditor (Siti)"
+      - navigation [ref=f13e12]:
+        - link "Ringkasan Utama" [ref=f13e13] [cursor=pointer]:
+          - /url: /dashboard
+        - link "Unggah Batch" [ref=f13e17] [cursor=pointer]:
+          - /url: /dashboard/upload
+        - link [ref=f13e22] [cursor=pointer]:
+          - /url: /dashboard/verification
+          - generic [ref=f13e23]: Antrean Verifikasi
+          - text: "3"
+        - link "Repositori Dokumen" [ref=f13e27] [cursor=pointer]:
+          - /url: /dashboard/documents
+        - link "Ekspor & Integrasi" [ref=f13e32] [cursor=pointer]:
+          - /url: /dashboard/export
+        - link "Analisis Operasional" [ref=f13e37] [cursor=pointer]:
+          - /url: /dashboard/analytics
+        - link "Audit Trail Forensik" [ref=f13e43] [cursor=pointer]:
+          - /url: /dashboard/audit
+        - link "Tim & Hak Akses" [ref=f13e48] [cursor=pointer]:
+          - /url: /dashboard/users
+        - link "Pengaturan Workspace" [ref=f13e55] [cursor=pointer]:
+          - /url: /dashboard/settings
+      - generic [ref=f13e61]:
+        - generic [ref=f13e62]: D
+        - generic [ref=f13e63]: Dewi Lestari, S.E., Ak., CAFinance & Tax Operations Supervisor
+    - generic [ref=f13e65]:
+      - banner [ref=f13e66]:
+        - generic [ref=f13e67]:
+          - heading "Ringkasan Operasional Dokumen" [level=1] [ref=f13e68]
+          - paragraph [ref=f13e69]: Pantau volume ekstraksi AI, status verifikasi human-in-the-loop, dan kepatuhan faktur
+        - generic [ref=f13e70]:
+          - textbox "Cari nomor faktur, vendor, atau tag..." [ref=f13e75]
+          - button "Reset Demo Data" [ref=f13e76]
+      - main [ref=f13e82]:
+        - generic [ref=f13e83]:
+          - generic [ref=f13e84]:
+            - generic [ref=f13e85]: Total Dokumen
+            - generic [ref=f13e89]: 6 Berkas
+            - generic [ref=f13e90]: ↑ +18.4%dari bulan lalu
+          - generic [ref=f13e91]:
+            - generic [ref=f13e92]: Perlu Verifikasi
+            - generic [ref=f13e95]: 3 Antrean
+            - link "Buka antrean review" [ref=f13e96] [cursor=pointer]:
+              - /url: /dashboard/verification
+          - generic [ref=f13e99]:
+            - generic [ref=f13e100]: Telah Disetujui
+            - generic [ref=f13e104]: 2 Berkas
+            - generic [ref=f13e105]: Terekonsiliasi ke Buku Besar
+          - generic [ref=f13e106]:
+            - generic [ref=f13e107]: Akurasi Model AI
+            - generic [ref=f13e112]: 86% Skor
+            - generic [ref=f13e113]: "Ambang batas otomatis: 95%"
+        - generic [ref=f13e114]:
+          - generic [ref=f13e115]:
+            - generic [ref=f13e116]: Simulasi Intelligent Processing
+            - heading "Ada 3 dokumen menunggu review mata manusia sebelum ekspor ke SAP ERP" [level=3] [ref=f13e117]
+            - paragraph [ref=f13e118]:
+              - text: "Total nominal transaksi yang telah tervalidasi dan siap dibayar:"
+              - strong [ref=f13e119]: Rp 94.035.000
+          - generic [ref=f13e120]:
+            - link "Unggah Faktur Baru" [ref=f13e121] [cursor=pointer]:
+              - /url: /dashboard/upload
+            - link "Buka Reviewer Workspace" [ref=f13e125] [cursor=pointer]:
+              - /url: /dashboard/verification
+        - generic [ref=f13e129]:
+          - generic [ref=f13e130]:
+            - generic [ref=f13e131]:
+              - heading "Dokumen Terbaru Diproses" [level=2] [ref=f13e132]
+              - paragraph [ref=f13e133]: Daftar faktur, invoice, dan kontrak terkini dalam sistem
+            - link "Lihat Semua Dokumen" [ref=f13e134] [cursor=pointer]:
+              - /url: /dashboard/documents
+          - table [ref=f13e138]:
+            - rowgroup [ref=f13e139]:
+              - row [ref=f13e140]:
+                - columnheader "Nomor Dokumen / Judul" [ref=f13e141]
+                - columnheader "Jenis Dokumen" [ref=f13e142]
+                - columnheader "Vendor / Entitas" [ref=f13e143]
+                - columnheader "Total Nilai" [ref=f13e144]
+                - columnheader "Akurasi" [ref=f13e145]
+                - columnheader "Status" [ref=f13e146]
+                - columnheader "Aksi" [ref=f13e147]
+            - rowgroup [ref=f13e148]:
+              - row [ref=f13e149]:
+                - cell "010.002-26.88219012 Faktur Pajak Standar - Layanan Cloud & Internet" [ref=f13e150]:
+                  - generic [ref=f13e151]: 010.002-26.88219012
+                  - generic [ref=f13e152]: Faktur Pajak Standar - Layanan Cloud & Internet
+                - cell "Faktur Pajak (e-Faktur)" [ref=f13e153]
+                - 'cell "PT Telkom Prima Nusantara NPWP: 01.345.678.9-012.000" [ref=f13e154]':
+                  - generic [ref=f13e155]: PT Telkom Prima Nusantara
+                  - generic [ref=f13e156]: "NPWP: 01.345.678.9-012.000"
+                - cell "Rp 49.950.000" [ref=f13e157]
+                - cell "88%" [ref=f13e158]
+                - cell "Perlu Verifikasi" [ref=f13e161]
+                - cell [ref=f13e163]:
+                  - link "Verifikasi" [ref=f13e164] [cursor=pointer]:
+                    - /url: /dashboard/verification?docId=doc-001
+              - row [ref=f13e167]:
+                - cell "INV/2026/02/GLI-9014 Invoice Ekspedisi Pengiriman Bahan Baku Cikarang - Surabaya" [ref=f13e168]:
+                  - generic [ref=f13e169]: INV/2026/02/GLI-9014
+                  - generic [ref=f13e170]: Invoice Ekspedisi Pengiriman Bahan Baku Cikarang - Surabaya
+                - cell "Invoice Komersial" [ref=f13e171]
+                - 'cell "PT Graha Logistik Indonesia NPWP: 02.987.654.3-054.000" [ref=f13e172]':
+                  - generic [ref=f13e173]: PT Graha Logistik Indonesia
+                  - generic [ref=f13e174]: "NPWP: 02.987.654.3-054.000"
+                - cell "Rp 20.535.000" [ref=f13e175]
+                - cell "96%" [ref=f13e176]
+                - cell "Terverifikasi" [ref=f13e179]
+                - cell [ref=f13e181]:
+                  - link "Detail" [ref=f13e182] [cursor=pointer]:
+                    - /url: /dashboard/documents
+              - row [ref=f13e183]:
+                - cell "PO-2026-0819-NTC Surat Pesanan Pembelian Server Rack 42U & UPS" [ref=f13e184]:
+                  - generic [ref=f13e185]: PO-2026-0819-NTC
+                  - generic [ref=f13e186]: Surat Pesanan Pembelian Server Rack 42U & UPS
+                - cell "Surat Pesanan (PO)" [ref=f13e187]
+                - 'cell "PT Kharisma Hardware Solusindo NPWP: 02.444.333.2-016.000" [ref=f13e188]':
+                  - generic [ref=f13e189]: PT Kharisma Hardware Solusindo
+                  - generic [ref=f13e190]: "NPWP: 02.444.333.2-016.000"
+                - cell "Rp 138.750.000" [ref=f13e191]
+                - cell "82%" [ref=f13e192]
+                - cell "Perlu Verifikasi" [ref=f13e195]
+                - cell [ref=f13e197]:
+                  - link "Verifikasi" [ref=f13e198] [cursor=pointer]:
+                    - /url: /dashboard/verification?docId=doc-003
+              - row [ref=f13e201]:
+                - cell "KTR-2026-0041-MSD Perjanjian Lisensi Enterprise SaaS & SLA Pemeliharaan Sistem" [ref=f13e202]:
+                  - generic [ref=f13e203]: KTR-2026-0041-MSD
+                  - generic [ref=f13e204]: Perjanjian Lisensi Enterprise SaaS & SLA Pemeliharaan Sistem
+                - cell "Perjanjian Kontrak" [ref=f13e205]
+                - 'cell "PT Mitra Solusi Digital Nusantara NPWP: 01.888.777.6-023.000" [ref=f13e206]':
+                  - generic [ref=f13e207]: PT Mitra Solusi Digital Nusantara
+                  - generic [ref=f13e208]: "NPWP: 01.888.777.6-023.000"
+                - cell "Rp 399.600.000" [ref=f13e209]
+                - cell "91%" [ref=f13e210]
+                - cell "Perlu Verifikasi" [ref=f13e213]
+                - cell [ref=f13e215]:
+                  - link "Verifikasi" [ref=f13e216] [cursor=pointer]:
+                    - /url: /dashboard/verification?docId=doc-004
+              - row [ref=f13e219]:
+                - cell "BPU/2026/02/ESB-091 Bukti Potong PPh Pasal 23 atas Jasa Konsultasi Energi Terbarukan" [ref=f13e220]:
+                  - generic [ref=f13e221]: BPU/2026/02/ESB-091
+                  - generic [ref=f13e222]: Bukti Potong PPh Pasal 23 atas Jasa Konsultasi Energi Terbarukan
+                - cell "Bukti Potong PPh" [ref=f13e223]
+                - 'cell "PT Energi Surya Bersama NPWP: 04.555.666.7-045.000" [ref=f13e224]':
+                  - generic [ref=f13e225]: PT Energi Surya Bersama
+                  - generic [ref=f13e226]: "NPWP: 04.555.666.7-045.000"
+                - cell "Rp 73.500.000" [ref=f13e227]
+                - cell "97%" [ref=f13e228]
+                - cell "Terverifikasi" [ref=f13e231]
+                - cell [ref=f13e233]:
+                  - link "Detail" [ref=f13e234] [cursor=pointer]:
+                    - /url: /dashboard/documents
+  - alert [ref=f13e235]

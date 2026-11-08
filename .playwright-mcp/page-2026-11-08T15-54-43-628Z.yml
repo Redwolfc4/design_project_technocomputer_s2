@@ -1,0 +1,76 @@
+- generic [active] [ref=f4e1]:
+  - generic [ref=f4e2]:
+    - complementary [ref=f4e3]:
+      - link "D DokumenAIEnterpriseDocument Intelligence" [ref=f4e5] [cursor=pointer]:
+        - /url: /
+        - generic [ref=f4e6]: D
+        - generic [ref=f4e7]:
+          - generic [ref=f4e8]: DokumenAIEnterprise
+          - text: Document Intelligence
+      - generic [ref=f4e9]:
+        - generic [ref=f4e10]: Peran Pengguna DemoSimulasi Aktif
+        - combobox [ref=f4e11]:
+          - option "Finance & Tax Supervisor (Dewi)" [selected]
+          - option "Super Admin / CISO (Budi)"
+          - option "Document Specialist (Rizky)"
+          - option "Compliance Auditor (Siti)"
+      - navigation [ref=f4e12]:
+        - link "Ringkasan Utama" [ref=f4e13] [cursor=pointer]:
+          - /url: /dashboard
+        - link "Unggah Batch" [ref=f4e17] [cursor=pointer]:
+          - /url: /dashboard/upload
+        - link [ref=f4e22] [cursor=pointer]:
+          - /url: /dashboard/verification
+          - generic [ref=f4e23]: Antrean Verifikasi
+          - text: "3"
+        - link "Repositori Dokumen" [ref=f4e27] [cursor=pointer]:
+          - /url: /dashboard/documents
+        - link "Ekspor & Integrasi" [ref=f4e32] [cursor=pointer]:
+          - /url: /dashboard/export
+        - link "Analisis Operasional" [ref=f4e37] [cursor=pointer]:
+          - /url: /dashboard/analytics
+        - link "Audit Trail Forensik" [ref=f4e43] [cursor=pointer]:
+          - /url: /dashboard/audit
+        - link "Tim & Hak Akses" [ref=f4e48] [cursor=pointer]:
+          - /url: /dashboard/users
+        - link "Pengaturan Workspace" [ref=f4e55] [cursor=pointer]:
+          - /url: /dashboard/settings
+      - generic [ref=f4e61]:
+        - generic [ref=f4e62]: D
+        - generic [ref=f4e63]: Dewi Lestari, S.E., Ak., CAFinance & Tax Operations Supervisor
+    - generic [ref=f4e65]:
+      - banner [ref=f4e66]:
+        - generic [ref=f4e67]:
+          - heading "Unggah Dokumen Batch & Profil Ekstraksi" [level=1] [ref=f4e68]
+          - paragraph [ref=f4e69]: Simulasi integrasi berkas PDF / gambar faktur pajak, invoice, atau PO dengan pipeline AI
+        - generic [ref=f4e70]:
+          - textbox "Cari nomor faktur, vendor, atau tag..." [ref=f4e75]
+          - button "Reset Demo Data" [ref=f4e76]
+      - main [ref=f4e82]:
+        - generic [ref=f4e83]:
+          - generic [ref=f4e84]:
+            - heading "Formulir Batch Upload Demo" [level=2] [ref=f4e85]
+            - paragraph [ref=f4e86]: Unggah berkas atau isi rincian faktur untuk langsung disimulasikan melalui pipeline AI OCR.
+          - generic [ref=f4e92]:
+            - paragraph [ref=f4e93]: Tarik berkas PDF/PNG ke sini, atau klik untuk memilih
+            - paragraph [ref=f4e94]: Mendukung e-Faktur PDF DJP, Faktur Komersial, PO hingga 25MB
+          - generic [ref=f4e95]:
+            - generic [ref=f4e96]:
+              - text: Profil / Jenis Dokumen
+              - combobox [ref=f4e97]:
+                - option "Faktur Pajak (e-Faktur DJP)" [selected]
+                - option "Invoice Komersial AP"
+                - option "Surat Pesanan (PO)"
+                - option "Perjanjian Kontrak"
+                - option "Bukti Potong PPh 23/26"
+            - generic [ref=f4e98]:
+              - text: Nomor Seri / Referensi
+              - 'textbox "Contoh: 010.002-26.99410123" [ref=f4e99]': 010.002-26.99410123
+            - generic [ref=f4e100]:
+              - text: Nama Vendor Rekanan
+              - 'textbox "Contoh: PT Telkom Prima Nusantara" [ref=f4e101]': PT Telkom Prima Nusantara
+            - generic [ref=f4e102]:
+              - text: Nominal DPP / Subtotal (IDR)
+              - spinbutton "35000000" [ref=f4e103]
+          - button "Mulai Ekstraksi AI & Buka Verifikasi" [ref=f4e105]
+  - alert [ref=f4e108]
