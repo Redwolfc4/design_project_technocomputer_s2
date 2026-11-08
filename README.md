@@ -122,30 +122,22 @@ DokumenAI Enterprise mengintegrasikan seluruh rantai pemrosesan dokumen:
 
 ---
 
-## 7. Alur Kerja Sistem (System Workflow)
+## 7. Alur Kerja Sistem (System Workflow Diagram)
 
-```mermaid
-flowchart TD
-    A["Mulai: Dokumen Diterima (PDF/Scan)"] --> B["Batch Upload & Profiling"]
-    B --> C["Preprocessing & OCR Pipeline"]
-    C --> D["Ekstraksi Bidang & Penilaian Skor Keyakinan"]
-    D --> E{"Skor >= Ambang Batas (misal: 95%) & Aritmatika Sesuai?"}
-    
-    E -- "Ya (Auto-Match)" --> F["Disetujui Otomatis (Approved)"]
-    E -- "Tidak (Perlu Verifikasi)" --> G["Masuk Antrean Human-in-the-Loop"]
-    
-    G --> H["Reviewer Memeriksa Dokumen & Bounding Box"]
-    H --> I{"Keputusan Reviewer"}
-    
-    I -- "Nilai Dikoreksi & Disetujui" --> F
-    I -- "Berkas Buram / Data Cacat" --> J["Ditolak (Rejected) + Catatan Koreksi"]
-    
-    F --> K["Generate Ekspor Terpetakan (SAP / Oracle / CSV DJP)"]
-    K --> L["Pengiriman Webhook / Posting ke ERP Core"]
-    F --> M["Pencatatan Permanen di Audit Trail Forensik"]
-    J --> M
-    L --> N["Selesai: Arsip Terekonsiliasi"]
-```
+Berikut adalah diagram alur kerja terpadu DokumenAI Enterprise dari fase penerimaan berkas, penilaian skor AI, verifikasi *human-in-the-loop*, hingga posting ke sistem ERP dan pencatatan audit forensik:
+
+![Diagram Alur Kerja Sistem](/public/illustrations/system-workflow-diagram.svg)
+
+### Rincian Tahapan Alur Kerja:
+1. **Dokumen Masuk**: Berkas PDF atau scan gambar (e-Faktur, Invoice AP, Purchase Order) diterima sistem.
+2. **Batch Upload & Profiling**: Sistem memvalidasi tipe file, ukuran, dan memilih skema profil ekstraksi yang relevan.
+3. **OCR & Field Extraction**: Mesin membaca data visual dan mengekstrak entitas (*key-value pairs*) beserta penanda koordinat (*bounding box*).
+4. **Evaluasi Aturan Bisnis & Ambang Batas**:
+   - Jika **Skor Keyakinan ≥ 95%** dan formula aritmatika (DPP + PPN 11%/12%) cocok: Dokumen langsung berstatus **Disetujui Otomatis (Straight-Through Processing)**.
+   - Jika di bawah ambang batas atau ada anomali: Berkas dialihkan ke **Antrean Human-in-the-Loop**.
+5. **Verifikasi Human-in-the-Loop**: Spesialis verifikator memeriksa lembar dokumen dengan penyorot visual dua arah, mengoreksi nilai jika perlu, atau menolak jika berkas fisik buram/cacat.
+6. **Ekspor & Sinkronisasi ERP**: Berkas yang disetujui dipetakan ke format siap posting (SAP S/4HANA, Oracle Cloud, DJP Tax CSV).
+7. **Audit Trail Forensik**: Seluruh aksi persetujuan, koreksi nilai, atau penolakan dicatat permanen dengan stempel waktu ISO, nama aktor, dan alamat IP.
 
 ---
 
