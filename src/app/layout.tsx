@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import './globals.css';
+import './compiled.css';
 
 export const metadata: Metadata = {
   title: 'DokumenAI Enterprise — Intelligent Document Processing (IDP)',
