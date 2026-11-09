@@ -9,6 +9,7 @@ import {
   ArrowRightIcon,
   LayersIcon,
 } from '@/components/ui/icons';
+import { BrandLogo } from '@/components/shared/BrandLogo';
 
 export default function MarketingHomePage() {
   return (
@@ -17,19 +18,8 @@ export default function MarketingHomePage() {
       <header className="border-b border-[#E2E8F0] bg-white/95 backdrop-blur-md sticky top-0 z-50 py-3 sm:py-4">
         <div className="max-w-screen-2xl mx-auto px-6 lg:px-12 flex items-center justify-between">
           <div className="flex items-center gap-10">
-            <Link href="/" className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-[#4F46E5] flex items-center justify-center text-white font-black text-lg shadow-sm">
-                D
-              </div>
-              <div className="flex flex-col">
-                <span className="font-bold text-[16px] leading-tight tracking-tight text-[#0F172A] flex items-center gap-1.5">
-                  DokumenAI
-                  <span className="text-[10px] uppercase px-1.5 py-0.5 rounded font-bold bg-[#EEF2FF] text-[#4F46E5]">
-                    Enterprise
-                  </span>
-                </span>
-                <span className="text-[11px] text-[#64748B]">Document Intelligence</span>
-              </div>
+            <Link href="/" className="hover:opacity-90 transition-opacity">
+              <BrandLogo size={36} textSize="base" />
             </Link>
 
             <nav className="hidden md:flex items-center gap-7 text-xs font-semibold text-[#475569]">
@@ -110,7 +100,7 @@ export default function MarketingHomePage() {
             <div className="lg:col-span-6 relative flex justify-center">
               <div className="w-full max-w-xl rounded-2xl border border-[#CBD5E1] bg-white p-2 shadow-2xl shadow-indigo-500/5">
                 <Image
-                  src="/illustrations/hero-document-flow.svg"
+                  src="/images/features/hero-document-flow.webp"
                   alt="Ilustrasi Pemrosesan Dokumen Enterprise DokumenAI"
                   width={800}
                   height={520}
@@ -176,7 +166,7 @@ export default function MarketingHomePage() {
             <div className="lg:col-span-6 relative">
               <div className="rounded-2xl border border-[#CBD5E1] bg-white p-2 shadow-xl">
                 <Image
-                  src="/illustrations/verification-workspace.svg"
+                  src="/images/features/verification-workspace.webp"
                   alt="Ilustrasi Human-in-the-loop Verification Workspace"
                   width={700}
                   height={420}
@@ -252,7 +242,7 @@ export default function MarketingHomePage() {
             <div className="lg:col-span-6 relative">
               <div className="rounded-2xl border border-[#CBD5E1] bg-white p-2 shadow-xl">
                 <Image
-                  src="/illustrations/enterprise-integrations.svg"
+                  src="/images/features/enterprise-integrations.webp"
                   alt="Ilustrasi Integrasi Enterprise DokumenAI"
                   width={600}
                   height={380}
@@ -344,12 +334,9 @@ export default function MarketingHomePage() {
       {/* Footer */}
       <footer className="bg-white border-t border-[#E2E8F0] py-12">
         <div className="max-w-screen-2xl mx-auto px-6 lg:px-12 flex flex-col md:flex-row items-center justify-between gap-6">
-          <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-lg bg-[#4F46E5] flex items-center justify-center text-white font-bold text-sm">
-              D
-            </div>
-            <span className="font-bold text-sm text-[#0F172A]">DokumenAI Enterprise</span>
-          </div>
+          <Link href="/" className="hover:opacity-90 transition-opacity">
+            <BrandLogo size={28} showText={true} subtitle="" textSize="sm" />
+          </Link>
 
           <p className="text-xs text-[#64748B] text-center md:text-right">
             © 2026 PT Nusantara Teknologi Cipta. Aplikasi Demonstrasi Intelligent Document Processing.

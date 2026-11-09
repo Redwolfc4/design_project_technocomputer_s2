@@ -17,6 +17,7 @@ import {
 import { MockDocumentService } from '@/lib/mocks/storage';
 import { UserPersona, UserRole } from '@/types';
 import { DEMO_PERSONAS } from '@/lib/constants/personas';
+import { BrandLogo } from '@/components/shared/BrandLogo';
 
 export function Sidebar() {
   const pathname = usePathname();
@@ -69,19 +70,8 @@ export function Sidebar() {
     <aside className="w-64 border-r border-[#E2E8F0] dark:border-[#1F2937] bg-white dark:bg-[#111827] flex flex-col h-screen fixed left-0 top-0 z-30 transition-all select-none">
       {/* Brand Header */}
       <div className="h-16 flex items-center px-6 border-b border-[#E2E8F0] dark:border-[#1F2937]">
-        <Link href="/" className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-[#4F46E5] flex items-center justify-center text-white font-black text-lg shadow-sm">
-            D
-          </div>
-          <div className="flex flex-col">
-            <span className="font-bold text-[15px] leading-tight tracking-tight text-[#0F172A] dark:text-white flex items-center gap-1.5">
-              DokumenAI
-              <span className="text-[9px] uppercase px-1.5 py-0.5 rounded font-bold bg-[#EEF2FF] text-[#4F46E5] dark:bg-[#1E1B4B] dark:text-[#818CF8]">
-                Enterprise
-              </span>
-            </span>
-            <span className="text-[11px] text-[#64748B] dark:text-[#94A3B8]">Document Intelligence</span>
-          </div>
+        <Link href="/" className="hover:opacity-90 transition-opacity">
+          <BrandLogo size={32} />
         </Link>
       </div>
 
@@ -114,11 +104,10 @@ export function Sidebar() {
             <Link
               key={item.href}
               href={item.href}
-              className={`flex items-center justify-between px-3 py-2 rounded-md text-xs font-medium transition-colors ${
-                isActive
-                  ? 'bg-[#EEF2FF] dark:bg-[#1E1B4B]/80 text-[#4F46E5] dark:text-[#818CF8] font-semibold'
-                  : 'text-[#475569] dark:text-[#94A3B8] hover:bg-[#F8FAFC] dark:hover:bg-[#1F2937] hover:text-[#0F172A] dark:hover:text-white'
-              }`}
+              className={`flex items-center justify-between px-3 py-2 rounded-md text-xs font-medium transition-colors ${isActive
+                ? 'bg-[#EEF2FF] dark:bg-[#1E1B4B]/80 text-[#4F46E5] dark:text-[#818CF8] font-semibold'
+                : 'text-[#475569] dark:text-[#94A3B8] hover:bg-[#F8FAFC] dark:hover:bg-[#1F2937] hover:text-[#0F172A] dark:hover:text-white'
+                }`}
             >
               <div className="flex items-center gap-2.5">
                 <Icon className={`w-4 h-4 ${isActive ? 'text-[#4F46E5] dark:text-[#818CF8]' : 'text-[#64748B]'}`} />

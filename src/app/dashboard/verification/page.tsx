@@ -1,10 +1,9 @@
 'use client';
 
-import React, { useState, useEffect, Suspense } from 'react';
+import React, { Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Topbar } from '@/components/layout/Topbar';
-import { MockDocumentService } from '@/lib/mocks/storage';
-import { DocumentRecord } from '@/types';
+import { VerificationProvider, useVerification } from '@/context/VerificationContext';
 import { formatIDR, getDocumentTypeLabel, getStatusBadgeInfo } from '@/lib/utils/formatters';
 import {
   CheckIcon,
@@ -12,99 +11,22 @@ import {
   AlertTriangleIcon,
 } from '@/components/ui/icons';
 
-function VerificationContent() {
-  const searchParams = useSearchParams();
-  const docIdParam = searchParams.get('docId');
-
-  const [documents, setDocuments] = useState<DocumentRecord[]>([]);
-  const [activeDoc, setActiveDoc] = useState<DocumentRecord | null>(null);
-  const [selectedFieldId, setSelectedFieldId] = useState<string | null>(null);
-  const [reviewerNote, setReviewerNote] = useState('');
-  const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
-
-  useEffect(() => {
-    const docs = MockDocumentService.getDocuments();
-    setDocuments(docs);
-
-    if (docIdParam) {
-      const found = docs.find((d) => d.id === docIdParam);
-      if (found) {
-        setActiveDoc(found);
-        if (found.fields.length > 0) {
-          setSelectedFieldId(found.fields[0].id);
-        }
-        return;
-      }
-    }
-
-    const firstPending = docs.find((d) => d.status === 'needs_review') || docs[0];
-    if (firstPending) {
-      setActiveDoc(firstPending);
-      if (firstPending.fields.length > 0) {
-        setSelectedFieldId(firstPending.fields[0].id);
-      }
-    }
-  }, [docIdParam]);
-
-  const handleFieldChange = (fieldId: string, newValue: string) => {
-    if (!activeDoc) return;
-    const updatedFields = activeDoc.fields.map((f) => {
-      if (f.id === fieldId) {
-        return {
-          ...f,
-          value: newValue,
-          isEdited: true,
-          validationStatus: 'valid' as const,
-          validationMessage: undefined,
-        };
-      }
-      return f;
-    });
-
-    const updatedDoc = {
-      ...activeDoc,
-      fields: updatedFields,
-    };
-
-    setActiveDoc(updatedDoc);
-    MockDocumentService.saveDocument(updatedDoc);
-  };
-
-  const handleApprove = () => {
-    if (!activeDoc) return;
-    const currentUser = MockDocumentService.getCurrentUser();
-    const updated = MockDocumentService.updateDocumentStatus(
-      activeDoc.id,
-      'approved',
-      currentUser.name,
-      reviewerNote || 'Disetujui setelah verifikasi kelengkapan faktur'
-    );
-    if (updated) {
-      setActiveDoc(updated);
-      setNotification({ message: 'Dokumen berhasil disetujui dan dicatat ke audit log!', type: 'success' });
-      setTimeout(() => setNotification(null), 4000);
-    }
-  };
-
-  const handleReject = () => {
-    if (!activeDoc) return;
-    if (!reviewerNote) {
-      alert('Harap masukkan catatan/alasan penolakan terlebih dahulu.');
-      return;
-    }
-    const currentUser = MockDocumentService.getCurrentUser();
-    const updated = MockDocumentService.updateDocumentStatus(
-      activeDoc.id,
-      'rejected',
-      currentUser.name,
-      reviewerNote
-    );
-    if (updated) {
-      setActiveDoc(updated);
-      setNotification({ message: 'Dokumen ditolak dan catatan dikirim ke pengunggah.', type: 'error' });
-      setTimeout(() => setNotification(null), 4000);
-    }
-  };
+function VerificationWorkspaceInner() {
+  const {
+    documents,
+    activeDocId,
+    activeDoc,
+    activeDraft,
+    selectedFieldId,
+    notification,
+    selectDocument,
+    setSelectedFieldId,
+    updateFieldDraft,
+    updateNoteDraft,
+    approveDocument,
+    rejectDocument,
+    clearNotification,
+  } = useVerification();
 
   const pendingList = documents.filter((d) => d.status === 'needs_review');
 
@@ -115,21 +37,28 @@ function VerificationContent() {
         subtitle="Verifikasi berdampingan: Pratinjau berkas asli dengan anotasi visual & formulir koreksi nilai AI"
       />
 
+      {/* Global Notification Banner */}
       {notification && (
         <div
-          className={`px-8 py-2.5 text-xs font-bold text-white flex items-center justify-between ${
+          className={`px-8 py-2.5 text-xs font-bold text-white flex items-center justify-between transition-all ${
             notification.type === 'success' ? 'bg-[#059669]' : 'bg-[#E11D48]'
           }`}
         >
           <span>{notification.message}</span>
-          <button onClick={() => setNotification(null)}>
+          <button
+            type="button"
+            onClick={clearNotification}
+            className="p-1 hover:opacity-80 transition-opacity"
+          >
             <XIcon className="w-4 h-4" />
           </button>
         </div>
       )}
 
       <div className="flex-1 flex overflow-hidden">
-        {/* Left Column 1: Verification Queue List */}
+        {/* ======================================================== */}
+        {/* Left Column 1: Verification Queue List                    */}
+        {/* ======================================================== */}
         <div className="w-80 border-r border-[#E2E8F0] bg-white flex flex-col h-full">
           <div className="p-4 border-b border-[#E2E8F0] bg-[#FAFAFF] flex items-center justify-between">
             <span className="text-xs font-bold uppercase tracking-wider text-[#475569]">
@@ -142,15 +71,13 @@ function VerificationContent() {
 
           <div className="flex-1 overflow-y-auto divide-y divide-[#E2E8F0]">
             {documents.map((doc) => {
-              const isSelected = activeDoc?.id === doc.id;
+              const isSelected = activeDocId === doc.id;
               const badge = getStatusBadgeInfo(doc.status);
               return (
                 <button
                   key={doc.id}
-                  onClick={() => {
-                    setActiveDoc(doc);
-                    if (doc.fields.length > 0) setSelectedFieldId(doc.fields[0].id);
-                  }}
+                  type="button"
+                  onClick={() => selectDocument(doc.id)}
                   className={`w-full text-left p-4 transition-colors flex flex-col gap-1.5 ${
                     isSelected ? 'bg-[#EEF2FF] border-l-4 border-[#4F46E5]' : 'hover:bg-[#F8FAFC]'
                   }`}
@@ -184,7 +111,9 @@ function VerificationContent() {
           </div>
         </div>
 
-        {/* Center Column: Visual Document Preview with Bounding Box Overlay */}
+        {/* ======================================================== */}
+        {/* Center Column: Visual Document Preview & Extraction Box  */}
+        {/* ======================================================== */}
         <div className="flex-1 bg-[#F1F5F9] p-6 flex flex-col overflow-y-auto items-center justify-start">
           <div className="w-full max-w-2xl bg-white rounded-xl shadow-lg border border-[#CBD5E1] p-8 relative min-h-[640px] flex flex-col justify-between select-none">
             <div className="absolute top-3 right-4 flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#EEF2FF] border border-[#CBD5E1] text-[#4F46E5] text-[10px] font-bold uppercase tracking-wider">
@@ -212,7 +141,7 @@ function VerificationContent() {
                   </div>
 
                   <div className="grid grid-cols-1 gap-3">
-                    {activeDoc.fields.map((field) => {
+                    {(activeDraft?.fields || activeDoc.fields).map((field) => {
                       const isHighlighted = selectedFieldId === field.id;
                       return (
                         <div
@@ -293,17 +222,31 @@ function VerificationContent() {
           </div>
         </div>
 
-        {/* Right Column: Extracted Data Editor & Review Decision */}
+        {/* ======================================================== */}
+        {/* Right Column: Debounced Auto-Sync Editor & Direct Actions */}
+        {/* ======================================================== */}
         <div className="w-96 border-l border-[#E2E8F0] bg-white flex flex-col h-full">
           <div className="p-4 border-b border-[#E2E8F0] bg-[#FAFAFF] flex items-center justify-between">
             <span className="text-xs font-bold uppercase tracking-wider text-[#475569]">
               Editor Nilai Ekstraksi
             </span>
-            <span className="text-[10px] font-bold text-[#4F46E5]">Ambang: 95%</span>
+            <div className="flex items-center gap-1.5">
+              {activeDraft?.isSaving ? (
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-indigo-50 text-[#4F46E5] border border-indigo-200 animate-pulse flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#4F46E5] animate-ping" />
+                  <span>Menyimpan...</span>
+                </span>
+              ) : (
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                  <span>Tersinkronisasi Otomatis</span>
+                </span>
+              )}
+            </div>
           </div>
 
           <div className="flex-1 overflow-y-auto p-5 space-y-5">
-            {activeDoc && (
+            {activeDoc && activeDraft && (
               <>
                 <div className="p-3.5 rounded-lg border border-[#CBD5E1] bg-[#FAFAFF] space-y-1">
                   <div className="text-[10px] font-bold uppercase tracking-wider text-[#64748B]">
@@ -319,7 +262,7 @@ function VerificationContent() {
                 </div>
 
                 <div className="space-y-4">
-                  {activeDoc.fields.map((field) => (
+                  {activeDraft.fields.map((field) => (
                     <div
                       key={field.id}
                       className={`space-y-1.5 p-3 rounded-lg border transition-all ${
@@ -333,7 +276,7 @@ function VerificationContent() {
                           {field.label}
                         </label>
                         <span
-                          className={`text-[9px] font-bold px-1.5 py-0.2 rounded ${
+                          className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
                             field.confidence >= 0.9 ? 'text-[#059669]' : 'text-[#F59E0B]'
                           }`}
                         >
@@ -343,7 +286,7 @@ function VerificationContent() {
                       <input
                         type="text"
                         value={field.value}
-                        onChange={(e) => handleFieldChange(field.id, e.target.value)}
+                        onChange={(e) => updateFieldDraft(activeDoc.id, field.id, e.target.value)}
                         onFocus={() => setSelectedFieldId(field.id)}
                         className="w-full text-xs font-semibold px-3 py-2 rounded-md border border-[#CBD5E1] bg-white text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#4F46E5]"
                       />
@@ -362,8 +305,8 @@ function VerificationContent() {
                   <textarea
                     rows={3}
                     placeholder="Tuliskan catatan rekonsiliasi atau alasan revisi..."
-                    value={reviewerNote}
-                    onChange={(e) => setReviewerNote(e.target.value)}
+                    value={activeDraft.reviewerNote}
+                    onChange={(e) => updateNoteDraft(activeDoc.id, e.target.value)}
                     className="w-full text-xs px-3 py-2 rounded-md border border-[#CBD5E1] bg-white text-[#0F172A] focus:outline-none focus:ring-1 focus:ring-[#4F46E5]"
                   />
                 </div>
@@ -371,22 +314,29 @@ function VerificationContent() {
             )}
           </div>
 
-          <div className="p-4 border-t border-[#E2E8F0] bg-[#FAFAFF] flex items-center gap-3">
-            <button
-              onClick={handleReject}
-              className="flex-1 flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-lg border border-[#E11D48] text-[#E11D48] hover:bg-rose-50 text-xs font-bold transition-colors"
-            >
-              <XIcon className="w-4 h-4" />
-              <span>Tolak Faktur</span>
-            </button>
+          {/* Action Buttons: Bersih Langsung Tolak & Setujui */}
+          <div className="p-4 border-t border-[#E2E8F0] bg-[#FAFAFF]">
+            {activeDoc && (
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => rejectDocument(activeDoc.id)}
+                  className="flex-1 flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-lg border border-[#E11D48] text-[#E11D48] hover:bg-rose-50 text-xs font-bold transition-colors"
+                >
+                  <XIcon className="w-4 h-4" />
+                  <span>Tolak Faktur</span>
+                </button>
 
-            <button
-              onClick={handleApprove}
-              className="flex-1 flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-lg bg-[#059669] hover:bg-[#047857] text-white text-xs font-bold shadow-sm transition-colors"
-            >
-              <CheckIcon className="w-4 h-4" />
-              <span>Setujui (Approve)</span>
-            </button>
+                <button
+                  type="button"
+                  onClick={() => approveDocument(activeDoc.id)}
+                  className="flex-1 flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-lg bg-[#059669] hover:bg-[#047857] text-white text-xs font-bold shadow-sm transition-colors"
+                >
+                  <CheckIcon className="w-4 h-4" />
+                  <span>Setujui (Approve)</span>
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -394,10 +344,21 @@ function VerificationContent() {
   );
 }
 
+function VerificationContentWrapper() {
+  const searchParams = useSearchParams();
+  const docIdParam = searchParams.get('docId');
+
+  return (
+    <VerificationProvider initialDocId={docIdParam}>
+      <VerificationWorkspaceInner />
+    </VerificationProvider>
+  );
+}
+
 export default function VerificationPage() {
   return (
     <Suspense fallback={<div className="p-8 text-center text-xs text-[#64748B]">Memuat Workspace Verifikasi...</div>}>
-      <VerificationContent />
+      <VerificationContentWrapper />
     </Suspense>
   );
 }

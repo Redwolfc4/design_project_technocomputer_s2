@@ -2,6 +2,7 @@ import React from 'react';
 import Link from 'next/link';
 import { Topbar } from '@/components/layout/Topbar';
 import { FileTextIcon, ArrowRightIcon } from '@/components/ui/icons';
+import { BrandLogo } from '@/components/shared/BrandLogo';
 
 interface MarketingPageProps {
   title: string;
@@ -15,11 +16,8 @@ export function MarketingPageTemplate({ title, subtitle, description, points }: 
     <div className="min-h-screen bg-[#FAFAFF] flex flex-col font-sans">
       <header className="border-b border-[#E2E8F0] bg-white sticky top-0 z-50 py-3 sm:py-4">
         <div className="max-w-screen-2xl mx-auto px-6 lg:px-12 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-[#4F46E5] flex items-center justify-center text-white font-black text-lg">
-              D
-            </div>
-            <span className="font-bold text-base text-[#0F172A]">DokumenAI Enterprise</span>
+          <Link href="/" className="hover:opacity-90 transition-opacity">
+            <BrandLogo size={32} textSize="base" subtitle="" />
           </Link>
           <div className="flex items-center gap-3">
             <Link href="/" className="text-xs font-semibold text-[#475569] hover:text-[#0F172A]">

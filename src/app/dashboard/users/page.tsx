@@ -9,6 +9,14 @@ import {
 } from '@/lib/mocks/rbacUsers';
 import { RBACActionMenu } from '@/components/shared/RBACActionMenu';
 import {
+  DataTableRow,
+  useDataTableInteractions,
+  DataTableToolbar,
+  DataTablePagination,
+  DataTableEmptyState,
+  FilterConfig,
+} from '@/components/shared/data-table';
+import {
   ShieldCheckIcon,
   SearchIcon,
   XIcon,
@@ -62,11 +70,17 @@ export default function UsersManagementPage() {
   const [deleteUser, setDeleteUser] = useState<RBACMember | null>(null);
   const [isAddOpen, setIsAddOpen] = useState(false);
 
-  // Active Action Menu (Shared for 3-dot dropdown & right-click context menu)
-  const [activeMenu, setActiveMenu] = useState<{
-    user: RBACMember;
-    position: { x: number; y: number };
-  } | null>(null);
+  // Active Action Menu interactions (3-dot dropdown hover/click & right-click context menu)
+  const {
+    activeMenu,
+    closeMenu,
+    openDropdownMenu,
+    handleButtonMouseEnter,
+    handleButtonMouseLeave,
+    cancelScheduledClose,
+    scheduleCloseMenu,
+    openContextMenu,
+  } = useDataTableInteractions<RBACMember>();
 
   // Form state for Add/Edit
   const [formData, setFormData] = useState({
@@ -93,6 +107,16 @@ export default function UsersManagementPage() {
     }
   }, [toast]);
 
+  // Escape key handler for viewUser modal
+  useEffect(() => {
+    if (!viewUser) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setViewUser(null);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [viewUser]);
+
   // Derived options for filter dropdowns
   const uniqueDepartments = useMemo(() => {
     const depts = new Set<string>();
@@ -105,6 +129,12 @@ export default function UsersManagementPage() {
     users.forEach((u) => roles.add(u.roleTitle));
     return Array.from(roles);
   }, [users]);
+
+  const permMap = useMemo(() => {
+    const map = new Map<string, string>();
+    ALL_AVAILABLE_PERMISSIONS.forEach((p) => map.set(p.key, p.label));
+    return map;
+  }, []);
 
   // Filtered lists for searchable dropdowns
   const filteredDeptOptions = useMemo(() => {
@@ -420,6 +450,64 @@ export default function UsersManagementPage() {
     setToast({ message: `Berhasil mengekspor ${dataToExport.length} data ke berkas Excel (.xls)!`, type: 'success' });
   };
 
+  // Filter configurations for DataTableToolbar
+  const filterConfigs: FilterConfig[] = [
+    {
+      id: 'department',
+      label: 'Departemen',
+      type: 'select',
+      placeholder: 'Semua',
+      options: [
+        { label: 'Semua Departemen', value: 'Semua' },
+        ...uniqueDepartments.map((d) => ({ label: d, value: d })),
+      ],
+      selectedValue: selectedDept,
+      onChange: (val) => setSelectedDept(val),
+      searchable: true,
+    },
+    {
+      id: 'role',
+      label: 'Role Sistem',
+      type: 'select',
+      placeholder: 'Semua',
+      options: [
+        { label: 'Semua Role', value: 'Semua' },
+        ...uniqueRoles.map((r) => ({ label: r, value: r })),
+      ],
+      selectedValue: selectedRole,
+      onChange: (val) => setSelectedRole(val),
+      searchable: true,
+    },
+    {
+      id: 'status',
+      label: 'Status',
+      type: 'select',
+      placeholder: 'Semua',
+      options: [
+        { label: 'Semua', value: 'Semua' },
+        { label: 'Aktif', value: 'Aktif' },
+        { label: 'Nonaktif', value: 'Nonaktif' },
+      ],
+      selectedValue: selectedStatus,
+      onChange: (val) => setSelectedStatus(val),
+      searchable: false,
+    },
+    {
+      id: 'permissions',
+      label: 'Hak Akses',
+      type: 'multi-select',
+      placeholder: 'Semua Hak Akses',
+      options: ALL_AVAILABLE_PERMISSIONS.map((p) => ({
+        label: p.label,
+        value: p.key,
+        category: p.category,
+      })),
+      selectedValue: selectedPermissions,
+      onChange: (vals) => setSelectedPermissions(vals),
+      searchable: true,
+    },
+  ];
+
   return (
     <div className="flex-1 flex flex-col font-sans">
       <Topbar
@@ -456,346 +544,26 @@ export default function UsersManagementPage() {
           </div>
         </div>
 
-        {/* Toolbar Card */}
-        <div className="rounded-xl border border-[#E2E8F0] bg-white p-5 shadow-xs space-y-4">
-          {/* 1. Search Bar */}
-          <div className="relative">
-            <SearchIcon className="w-4 h-4 text-[#94A3B8] absolute left-3.5 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Cari nama, email, departemen, atau role..."
-              className="w-full pl-10 pr-10 py-2.5 bg-[#FAFAFF] border border-[#CBD5E1] rounded-lg text-xs text-[#0F172A] placeholder-[#94A3B8] focus:outline-none focus:border-[#4F46E5] focus:bg-white transition-all shadow-xs"
-            />
-            {searchQuery && (
-              <button
-                onClick={() => setSearchQuery('')}
-                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#94A3B8] hover:text-[#0F172A]"
-                title="Hapus pencarian"
-              >
-                <XIcon className="w-4 h-4" />
-              </button>
-            )}
-          </div>
-
-          {/* 2. 4 Searchable Filters Row */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            {/* Filter 1: Departemen */}
-            <div className="relative">
-              <label className="block text-[11px] font-bold text-[#64748B] uppercase tracking-wider mb-1">
-                Departemen
-              </label>
-              <button
-                type="button"
-                onClick={() => {
-                  setIsDeptOpen(!isDeptOpen);
-                  setIsRoleOpen(false);
-                  setIsStatusOpen(false);
-                  setIsPermOpen(false);
-                }}
-                className="w-full flex items-center justify-between px-3 py-2 bg-[#FAFAFF] border border-[#CBD5E1] rounded-lg text-xs text-[#0F172A] hover:bg-white transition-colors"
-              >
-                <span className="truncate">{selectedDept}</span>
-                <ChevronDownIcon className="w-3.5 h-3.5 text-[#64748B] shrink-0 ml-1.5" />
-              </button>
-
-              {isDeptOpen && (
-                <div className="absolute left-0 mt-1 w-64 bg-white border border-[#CBD5E1] rounded-lg shadow-xl z-30 p-2 space-y-1">
-                  <input
-                    type="text"
-                    value={deptSearch}
-                    onChange={(e) => setDeptSearch(e.target.value)}
-                    placeholder="Cari departemen..."
-                    className="w-full px-2.5 py-1.5 text-xs border border-[#E2E8F0] rounded mb-1 focus:outline-none focus:border-[#4F46E5]"
-                    autoFocus
-                  />
-                  <div className="max-h-48 overflow-y-auto space-y-0.5">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSelectedDept('Semua');
-                        setIsDeptOpen(false);
-                        setDeptSearch('');
-                      }}
-                      className={`w-full text-left px-2.5 py-1.5 rounded text-xs flex items-center justify-between hover:bg-[#EEF2FF] ${
-                        selectedDept === 'Semua' ? 'bg-[#EEF2FF] text-[#4F46E5] font-bold' : 'text-[#334155]'
-                      }`}
-                    >
-                      <span>Semua Departemen</span>
-                      {selectedDept === 'Semua' && <CheckIcon className="w-3.5 h-3.5 text-[#4F46E5]" />}
-                    </button>
-                    {filteredDeptOptions.map((dept) => (
-                      <button
-                        key={dept}
-                        type="button"
-                        onClick={() => {
-                          setSelectedDept(dept);
-                          setIsDeptOpen(false);
-                          setDeptSearch('');
-                        }}
-                        className={`w-full text-left px-2.5 py-1.5 rounded text-xs flex items-center justify-between hover:bg-[#EEF2FF] ${
-                          selectedDept === dept ? 'bg-[#EEF2FF] text-[#4F46E5] font-bold' : 'text-[#334155]'
-                        }`}
-                      >
-                        <span className="truncate">{dept}</span>
-                        {selectedDept === dept && <CheckIcon className="w-3.5 h-3.5 text-[#4F46E5]" />}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Filter 2: Peran Sistem */}
-            <div className="relative">
-              <label className="block text-[11px] font-bold text-[#64748B] uppercase tracking-wider mb-1">
-                Role Sistem
-              </label>
-              <button
-                type="button"
-                onClick={() => {
-                  setIsRoleOpen(!isRoleOpen);
-                  setIsDeptOpen(false);
-                  setIsStatusOpen(false);
-                  setIsPermOpen(false);
-                }}
-                className="w-full flex items-center justify-between px-3 py-2 bg-[#FAFAFF] border border-[#CBD5E1] rounded-lg text-xs text-[#0F172A] hover:bg-white transition-colors"
-              >
-                <span className="truncate">{selectedRole}</span>
-                <ChevronDownIcon className="w-3.5 h-3.5 text-[#64748B] shrink-0 ml-1.5" />
-              </button>
-
-              {isRoleOpen && (
-                <div className="absolute left-0 mt-1 w-64 bg-white border border-[#CBD5E1] rounded-lg shadow-xl z-30 p-2 space-y-1">
-                  <input
-                    type="text"
-                    value={roleSearch}
-                    onChange={(e) => setRoleSearch(e.target.value)}
-                    placeholder="Cari peran..."
-                    className="w-full px-2.5 py-1.5 text-xs border border-[#E2E8F0] rounded mb-1 focus:outline-none focus:border-[#4F46E5]"
-                    autoFocus
-                  />
-                  <div className="max-h-48 overflow-y-auto space-y-0.5">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSelectedRole('Semua');
-                        setIsRoleOpen(false);
-                        setRoleSearch('');
-                      }}
-                      className={`w-full text-left px-2.5 py-1.5 rounded text-xs flex items-center justify-between hover:bg-[#EEF2FF] ${
-                        selectedRole === 'Semua' ? 'bg-[#EEF2FF] text-[#4F46E5] font-bold' : 'text-[#334155]'
-                      }`}
-                    >
-                      <span>Semua Role</span>
-                      {selectedRole === 'Semua' && <CheckIcon className="w-3.5 h-3.5 text-[#4F46E5]" />}
-                    </button>
-                    {filteredRoleOptions.map((role) => (
-                      <button
-                        key={role}
-                        type="button"
-                        onClick={() => {
-                          setSelectedRole(role);
-                          setIsRoleOpen(false);
-                          setRoleSearch('');
-                        }}
-                        className={`w-full text-left px-2.5 py-1.5 rounded text-xs flex items-center justify-between hover:bg-[#EEF2FF] ${
-                          selectedRole === role ? 'bg-[#EEF2FF] text-[#4F46E5] font-bold' : 'text-[#334155]'
-                        }`}
-                      >
-                        <span className="truncate">{role}</span>
-                        {selectedRole === role && <CheckIcon className="w-3.5 h-3.5 text-[#4F46E5]" />}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Filter 3: Status */}
-            <div className="relative">
-              <label className="block text-[11px] font-bold text-[#64748B] uppercase tracking-wider mb-1">
-                Status
-              </label>
-              <button
-                type="button"
-                onClick={() => {
-                  setIsStatusOpen(!isStatusOpen);
-                  setIsDeptOpen(false);
-                  setIsRoleOpen(false);
-                  setIsPermOpen(false);
-                }}
-                className="w-full flex items-center justify-between px-3 py-2 bg-[#FAFAFF] border border-[#CBD5E1] rounded-lg text-xs text-[#0F172A] hover:bg-white transition-colors"
-              >
-                <span>{selectedStatus}</span>
-                <ChevronDownIcon className="w-3.5 h-3.5 text-[#64748B] shrink-0 ml-1.5" />
-              </button>
-
-              {isStatusOpen && (
-                <div className="absolute left-0 mt-1 w-44 bg-white border border-[#CBD5E1] rounded-lg shadow-xl z-30 p-2 space-y-0.5">
-                  {['Semua', 'Aktif', 'Nonaktif'].map((st) => (
-                    <button
-                      key={st}
-                      type="button"
-                      onClick={() => {
-                        setSelectedStatus(st);
-                        setIsStatusOpen(false);
-                      }}
-                      className={`w-full text-left px-2.5 py-1.5 rounded text-xs flex items-center justify-between hover:bg-[#EEF2FF] ${
-                        selectedStatus === st ? 'bg-[#EEF2FF] text-[#4F46E5] font-bold' : 'text-[#334155]'
-                      }`}
-                    >
-                      <span>{st}</span>
-                      {selectedStatus === st && <CheckIcon className="w-3.5 h-3.5 text-[#4F46E5]" />}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Filter 4: Hak Akses (Multi-select) */}
-            <div className="relative">
-              <label className="block text-[11px] font-bold text-[#64748B] uppercase tracking-wider mb-1">
-                Hak Akses {selectedPermissions.length > 0 && `(${selectedPermissions.length})`}
-              </label>
-              <button
-                type="button"
-                onClick={() => {
-                  setIsPermOpen(!isPermOpen);
-                  setIsDeptOpen(false);
-                  setIsRoleOpen(false);
-                  setIsStatusOpen(false);
-                }}
-                className="w-full flex items-center justify-between px-3 py-2 bg-[#FAFAFF] border border-[#CBD5E1] rounded-lg text-xs text-[#0F172A] hover:bg-white transition-colors"
-              >
-                <span className="truncate">
-                  {selectedPermissions.length === 0
-                    ? 'Semua Hak Akses'
-                    : `${selectedPermissions.length} hak dipilih`}
-                </span>
-                <ChevronDownIcon className="w-3.5 h-3.5 text-[#64748B] shrink-0 ml-1.5" />
-              </button>
-
-              {isPermOpen && (
-                <div className="absolute right-0 sm:left-0 mt-1 w-72 bg-white border border-[#CBD5E1] rounded-lg shadow-xl z-30 p-2 space-y-1">
-                  <div className="flex items-center justify-between pb-1 border-b border-slate-100">
-                    <span className="text-[11px] font-bold text-slate-600">Pilih Hak Akses</span>
-                    {selectedPermissions.length > 0 && (
-                      <button
-                        type="button"
-                        onClick={() => setSelectedPermissions([])}
-                        className="text-[10px] text-[#4F46E5] font-semibold hover:underline"
-                      >
-                        Reset Pilihan
-                      </button>
-                    )}
-                  </div>
-                  <input
-                    type="text"
-                    value={permSearch}
-                    onChange={(e) => setPermSearch(e.target.value)}
-                    placeholder="Cari izin akses..."
-                    className="w-full px-2.5 py-1.5 text-xs border border-[#E2E8F0] rounded mb-1 focus:outline-none focus:border-[#4F46E5]"
-                    autoFocus
-                  />
-                  <div className="max-h-52 overflow-y-auto space-y-1">
-                    {filteredPermOptions.map((p) => {
-                      const isChecked = selectedPermissions.includes(p.key);
-                      return (
-                        <label
-                          key={p.key}
-                          className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-[#F8FAFC] cursor-pointer text-xs"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={isChecked}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                setSelectedPermissions([...selectedPermissions, p.key]);
-                              } else {
-                                setSelectedPermissions(selectedPermissions.filter((k) => k !== p.key));
-                              }
-                            }}
-                            className="rounded border-[#CBD5E1] text-[#4F46E5] focus:ring-[#4F46E5]"
-                          />
-                          <div className="flex flex-col flex-1 min-w-0">
-                            <span className="font-medium text-[#0F172A] truncate">{p.label}</span>
-                            <span className="text-[10px] text-[#64748B] truncate">{p.category}</span>
-                          </div>
-                        </label>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* 3. Action Bar: Count, Reset Button, Export Dropdown, and + Tambah Anggota */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-2 border-t border-[#F1F5F9]">
-            <div className="flex items-center gap-3">
-              <span className="text-xs font-semibold text-[#475569]">
-                <strong className="text-[#0F172A] font-bold">{filteredUsers.length}</strong> anggota ditemukan
-                {filteredUsers.length !== users.length && ` (dari total ${users.length})`}
-              </span>
-              {isFilterActive && (
-                <button
-                  type="button"
-                  onClick={handleResetFilters}
-                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#4F46E5] hover:text-[#4338CA] hover:underline"
-                >
-                  <XIcon className="w-3.5 h-3.5" />
-                  <span>Reset Filter</span>
-                </button>
-              )}
-            </div>
-
-            <div className="flex items-center gap-2.5">
-              {/* Export Dropdown */}
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={() => setIsExportOpen(!isExportOpen)}
-                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg border border-[#CBD5E1] bg-white text-xs font-semibold text-[#334155] hover:bg-[#FAFAFF] transition-colors shadow-xs"
-                >
-                  <DownloadIcon className="w-3.5 h-3.5 text-[#64748B]" />
-                  <span>Export</span>
-                  <ChevronDownIcon className="w-3 h-3 text-[#64748B]" />
-                </button>
-
-                {isExportOpen && (
-                  <div className="absolute right-0 mt-1 w-44 bg-white border border-[#CBD5E1] rounded-lg shadow-xl z-30 p-1.5 space-y-0.5">
-                    <button
-                      type="button"
-                      onClick={handleExportCSV}
-                      className="w-full text-left px-3 py-2 rounded text-xs text-[#334155] hover:bg-[#EEF2FF] hover:text-[#4F46E5] font-medium flex items-center gap-2"
-                    >
-                      <span>Export CSV (.csv)</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleExportExcel}
-                      className="w-full text-left px-3 py-2 rounded text-xs text-[#334155] hover:bg-[#EEF2FF] hover:text-[#4F46E5] font-medium flex items-center gap-2"
-                    >
-                      <span>Export Excel (.xls)</span>
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              {/* + Tambah Anggota */}
-              <button
-                type="button"
-                onClick={openAddModal}
-                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[#4F46E5] hover:bg-[#4338CA] text-white text-xs font-bold transition-all shadow-sm shadow-indigo-500/20"
-              >
-                <PlusIcon className="w-3.5 h-3.5" />
-                <span>+ Tambah Anggota</span>
-              </button>
-            </div>
-          </div>
-        </div>
+        {/* Global Reusable DataTableToolbar */}
+        <DataTableToolbar
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          searchPlaceholder="Cari nama, email, departemen, atau role..."
+          filters={filterConfigs}
+          totalFiltered={filteredUsers.length}
+          totalUnfiltered={users.length}
+          entityName="anggota"
+          isFilterActive={isFilterActive}
+          onResetFilters={handleResetFilters}
+          exportOptions={{
+            onExportCSV: handleExportCSV,
+            onExportExcel: handleExportExcel,
+          }}
+          primaryAction={{
+            label: "+ Tambah Anggota",
+            onClick: openAddModal,
+          }}
+        />
 
         {/* RBAC Table Card */}
         <div className="rounded-xl border border-[#E2E8F0] bg-white shadow-xs overflow-hidden">
@@ -866,37 +634,22 @@ export default function UsersManagementPage() {
               <tbody className="divide-y divide-[#E2E8F0] text-xs text-[#334155]">
                 {paginatedUsers.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="py-12 text-center text-slate-500">
-                      <div className="flex flex-col items-center justify-center space-y-2">
-                        <AlertTriangleIcon className="w-8 h-8 text-amber-500/80 mb-1" />
-                        <span className="font-bold text-sm text-slate-700">Tidak ada anggota yang cocok</span>
-                        <p className="text-xs text-slate-500 max-w-sm">
-                          Coba sesuaikan kata kunci pencarian atau reset filter untuk menampilkan kembali data anggota tim.
-                        </p>
-                        {isFilterActive && (
-                          <button
-                            type="button"
-                            onClick={handleResetFilters}
-                            className="mt-2 text-xs font-bold text-[#4F46E5] hover:underline"
-                          >
-                            Reset Semua Filter
-                          </button>
-                        )}
-                      </div>
+                    <td colSpan={6} className="p-0">
+                      <DataTableEmptyState
+                        title="Tidak ada anggota yang cocok"
+                        description="Coba sesuaikan kata kunci pencarian atau reset filter untuk menampilkan kembali data anggota tim."
+                        isFilterActive={isFilterActive}
+                        onResetFilters={handleResetFilters}
+                      />
                     </td>
                   </tr>
                 ) : (
                   paginatedUsers.map((user) => (
-                    <tr
+                    <DataTableRow
                       key={user.id}
-                      onContextMenu={(e) => {
-                        e.preventDefault();
-                        setActiveMenu({
-                          user,
-                          position: { x: e.clientX, y: e.clientY },
-                        });
-                      }}
-                      className="hover:bg-[#F8FAFC] transition-colors cursor-default"
+                      row={user}
+                      onRowDoubleClick={(u) => setViewUser(u)}
+                      onRowContextMenu={(u, e) => openContextMenu(u, e, 'Aksi Anggota')}
                     >
                       {/* 1. Nama Anggota */}
                       <td className="py-3.5 px-5">
@@ -919,7 +672,12 @@ export default function UsersManagementPage() {
                       {/* 4. Hak Akses Kunci with Tooltip */}
                       <td className="py-3.5 px-5 text-[11px] text-[#64748B] relative">
                         <div className="flex items-center gap-1 flex-wrap">
-                          <span>{user.permissions.slice(0, 3).join(', ')}</span>
+                          <span>
+                            {user.permissions
+                              .slice(0, 3)
+                              .map((p) => permMap.get(p) || p)
+                              .join(', ')}
+                          </span>
                           {user.permissions.length > 3 && (
                             <div className="relative inline-block">
                               <span
@@ -939,7 +697,7 @@ export default function UsersManagementPage() {
                                   <div className="flex flex-wrap gap-1">
                                     {user.permissions.map((p) => (
                                       <span key={p} className="bg-slate-800 px-1.5 py-0.5 rounded">
-                                        {p}
+                                        {permMap.get(p) || p}
                                       </span>
                                     ))}
                                   </div>
@@ -970,14 +728,9 @@ export default function UsersManagementPage() {
                         <div className="flex items-center justify-end">
                           <button
                             type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              const rect = e.currentTarget.getBoundingClientRect();
-                              setActiveMenu({
-                                user,
-                                position: { x: rect.right - 200, y: rect.bottom + 6 },
-                              });
-                            }}
+                            onClick={(e) => openDropdownMenu(user, e, 'Aksi Anggota')}
+                            onMouseEnter={(e) => handleButtonMouseEnter(user, e, 'Aksi Anggota')}
+                            onMouseLeave={handleButtonMouseLeave}
                             title="Aksi Anggota"
                             className="p-1.5 rounded-lg border border-transparent hover:border-[#CBD5E1] text-slate-500 hover:text-[#4F46E5] hover:bg-[#EEF2FF] focus:outline-none focus:ring-1 focus:ring-[#4F46E5] transition-all"
                           >
@@ -985,66 +738,22 @@ export default function UsersManagementPage() {
                           </button>
                         </div>
                       </td>
-                    </tr>
+                    </DataTableRow>
                   ))
                 )}
               </tbody>
             </table>
           </div>
 
-          {/* Pagination Controls */}
-          {totalItems > 0 && (
-            <div className="p-4 border-t border-[#E2E8F0] bg-[#FAFAFF] flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-[#64748B]">
-              <div className="flex items-center gap-2">
-                <span>Tampilkan</span>
-                <select
-                  value={pageSize}
-                  onChange={(e) => setPageSize(Number(e.target.value))}
-                  className="bg-white border border-[#CBD5E1] rounded px-2 py-1 text-xs text-[#0F172A] focus:outline-none focus:border-[#4F46E5]"
-                >
-                  <option value={5}>5</option>
-                  <option value={10}>10</option>
-                  <option value={20}>20</option>
-                </select>
-                <span>baris per halaman (Halaman {currentPage} dari {totalPages})</span>
-              </div>
-
-              <div className="flex items-center gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                  disabled={currentPage === 1}
-                  className="px-3 py-1.5 rounded border border-[#CBD5E1] bg-white text-xs font-semibold text-[#0F172A] disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50"
-                >
-                  Sebelumnya
-                </button>
-
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
-                  <button
-                    key={pageNum}
-                    type="button"
-                    onClick={() => setCurrentPage(pageNum)}
-                    className={`w-7 h-7 rounded text-xs font-bold transition-colors ${
-                      currentPage === pageNum
-                        ? 'bg-[#4F46E5] text-white shadow-xs'
-                        : 'bg-white border border-[#CBD5E1] text-[#0F172A] hover:bg-slate-50'
-                    }`}
-                  >
-                    {pageNum}
-                  </button>
-                ))}
-
-                <button
-                  type="button"
-                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                  disabled={currentPage === totalPages}
-                  className="px-3 py-1.5 rounded border border-[#CBD5E1] bg-white text-xs font-semibold text-[#0F172A] disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50"
-                >
-                  Selanjutnya
-                </button>
-              </div>
-            </div>
-          )}
+          {/* Reusable DataTablePagination Controls */}
+          <DataTablePagination
+            currentPage={currentPage}
+            pageSize={pageSize}
+            totalItems={totalItems}
+            pageSizeOptions={[5, 10, 20, 50, 100]}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={setPageSize}
+          />
         </div>
       </main>
 
@@ -1390,13 +1099,15 @@ export default function UsersManagementPage() {
         </div>
       )}
 
-      {/* Shared Action Menu (Triggered by 3-dot button or right-click context menu) */}
+      {/* Shared Action Menu (Triggered by 3-dot button hover/click or right-click context menu) */}
       {activeMenu && (
         <RBACActionMenu
           isOpen={Boolean(activeMenu)}
           position={activeMenu.position}
-          user={activeMenu.user}
-          onClose={() => setActiveMenu(null)}
+          user={activeMenu.row}
+          onClose={closeMenu}
+          onMouseEnter={cancelScheduledClose}
+          onMouseLeave={() => scheduleCloseMenu(250)}
           onView={(u) => setViewUser(u)}
           onEdit={(u) => openEditModal(u)}
           onToggleStatus={(u) => handleToggleStatus(u)}

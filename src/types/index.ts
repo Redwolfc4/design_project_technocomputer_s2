@@ -158,6 +158,48 @@ export interface ExportMappingTemplate {
   }[];
 }
 
+export type WebhookHttpMethod = 'POST' | 'GET';
+export type WebhookAuthType = 'none' | 'bearer' | 'api_key' | 'basic' | 'hmac';
+export type WebhookBodyFormat = 'json' | 'form_data' | 'raw';
+
+export interface WebhookHeaderItem {
+  id: string;
+  key: string;
+  value: string;
+  enabled: boolean;
+  isSecret?: boolean;
+}
+
+export interface WebhookParamItem {
+  id: string;
+  key: string;
+  value: string;
+  enabled: boolean;
+}
+
+export interface WebhookAuthConfig {
+  type: WebhookAuthType;
+  bearerToken?: string;
+  apiKeyName?: string;
+  apiKeyValue?: string;
+  apiKeyPlacement?: 'header' | 'query';
+  basicUsername?: string;
+  basicPassword?: string;
+  hmacSecret?: string;
+  hmacHeader?: string;
+}
+
+export interface WebhookConfig {
+  url: string;
+  method: WebhookHttpMethod;
+  events: string[];
+  headers: WebhookHeaderItem[];
+  params: WebhookParamItem[];
+  bodyFormat: WebhookBodyFormat;
+  rawBody: string;
+  auth: WebhookAuthConfig;
+}
+
 export interface WorkspaceSettings {
   workspaceName: string;
   companyName: string;
@@ -170,5 +212,6 @@ export interface WorkspaceSettings {
   defaultTaxRatePercent: number; // 11
   notificationEmail: string;
   webhookUrl: string;
+  webhookConfig?: WebhookConfig;
 }
 

@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { DEMO_PERSONAS } from '@/lib/constants/personas';
 import { MockDocumentService } from '@/lib/mocks/storage';
 import { UserRole } from '@/types';
+import { BrandLogo } from '@/components/shared/BrandLogo';
 import { ArrowRightIcon, ShieldCheckIcon } from '@/components/ui/icons';
 
 export default function LoginPage() {
@@ -24,11 +25,8 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen bg-[#FAFAFF] flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md text-center space-y-2">
-        <Link href="/" className="inline-flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-[#4F46E5] flex items-center justify-center text-white font-black text-lg shadow-sm">
-            D
-          </div>
-          <span className="font-bold text-xl text-[#0F172A]">DokumenAI Enterprise</span>
+        <Link href="/" className="inline-flex items-center justify-center hover:opacity-90 transition-opacity">
+          <BrandLogo size={40} textSize="lg" subtitle="" />
         </Link>
         <h2 className="text-xl font-bold text-[#0F172A]">Masuk ke Portal Operasional</h2>
         <p className="text-xs text-[#64748B]">

@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Topbar } from '@/components/layout/Topbar';
 import { MockDocumentService } from '@/lib/mocks/storage';
 import { DocumentRecord } from '@/types';
@@ -13,14 +14,55 @@ import {
   UploadCloudIcon,
   ArrowRightIcon,
   LayersIcon,
+  MoreHorizontalIcon,
+  CopyIcon,
 } from '@/components/ui/icons';
+import {
+  DataTableRow,
+  DataTableActionMenu,
+  useDataTableInteractions,
+  RowAction,
+} from '@/components/shared/data-table';
+import { DocumentQuickDetailModal } from '@/components/dashboard/documents/DocumentQuickDetailModal';
 
 export default function DashboardOverviewPage() {
+  const router = useRouter();
   const [documents, setDocuments] = useState<DocumentRecord[]>([]);
+  const [previewDoc, setPreviewDoc] = useState<DocumentRecord | null>(null);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' } | null>(null);
+
+  const {
+    activeMenu,
+    closeMenu,
+    openDropdownMenu,
+    handleButtonMouseEnter,
+    handleButtonMouseLeave,
+    cancelScheduledClose,
+    scheduleCloseMenu,
+    openContextMenu,
+  } = useDataTableInteractions<DocumentRecord>();
 
   useEffect(() => {
     setDocuments(MockDocumentService.getDocuments());
   }, []);
+
+  useEffect(() => {
+    if (toast) {
+      const timer = setTimeout(() => setToast(null), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [toast]);
+
+  const showToast = (message: string, type: 'success' | 'info' = 'success') => {
+    setToast({ message, type });
+  };
+
+  const handleCopyText = (text: string, label: string) => {
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(text);
+      showToast(`${label} berhasil disalin ke clipboard!`);
+    }
+  };
 
   const totalDocs = documents.length;
   const pendingDocs = documents.filter((d) => d.status === 'needs_review').length;
@@ -35,8 +77,40 @@ export default function DashboardOverviewPage() {
     .filter((d) => d.status === 'approved')
     .reduce((acc, d) => acc + d.totalAmount, 0);
 
+  const recentDocActions: RowAction<DocumentRecord>[] = useMemo(
+    () => [
+      {
+        id: 'open_verification',
+        label: 'Buka Workspace Verifikasi',
+        icon: <ArrowRightIcon className="w-4 h-4 text-[#4F46E5]" />,
+        onSelect: (doc) => router.push(`/dashboard/verification?docId=${doc.id}`),
+      },
+      {
+        id: 'quick_detail',
+        label: 'Lihat Rincian Cepat',
+        icon: <FileTextIcon className="w-4 h-4 text-[#64748B]" />,
+        onSelect: (doc) => setPreviewDoc(doc),
+      },
+      {
+        id: 'copy_faktur',
+        label: 'Salin Nomor Faktur',
+        icon: <CopyIcon className="w-4 h-4 text-[#64748B]" />,
+        onSelect: (doc) => handleCopyText(doc.fileNumber, 'Nomor Faktur'),
+      },
+    ],
+    [router]
+  );
+
   return (
-    <div className="flex-1 flex flex-col">
+    <div className="flex-1 flex flex-col relative">
+      {/* Toast Notification */}
+      {toast && (
+        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2 bg-[#0F172A] text-white px-4 py-3 rounded-xl shadow-2xl text-xs border border-slate-700 animate-in fade-in slide-in-from-bottom-3 duration-200">
+          <CheckCircleIcon className="w-4 h-4 text-emerald-400 shrink-0" />
+          <span className="font-medium">{toast.message}</span>
+        </div>
+      )}
+
       <Topbar
         title="Ringkasan Operasional Dokumen"
         subtitle="Pantau volume ekstraksi AI, status verifikasi human-in-the-loop, dan kepatuhan faktur"
@@ -58,35 +132,31 @@ export default function DashboardOverviewPage() {
             </div>
           </div>
 
-          {/* Pending Verification */}
+          {/* Menunggu Review */}
           <div className="p-5 rounded-xl border border-[#E2E8F0] bg-white shadow-sm space-y-2">
             <div className="flex items-center justify-between text-xs font-semibold text-[#64748B]">
-              <span>Perlu Verifikasi</span>
+              <span>Perlu Verifikasi (HITL)</span>
               <AlertTriangleIcon className="w-4 h-4 text-[#F59E0B]" />
             </div>
-            <div className="text-2xl font-bold text-[#F59E0B]">{pendingDocs} Antrean</div>
-            <Link
-              href="/dashboard/verification"
-              className="text-[11px] text-[#4F46E5] font-semibold flex items-center gap-1 hover:underline"
-            >
-              <span>Buka antrean review</span>
-              <ArrowRightIcon className="w-3 h-3" />
-            </Link>
+            <div className="text-2xl font-bold text-[#0F172A]">{pendingDocs} Berkas</div>
+            <div className="text-[11px] text-[#F59E0B] font-medium">
+              Memerlukan tindakan akuntan
+            </div>
           </div>
 
-          {/* Approved & Reconciled */}
+          {/* Disetujui */}
           <div className="p-5 rounded-xl border border-[#E2E8F0] bg-white shadow-sm space-y-2">
             <div className="flex items-center justify-between text-xs font-semibold text-[#64748B]">
-              <span>Telah Disetujui</span>
+              <span>Telah Disetujui & Valid</span>
               <CheckCircleIcon className="w-4 h-4 text-[#059669]" />
             </div>
-            <div className="text-2xl font-bold text-[#059669]">{approvedDocs} Berkas</div>
-            <div className="text-[11px] text-[#64748B] font-medium">
-              Terekonsiliasi ke Buku Besar
+            <div className="text-2xl font-bold text-[#0F172A]">{approvedDocs} Berkas</div>
+            <div className="text-[11px] text-[#059669] font-medium">
+              Siap diekspor ke SAP ERP
             </div>
           </div>
 
-          {/* Average Confidence */}
+          {/* Akurasi */}
           <div className="p-5 rounded-xl border border-[#E2E8F0] bg-white shadow-sm space-y-2">
             <div className="flex items-center justify-between text-xs font-semibold text-[#64748B]">
               <span>Akurasi Model AI</span>
@@ -149,7 +219,7 @@ export default function DashboardOverviewPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="border-b border-[#E2E8F0] bg-[#FAFAFF] text-[11px] font-bold text-[#64748B] uppercase tracking-wider">
+                <tr className="border-b border-[#E2E8F0] bg-[#FAFAFF] text-[11px] font-bold text-[#64748B] uppercase tracking-wider select-none">
                   <th className="py-3 px-5">Nomor Dokumen / Judul</th>
                   <th className="py-3 px-5">Jenis Dokumen</th>
                   <th className="py-3 px-5">Vendor / Entitas</th>
@@ -163,7 +233,12 @@ export default function DashboardOverviewPage() {
                 {documents.slice(0, 5).map((doc) => {
                   const badge = getStatusBadgeInfo(doc.status);
                   return (
-                    <tr key={doc.id} className="hover:bg-[#F8FAFC] transition-colors">
+                    <DataTableRow
+                      key={doc.id}
+                      row={doc}
+                      onRowDoubleClick={(d) => router.push(`/dashboard/verification?docId=${d.id}`)}
+                      onRowContextMenu={(d, e) => openContextMenu(d, e, 'Aksi Dokumen')}
+                    >
                       <td className="py-3.5 px-5">
                         <div className="font-semibold text-[#0F172A]">{doc.fileNumber}</div>
                         <div className="text-[11px] text-[#64748B] truncate max-w-xs">{doc.title}</div>
@@ -204,24 +279,18 @@ export default function DashboardOverviewPage() {
                         </span>
                       </td>
                       <td className="py-3.5 px-5 text-right">
-                        {doc.status === 'needs_review' ? (
-                          <Link
-                            href={`/dashboard/verification?docId=${doc.id}`}
-                            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md bg-[#4F46E5] hover:bg-[#4338CA] text-white text-[11px] font-bold shadow-xs transition-colors"
-                          >
-                            <span>Verifikasi</span>
-                            <ArrowRightIcon className="w-3 h-3" />
-                          </Link>
-                        ) : (
-                          <Link
-                            href="/dashboard/documents"
-                            className="text-[11px] font-semibold text-[#4F46E5] hover:underline"
-                          >
-                            Detail
-                          </Link>
-                        )}
+                        <button
+                          type="button"
+                          onClick={(e) => openDropdownMenu(doc, e, 'Aksi Dokumen')}
+                          onMouseEnter={(e) => handleButtonMouseEnter(doc, e, 'Aksi Dokumen')}
+                          onMouseLeave={handleButtonMouseLeave}
+                          title="Menu Aksi"
+                          className="p-1.5 rounded-md border border-[#CBD5E1] bg-white hover:bg-[#EEF2FF] text-slate-600 hover:text-[#4F46E5] transition-colors"
+                        >
+                          <MoreHorizontalIcon className="w-3.5 h-3.5" />
+                        </button>
                       </td>
-                    </tr>
+                    </DataTableRow>
                   );
                 })}
               </tbody>
@@ -229,7 +298,30 @@ export default function DashboardOverviewPage() {
           </div>
         </div>
       </main>
+
+      {/* Quick Detail Modal */}
+      {previewDoc && (
+        <DocumentQuickDetailModal
+          document={previewDoc}
+          onClose={() => setPreviewDoc(null)}
+          onCopyText={handleCopyText}
+        />
+      )}
+
+      {/* Floating Action Menu */}
+      {activeMenu && (
+        <DataTableActionMenu
+          isOpen={Boolean(activeMenu)}
+          position={activeMenu.position}
+          row={activeMenu.row}
+          title={activeMenu.title || 'Aksi Dokumen'}
+          subtitle={(d) => d.fileNumber}
+          actions={recentDocActions}
+          onClose={closeMenu}
+          onMouseEnter={cancelScheduledClose}
+          onMouseLeave={() => scheduleCloseMenu(250)}
+        />
+      )}
     </div>
   );
 }
-

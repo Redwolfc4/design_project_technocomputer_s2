@@ -5,6 +5,7 @@ import { Topbar } from '@/components/layout/Topbar';
 import { MockDocumentService } from '@/lib/mocks/storage';
 import { WorkspaceSettings } from '@/types';
 import { SettingsIcon, CheckIcon } from '@/components/ui/icons';
+import { WebhookConfigSection } from '@/components/dashboard/settings/WebhookConfigSection';
 
 export default function WorkspaceSettingsPage() {
   const [settings, setSettings] = useState<WorkspaceSettings>(MockDocumentService.getSettings());
@@ -93,16 +94,16 @@ export default function WorkspaceSettingsPage() {
               </div>
             </div>
 
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-[#475569]">Endpoint Webhook Realtime</label>
-              <input
-                type="url"
-                value={settings.webhookUrl}
-                onChange={(e) => setSettings({ ...settings, webhookUrl: e.target.value })}
-                className="w-full text-xs font-mono px-3 py-2 rounded-md border border-[#CBD5E1] bg-white text-[#0F172A]"
-              />
-              <span className="text-[11px] text-[#64748B]">Menerima payload HTTP POST setiap kali ada verifikasi yang disetujui.</span>
-            </div>
+            <WebhookConfigSection
+              initialUrl={settings.webhookUrl}
+              onChange={(cfg) =>
+                setSettings((prev) => ({
+                  ...prev,
+                  webhookUrl: cfg.url,
+                  webhookConfig: cfg,
+                }))
+              }
+            />
           </div>
 
           {savedSuccess && (
