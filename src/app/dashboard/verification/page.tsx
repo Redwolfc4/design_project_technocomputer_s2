@@ -9,6 +9,8 @@ import {
   CheckIcon,
   XIcon,
   AlertTriangleIcon,
+  Edit3Icon,
+  SaveIcon,
 } from '@/components/ui/icons';
 
 function VerificationWorkspaceInner() {
@@ -19,8 +21,12 @@ function VerificationWorkspaceInner() {
     activeDraft,
     selectedFieldId,
     notification,
+    isEditMode,
     selectDocument,
     setSelectedFieldId,
+    toggleEditMode,
+    cancelEdit,
+    saveEdit,
     updateFieldDraft,
     updateNoteDraft,
     approveDocument,
@@ -226,20 +232,61 @@ function VerificationWorkspaceInner() {
         {/* Right Column: Debounced Auto-Sync Editor & Direct Actions */}
         {/* ======================================================== */}
         <div className="w-96 border-l border-[#E2E8F0] bg-white flex flex-col h-full">
-          <div className="p-4 border-b border-[#E2E8F0] bg-[#FAFAFF] flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-[#475569]">
-              Editor Nilai Ekstraksi
-            </span>
-            <div className="flex items-center gap-1.5">
-              {activeDraft?.isSaving ? (
+          <div className="p-3.5 border-b border-[#E2E8F0] bg-[#FAFAFF] flex items-center justify-between">
+            <div className="flex flex-col">
+              <span className="text-xs font-bold uppercase tracking-wider text-[#475569]">
+                Detail & Editor Dokumen
+              </span>
+              <span className="text-[10px] text-[#64748B]">
+                {activeDoc?.status === 'approved' || activeDoc?.status === 'rejected'
+                  ? 'Status Final • Terkunci Permanen'
+                  : isEditMode
+                  ? 'Mode Edit Aktif'
+                  : 'Mode Read-Only (Default)'}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              {/* Tombol Edit / Batal & Simpan di Pojok Kanan Atas */}
+              {activeDoc && activeDoc.status !== 'approved' && activeDoc.status !== 'rejected' && (
+                <>
+                  {!isEditMode ? (
+                    <button
+                      type="button"
+                      onClick={toggleEditMode}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold bg-white border border-[#CBD5E1] text-[#4F46E5] hover:bg-[#EEF2FF] shadow-sm transition-all cursor-pointer"
+                      title="Klik untuk mengubah nilai field dokumen"
+                    >
+                      <Edit3Icon className="w-3.5 h-3.5" />
+                      <span>Edit</span>
+                    </button>
+                  ) : (
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={cancelEdit}
+                        className="px-2.5 py-1.5 rounded-md text-xs font-semibold bg-white border border-[#CBD5E1] text-[#64748B] hover:bg-[#F1F5F9] transition-colors cursor-pointer"
+                      >
+                        Batal
+                      </button>
+                      <button
+                        type="button"
+                        onClick={saveEdit}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-bold bg-[#4F46E5] hover:bg-[#4338CA] text-white shadow-sm transition-colors cursor-pointer"
+                      >
+                        <SaveIcon className="w-3.5 h-3.5" />
+                        <span>Simpan</span>
+                      </button>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* Status Sync / Saving feedback indicator */}
+              {isEditMode && activeDraft?.isSaving && (
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-indigo-50 text-[#4F46E5] border border-indigo-200 animate-pulse flex items-center gap-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-[#4F46E5] animate-ping" />
                   <span>Menyimpan...</span>
-                </span>
-              ) : (
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                  <span>Tersinkronisasi Otomatis</span>
                 </span>
               )}
             </div>
@@ -248,94 +295,186 @@ function VerificationWorkspaceInner() {
           <div className="flex-1 overflow-y-auto p-5 space-y-5">
             {activeDoc && activeDraft && (
               <>
-                <div className="p-3.5 rounded-lg border border-[#CBD5E1] bg-[#FAFAFF] space-y-1">
-                  <div className="text-[10px] font-bold uppercase tracking-wider text-[#64748B]">
-                    Status Verifikasi Dokumen
-                  </div>
-                  <div className="text-sm font-extrabold text-[#0F172A]">
-                    {activeDoc.status === 'approved'
-                      ? '✓ Dokumen Telah Disetujui'
+                <div
+                  className={`p-3.5 rounded-lg border space-y-1 ${
+                    activeDoc.status === 'approved'
+                      ? 'border-emerald-200 bg-emerald-50/50'
                       : activeDoc.status === 'rejected'
-                      ? '✕ Dokumen Ditolak'
-                      : '⏳ Menunggu Validasi Reviewer'}
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  {activeDraft.fields.map((field) => (
-                    <div
-                      key={field.id}
-                      className={`space-y-1.5 p-3 rounded-lg border transition-all ${
-                        selectedFieldId === field.id
-                          ? 'border-[#4F46E5] bg-[#EEF2FF]/30'
-                          : 'border-[#E2E8F0] bg-white'
+                      ? 'border-rose-200 bg-rose-50/50'
+                      : 'border-[#CBD5E1] bg-[#FAFAFF]'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-[#64748B]">
+                      Status Verifikasi Dokumen
+                    </span>
+                    <span
+                      className={`text-[9px] font-extrabold px-2 py-0.5 rounded-full ${
+                        activeDoc.status === 'approved'
+                          ? 'bg-emerald-100 text-emerald-800'
+                          : activeDoc.status === 'rejected'
+                          ? 'bg-rose-100 text-rose-800'
+                          : 'bg-amber-100 text-amber-800'
                       }`}
                     >
-                      <div className="flex items-center justify-between">
-                        <label className="text-[11px] font-bold text-[#475569]">
-                          {field.label}
-                        </label>
-                        <span
-                          className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
-                            field.confidence >= 0.9 ? 'text-[#059669]' : 'text-[#F59E0B]'
-                          }`}
-                        >
-                          {Math.round(field.confidence * 100)}%
-                        </span>
-                      </div>
-                      <input
-                        type="text"
-                        value={field.value}
-                        onChange={(e) => updateFieldDraft(activeDoc.id, field.id, e.target.value)}
-                        onFocus={() => setSelectedFieldId(field.id)}
-                        className="w-full text-xs font-semibold px-3 py-2 rounded-md border border-[#CBD5E1] bg-white text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#4F46E5]"
-                      />
-                      {field.validationMessage && (
-                        <p className="text-[10px] text-[#F59E0B] font-medium flex items-center gap-1">
-                          <AlertTriangleIcon className="w-3 h-3 shrink-0" />
-                          <span>{field.validationMessage}</span>
-                        </p>
-                      )}
-                    </div>
-                  ))}
+                      {activeDoc.status === 'approved'
+                        ? 'Terverifikasi'
+                        : activeDoc.status === 'rejected'
+                        ? 'Ditolak'
+                        : 'Perlu Verifikasi'}
+                    </span>
+                  </div>
+                  <div className="text-sm font-extrabold text-[#0F172A] pt-0.5">
+                    {activeDoc.status === 'approved'
+                      ? '✓ Dokumen Telah Terverifikasi (Final)'
+                      : activeDoc.status === 'rejected'
+                      ? '✕ Dokumen Telah Ditolak (Final)'
+                      : isEditMode
+                      ? '✏️ Sedang Mengedit Field Dokumen'
+                      : '🔒 Pratinjau Read-Only'}
+                  </div>
                 </div>
 
+                {/* Form Fields: Read-Only Secara Default, Editable Hanya di Edit Mode */}
+                <div className="space-y-4">
+                  {activeDraft.fields.map((field) => {
+                    const isFinalStatus =
+                      activeDoc.status === 'approved' || activeDoc.status === 'rejected';
+                    const isFieldReadOnly = !isEditMode || isFinalStatus;
+
+                    return (
+                      <div
+                        key={field.id}
+                        className={`space-y-1.5 p-3 rounded-lg border transition-all ${
+                          selectedFieldId === field.id
+                            ? 'border-[#4F46E5] bg-[#EEF2FF]/30 ring-1 ring-[#4F46E5]/20'
+                            : 'border-[#E2E8F0] bg-white'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <label className="text-[11px] font-bold text-[#475569]">
+                            {field.label}
+                          </label>
+                          <div className="flex items-center gap-1.5">
+                            {isFieldReadOnly && (
+                              <span className="text-[9px] font-semibold text-[#94A3B8]">
+                                Read-Only
+                              </span>
+                            )}
+                            <span
+                              className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
+                                field.confidence >= 0.9 ? 'text-[#059669]' : 'text-[#F59E0B]'
+                              }`}
+                            >
+                              {Math.round(field.confidence * 100)}% Match
+                            </span>
+                          </div>
+                        </div>
+
+                        <input
+                          type="text"
+                          value={field.value}
+                          readOnly={isFieldReadOnly}
+                          onChange={(e) => {
+                            if (!isFieldReadOnly) {
+                              updateFieldDraft(activeDoc.id, field.id, e.target.value);
+                            }
+                          }}
+                          onFocus={() => setSelectedFieldId(field.id)}
+                          className={`w-full text-xs font-semibold px-3 py-2 rounded-md border transition-colors ${
+                            isFieldReadOnly
+                              ? 'border-[#E2E8F0] bg-[#F8FAFC] text-[#1E293B] cursor-default focus:outline-none select-all'
+                              : 'border-[#4F46E5] bg-white text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#4F46E5]'
+                          }`}
+                        />
+
+                        {field.validationMessage && (
+                          <p className="text-[10px] text-[#F59E0B] font-medium flex items-center gap-1">
+                            <AlertTriangleIcon className="w-3 h-3 shrink-0" />
+                            <span>{field.validationMessage}</span>
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Catatan Verifikator — Pengecualian Khusus: Editable saat pending, read-only saat final */}
                 <div className="space-y-1.5 pt-2">
-                  <label className="text-xs font-bold text-[#475569]">Catatan Verifikator</label>
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-[#475569]">
+                      Catatan Verifikator
+                    </label>
+                    {(activeDoc.status === 'approved' || activeDoc.status === 'rejected') ? (
+                      <span className="text-[9px] font-bold text-[#94A3B8]">Terkunci (Final)</span>
+                    ) : (
+                      <span className="text-[9px] font-semibold text-[#059669]">
+                        Editable (Autosave)
+                      </span>
+                    )}
+                  </div>
+
                   <textarea
                     rows={3}
-                    placeholder="Tuliskan catatan rekonsiliasi atau alasan revisi..."
+                    placeholder={
+                      activeDoc.status === 'approved' || activeDoc.status === 'rejected'
+                        ? 'Catatan verifikator terkunci pada status final.'
+                        : 'Tuliskan catatan rekonsiliasi atau alasan penolakan/revisi...'
+                    }
                     value={activeDraft.reviewerNote}
-                    onChange={(e) => updateNoteDraft(activeDoc.id, e.target.value)}
-                    className="w-full text-xs px-3 py-2 rounded-md border border-[#CBD5E1] bg-white text-[#0F172A] focus:outline-none focus:ring-1 focus:ring-[#4F46E5]"
+                    readOnly={activeDoc.status === 'approved' || activeDoc.status === 'rejected'}
+                    onChange={(e) => {
+                      if (activeDoc.status !== 'approved' && activeDoc.status !== 'rejected') {
+                        updateNoteDraft(activeDoc.id, e.target.value);
+                      }
+                    }}
+                    className={`w-full text-xs px-3 py-2 rounded-md border transition-colors ${
+                      activeDoc.status === 'approved' || activeDoc.status === 'rejected'
+                        ? 'border-[#E2E8F0] bg-[#F8FAFC] text-[#334155] cursor-default focus:outline-none'
+                        : 'border-[#CBD5E1] bg-white text-[#0F172A] focus:outline-none focus:ring-1 focus:ring-[#4F46E5]'
+                    }`}
                   />
                 </div>
               </>
             )}
           </div>
 
-          {/* Action Buttons: Bersih Langsung Tolak & Setujui */}
+          {/* Action Buttons: Kunci Total pada Status Final ('approved' / 'rejected') */}
           <div className="p-4 border-t border-[#E2E8F0] bg-[#FAFAFF]">
             {activeDoc && (
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => rejectDocument(activeDoc.id)}
-                  className="flex-1 flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-lg border border-[#E11D48] text-[#E11D48] hover:bg-rose-50 text-xs font-bold transition-colors"
-                >
-                  <XIcon className="w-4 h-4" />
-                  <span>Tolak Faktur</span>
-                </button>
+              <>
+                {activeDoc.status === 'approved' ? (
+                  <div className="py-2.5 px-3 rounded-lg bg-emerald-50 border border-emerald-200 text-center text-xs font-bold text-emerald-800 flex items-center justify-center gap-1.5">
+                    <CheckIcon className="w-4 h-4 text-emerald-600" />
+                    <span>Dokumen Telah Disetujui • Keputusan Terkunci</span>
+                  </div>
+                ) : activeDoc.status === 'rejected' ? (
+                  <div className="py-2.5 px-3 rounded-lg bg-rose-50 border border-rose-200 text-center text-xs font-bold text-rose-800 flex items-center justify-center gap-1.5">
+                    <XIcon className="w-4 h-4 text-rose-600" />
+                    <span>Dokumen Telah Ditolak • Keputusan Terkunci</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => rejectDocument(activeDoc.id)}
+                      className="flex-1 flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-lg border border-[#E11D48] text-[#E11D48] hover:bg-rose-50 text-xs font-bold transition-colors cursor-pointer"
+                    >
+                      <XIcon className="w-4 h-4" />
+                      <span>Tolak Faktur</span>
+                    </button>
 
-                <button
-                  type="button"
-                  onClick={() => approveDocument(activeDoc.id)}
-                  className="flex-1 flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-lg bg-[#059669] hover:bg-[#047857] text-white text-xs font-bold shadow-sm transition-colors"
-                >
-                  <CheckIcon className="w-4 h-4" />
-                  <span>Setujui (Approve)</span>
-                </button>
-              </div>
+                    <button
+                      type="button"
+                      onClick={() => approveDocument(activeDoc.id)}
+                      className="flex-1 flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-lg bg-[#059669] hover:bg-[#047857] text-white text-xs font-bold shadow-sm transition-colors cursor-pointer"
+                    >
+                      <CheckIcon className="w-4 h-4" />
+                      <span>Setujui (Approve)</span>
+                    </button>
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>

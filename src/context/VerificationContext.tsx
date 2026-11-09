@@ -19,10 +19,15 @@ export interface VerificationContextType {
   drafts: Record<string, DocumentDraft>;
   selectedFieldId: string | null;
   notification: { message: string; type: 'success' | 'error' } | null;
+  isEditMode: boolean;
 
   // Actions
   selectDocument: (id: string) => void;
   setSelectedFieldId: (id: string | null) => void;
+  setIsEditMode: (editMode: boolean) => void;
+  toggleEditMode: () => void;
+  cancelEdit: () => void;
+  saveEdit: () => { success: boolean; message: string };
   updateFieldDraft: (documentId: string, fieldId: string, value: string) => void;
   updateNoteDraft: (documentId: string, note: string) => void;
   approveDocument: (documentId: string) => { success: boolean; message: string };
@@ -44,6 +49,10 @@ export function VerificationProvider({
   const [drafts, setDrafts] = useState<Record<string, DocumentDraft>>({});
   const [selectedFieldId, setSelectedFieldId] = useState<string | null>(null);
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [isEditMode, setIsEditMode] = useState<boolean>(false);
+
+  // Snapshot of fields when entering edit mode, to restore on cancel
+  const editSnapshot = useRef<Record<string, ExtractedField[]>>({});
 
   // Debounce timers stored per documentId
   const debounceTimers = useRef<Record<string, NodeJS.Timeout>>({});
@@ -265,6 +274,9 @@ export function VerificationProvider({
       }
     }
 
+    // Reset Edit Mode when switching documents: Always start in Read-Only Mode!
+    setIsEditMode(false);
+
     setActiveDocId(id);
     const targetDoc = documents.find((d) => d.id === id);
     if (targetDoc && targetDoc.fields.length > 0) {
@@ -273,6 +285,73 @@ export function VerificationProvider({
       setSelectedFieldId(null);
     }
   }, [activeDocId, drafts, documents, commitSave]);
+
+  // Toggle Edit Mode: Only allowed if document is not in final status (approved / rejected)
+  const toggleEditMode = useCallback(() => {
+    if (!activeDoc) return;
+    if (activeDoc.status === 'approved' || activeDoc.status === 'rejected') {
+      setNotification({
+        message: 'Dokumen berstatus final (' + (activeDoc.status === 'approved' ? 'Terverifikasi' : 'Ditolak') + ') terkunci dan tidak dapat diedit.',
+        type: 'error',
+      });
+      return;
+    }
+
+    if (!isEditMode) {
+      // Entering edit mode: store snapshot of fields
+      if (activeDraft) {
+        editSnapshot.current[activeDoc.id] = JSON.parse(JSON.stringify(activeDraft.fields));
+      }
+      setIsEditMode(true);
+    } else {
+      setIsEditMode(false);
+    }
+  }, [activeDoc, isEditMode, activeDraft]);
+
+  // Cancel Edit Mode: Restore fields to snapshot and return to Read-Only
+  const cancelEdit = useCallback(() => {
+    if (!activeDoc) return;
+    if (editSnapshot.current[activeDoc.id]) {
+      const restoredFields = editSnapshot.current[activeDoc.id];
+      setDrafts((prev) => {
+        const d = prev[activeDoc.id];
+        if (!d) return prev;
+        const restoredDraft = { ...d, fields: JSON.parse(JSON.stringify(restoredFields)) };
+        commitSave(activeDoc.id, restoredDraft);
+        return { ...prev, [activeDoc.id]: restoredDraft };
+      });
+    }
+    setIsEditMode(false);
+    setNotification({
+      message: 'Perubahan dibatalkan. Kembali ke Mode Read-Only.',
+      type: 'success',
+    });
+  }, [activeDoc, commitSave]);
+
+  // Save Edit Mode: Validate, commit save, and return to Read-Only
+  const saveEdit = useCallback(() => {
+    if (!activeDoc) return { success: false, message: 'Tidak ada dokumen aktif' };
+    if (activeDoc.status === 'approved' || activeDoc.status === 'rejected') {
+      setNotification({
+        message: 'Dokumen berstatus final tidak dapat diubah.',
+        type: 'error',
+      });
+      return { success: false, message: 'Status final terkunci' };
+    }
+
+    if (activeDraft) {
+      commitSave(activeDoc.id, activeDraft);
+      // Update snapshot to current saved state
+      editSnapshot.current[activeDoc.id] = JSON.parse(JSON.stringify(activeDraft.fields));
+    }
+
+    setIsEditMode(false);
+    setNotification({
+      message: 'Perubahan bidang dokumen berhasil disimpan.',
+      type: 'success',
+    });
+    return { success: true, message: 'Tersimpan' };
+  }, [activeDoc, activeDraft, commitSave]);
 
   // Approve document
   const approveDocument = useCallback((documentId: string) => {
@@ -360,8 +439,13 @@ export function VerificationProvider({
       drafts,
       selectedFieldId,
       notification,
+      isEditMode,
       selectDocument,
       setSelectedFieldId,
+      setIsEditMode,
+      toggleEditMode,
+      cancelEdit,
+      saveEdit,
       updateFieldDraft,
       updateNoteDraft,
       approveDocument,
@@ -376,7 +460,11 @@ export function VerificationProvider({
       drafts,
       selectedFieldId,
       notification,
+      isEditMode,
       selectDocument,
+      toggleEditMode,
+      cancelEdit,
+      saveEdit,
       updateFieldDraft,
       updateNoteDraft,
       approveDocument,

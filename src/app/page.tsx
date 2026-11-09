@@ -10,44 +10,13 @@ import {
   LayersIcon,
 } from '@/components/ui/icons';
 import { BrandLogo } from '@/components/shared/BrandLogo';
+import { Header } from '@/components/layout/Header';
 
 export default function MarketingHomePage() {
   return (
     <div className="min-h-screen bg-[#FAFAFF] flex flex-col font-sans selection:bg-[#4F46E5]/10 selection:text-[#4F46E5]">
       {/* Navigation Bar */}
-      <header className="border-b border-[#E2E8F0] bg-white/95 backdrop-blur-md sticky top-0 z-50 py-3 sm:py-4">
-        <div className="max-w-screen-2xl mx-auto px-6 lg:px-12 flex items-center justify-between">
-          <div className="flex items-center gap-10">
-            <Link href="/" className="hover:opacity-90 transition-opacity">
-              <BrandLogo size={36} textSize="base" />
-            </Link>
-
-            <nav className="hidden md:flex items-center gap-7 text-xs font-semibold text-[#475569]">
-              <Link href="/product" className="hover:text-[#4F46E5] transition-colors">Produk</Link>
-              <Link href="/features" className="hover:text-[#4F46E5] transition-colors">Fitur Utama</Link>
-              <Link href="/solutions" className="hover:text-[#4F46E5] transition-colors">Solusi Pajak & AP</Link>
-              <Link href="/security" className="hover:text-[#4F46E5] transition-colors">Keamanan & Audit</Link>
-              <Link href="/pricing" className="hover:text-[#4F46E5] transition-colors">Paket Demo</Link>
-            </nav>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <Link
-              href="/login"
-              className="text-xs font-semibold text-[#475569] hover:text-[#0F172A] px-3 py-2 transition-colors"
-            >
-              Masuk Akun
-            </Link>
-            <Link
-              href="/dashboard"
-              className="flex items-center gap-1.5 bg-[#4F46E5] hover:bg-[#4338CA] text-white text-xs font-semibold px-4 py-2.5 rounded-lg shadow-sm transition-all shadow-[#4F46E5]/20 hover:shadow-md hover:shadow-[#4F46E5]/30"
-            >
-              <span>Eksplor Dashboard Demo</span>
-              <ArrowRightIcon className="w-3.5 h-3.5" />
-            </Link>
-          </div>
-        </div>
-      </header>
+      <Header />
 
       {/* Hero Section */}
       <section className="pt-16 pb-20 border-b border-[#E2E8F0] relative overflow-hidden bg-gradient-to-b from-white to-[#FAFAFF]">

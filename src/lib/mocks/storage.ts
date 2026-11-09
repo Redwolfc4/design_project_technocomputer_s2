@@ -109,6 +109,18 @@ export class MockDocumentService {
   static saveDocument(doc: DocumentRecord): void {
     if (!this.isClient()) return;
     const docs = this.getDocuments();
+    const existing = docs.find((d) => d.id === doc.id);
+
+    // Backend rule: Jika status sebelumnya sudah final ('approved' atau 'rejected'),
+    // tolak modifikasi field data dokumen (hanya jika status tetap final)
+    if (existing && (existing.status === 'approved' || existing.status === 'rejected')) {
+      // Izinkan pembaruan auditHistory atau notes jika perlu, tetapi kunci fields data dokumen
+      doc.fields = existing.fields;
+      doc.totalAmount = existing.totalAmount;
+      doc.subtotal = existing.subtotal;
+      doc.taxAmount = existing.taxAmount;
+    }
+
     const index = docs.findIndex((d) => d.id === doc.id);
     if (index >= 0) {
       docs[index] = doc;
@@ -126,6 +138,12 @@ export class MockDocumentService {
   ): DocumentRecord | undefined {
     const doc = this.getDocumentById(id);
     if (!doc) return undefined;
+
+    // Backend rule: Status 'approved' dan 'rejected' adalah status final yang tidak boleh diubah kembali
+    if (doc.status === 'approved' || doc.status === 'rejected') {
+      console.warn(`[MockDocumentService] Dokumen ${id} berstatus final '${doc.status}'. Perubahan ke '${status}' ditolak.`);
+      return doc;
+    }
 
     const prevStatus = doc.status;
     doc.status = status;
