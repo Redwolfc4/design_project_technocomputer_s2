@@ -1,5 +1,0 @@
-[     232ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:3005/product?_rsc=1ld0r:0
-[     232ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:3005/features?_rsc=1ld0r:0
-[     233ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:3005/solutions?_rsc=1ld0r:0
-[     233ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:3005/security?_rsc=1ld0r:0
-[     233ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:3005/pricing?_rsc=1ld0r:0
