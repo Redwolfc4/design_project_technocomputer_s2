@@ -1,79 +1,174 @@
-<svg width="700" height="420" viewBox="0 0 700 420" fill="none" xmlns="http://www.w3.org/2000/svg">
+<svg width="860" height="480" viewBox="0 0 860 480" fill="none" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <linearGradient id="pGrad" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#4F46E5"/>
-      <stop offset="100%" stop-color="#3730A3"/>
+    <!-- Gradients -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="100%" stop-color="#F8FAFC"/>
     </linearGradient>
-    <filter id="pShadow" x="-5%" y="-5%" width="110%" height="115%">
-      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#0F172A" flood-opacity="0.06"/>
+    <linearGradient id="accentGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4F46E5"/>
+      <stop offset="100%" stop-color="#4338CA"/>
+    </linearGradient>
+    <linearGradient id="successGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#10B981"/>
+      <stop offset="100%" stop-color="#059669"/>
+    </linearGradient>
+
+    <!-- Filters for soft enterprise shadows -->
+    <filter id="cardShadow" x="-10%" y="-10%" width="125%" height="125%" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="12" stdDeviation="16" flood-color="#0F172A" flood-opacity="0.07"/>
+      <feDropShadow dx="0" dy="2" stdDeviation="4" flood-color="#0F172A" flood-opacity="0.04"/>
+    </filter>
+    <filter id="floatShadow" x="-20%" y="-20%" width="140%" height="140%" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="8" stdDeviation="10" flood-color="#4F46E5" flood-opacity="0.18"/>
     </filter>
   </defs>
 
-  <rect width="700" height="420" rx="14" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1.5"/>
+  <!-- Outer Canvas Frame -->
+  <rect width="860" height="480" rx="16" fill="url(#bgGrad)" stroke="#E2E8F0" stroke-width="1.5"/>
 
-  <!-- Left: Bounding Box Highlighted Document -->
-  <g filter="url(#pShadow)">
-    <rect x="36" y="36" width="280" height="348" rx="8" fill="#F8FAFC" stroke="#CBD5E1" stroke-width="1"/>
-    <!-- Mock document page lines -->
-    <rect x="56" y="60" width="120" height="12" rx="3" fill="#94A3B8"/>
-    <rect x="56" y="80" width="80" height="8" rx="2" fill="#CBD5E1"/>
-
-    <!-- Highlighted Active Field (Blue Bounding Box) -->
-    <rect x="52" y="110" width="248" height="36" rx="4" fill="#4F46E5" fill-opacity="0.12" stroke="#4F46E5" stroke-width="1.5"/>
-    <rect x="52" y="96" width="90" height="14" rx="2" fill="#4F46E5"/>
-    <text x="56" y="106" font-family="system-ui, sans-serif" font-size="8" font-weight="700" fill="#FFFFFF">ACTIVE SELECTION</text>
-    <text x="60" y="132" font-family="system-ui, sans-serif" font-size="11" font-weight="600" fill="#1E293B">PT Graha Logistik Indonesia</text>
-
-    <!-- Other fields -->
-    <rect x="52" y="160" width="248" height="24" rx="4" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1"/>
-    <text x="60" y="176" font-family="system-ui, sans-serif" font-size="10" fill="#64748B">NPWP: 02.987.654.3-054.000</text>
-
-    <rect x="52" y="196" width="248" height="60" rx="4" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1"/>
-    <text x="60" y="214" font-family="system-ui, sans-serif" font-size="9" font-weight="600" fill="#94A3B8">ITEM DESKRIPSI</text>
-    <text x="60" y="232" font-family="system-ui, sans-serif" font-size="10" fill="#334155">Jasa Pengiriman Truk Tronton Wingbox</text>
-    <text x="210" y="232" font-family="system-ui, sans-serif" font-size="10" font-weight="600" fill="#0F172A">Rp 18.500.000</text>
-
-    <rect x="52" y="270" width="248" height="30" rx="4" fill="#ECFDF5" stroke="#A7F3D0" stroke-width="1"/>
-    <text x="60" y="289" font-family="system-ui, sans-serif" font-size="10" font-weight="700" fill="#059669">TOTAL RECONCILED: Rp 20.535.000</text>
+  <!-- Subtle grid background decor -->
+  <g opacity="0.4">
+    <line x1="40" y1="80" x2="820" y2="80" stroke="#E2E8F0" stroke-dasharray="3 3"/>
+    <line x1="40" y1="160" x2="820" y2="160" stroke="#E2E8F0" stroke-dasharray="3 3"/>
+    <line x1="40" y1="240" x2="820" y2="240" stroke="#E2E8F0" stroke-dasharray="3 3"/>
+    <line x1="40" y1="320" x2="820" y2="320" stroke="#E2E8F0" stroke-dasharray="3 3"/>
+    <line x1="40" y1="400" x2="820" y2="400" stroke="#E2E8F0" stroke-dasharray="3 3"/>
   </g>
 
-  <!-- Center Arrow Sync -->
-  <g>
-    <circle cx="348" cy="210" r="18" fill="#EEF2FF" stroke="#4F46E5" stroke-width="1.5"/>
-    <path d="M 342 210 L 354 210 M 350 206 L 354 210 L 350 214" stroke="#4F46E5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- ========================================== -->
+  <!-- LEFT PANEL: Extracted Document & OCR Bounding Boxes -->
+  <!-- ========================================== -->
+  <g filter="url(#cardShadow)">
+    <rect x="36" y="32" width="364" height="416" rx="12" fill="#FFFFFF" stroke="#CBD5E1" stroke-width="1.2"/>
+    
+    <!-- Panel Header: Document Preview Meta -->
+    <rect x="36" y="32" width="364" height="48" rx="12" fill="#F8FAFC"/>
+    <rect x="52" y="48" width="16" height="16" rx="4" fill="#EEF2FF"/>
+    <path d="M57 52 H63 M57 56 H61 M57 60 H63" stroke="#4F46E5" stroke-width="1.5" stroke-linecap="round"/>
+    <text x="76" y="60" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="700" fill="#0F172A">Invoice_Scan_GLI_9014.pdf</text>
+    <rect x="306" y="46" width="78" height="20" rx="4" fill="#FEF3C7"/>
+    <text x="345" y="60" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="9" font-weight="700" fill="#B45309">AMBANG: 91%</text>
+    <line x1="36" y1="80" x2="400" y2="80" stroke="#E2E8F0" stroke-width="1"/>
+
+    <!-- Document Header Skeleton -->
+    <rect x="52" y="96" width="130" height="12" rx="3" fill="#94A3B8"/>
+    <rect x="52" y="114" width="85" height="8" rx="2" fill="#CBD5E1"/>
+
+    <!-- Highlighted Active OCR Bounding Box (Vendor Field) -->
+    <g>
+      <rect x="48" y="142" width="340" height="48" rx="6" fill="#EEF2FF" stroke="#4F46E5" stroke-width="1.8"/>
+      <!-- Pill Badge -->
+      <rect x="48" y="127" width="105" height="16" rx="3" fill="#4F46E5"/>
+      <text x="100.5" y="139" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="8" font-weight="700" fill="#FFFFFF">ACTIVE OCR SELECTION</text>
+      <!-- Extracted Text -->
+      <text x="60" y="165" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="700" fill="#1E293B">PT Graha Logistik Indonesia</text>
+      <text x="60" y="181" font-family="system-ui, -apple-system, sans-serif" font-size="9" font-weight="500" fill="#6366F1">Skor Keyakinan OCR: 98.4% (Tinggi)</text>
+    </g>
+
+    <!-- Field 2: NPWP Vendor -->
+    <rect x="48" y="202" width="340" height="34" rx="6" fill="#F8FAFC" stroke="#E2E8F0" stroke-width="1"/>
+    <text x="58" y="223" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="500" fill="#475569">NPWP: 02.987.654.3-054.000</text>
+    <text x="372" y="223" text-anchor="end" font-family="system-ui, -apple-system, sans-serif" font-size="9" font-weight="600" fill="#059669">Valid DJP ✓</text>
+
+    <!-- Field 3: Line Item & Price (NO TEXT OVERLAP, CLEAN LAYOUT) -->
+    <rect x="48" y="246" width="340" height="66" rx="6" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1"/>
+    <text x="58" y="266" font-family="system-ui, -apple-system, sans-serif" font-size="9" font-weight="700" fill="#94A3B8" letter-spacing="0.5">DESKRIPSI ITEM TAGIHAN</text>
+    <text x="58" y="286" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="600" fill="#1E293B">Jasa Ekspedisi Truk Tronton Wingbox</text>
+    <text x="58" y="302" font-family="system-ui, -apple-system, sans-serif" font-size="10" fill="#64748B">Rute Cikarang - Tanjung Priok (1 Lot)</text>
+    <!-- Price badge placed distinctly on top right of the item box -->
+    <rect x="264" y="270" width="114" height="24" rx="4" fill="#F1F5F9" stroke="#CBD5E1"/>
+    <text x="321" y="286" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="700" fill="#0F172A">Rp 18.500.000</text>
+
+    <!-- Total Reconciled Status Box -->
+    <rect x="48" y="324" width="340" height="42" rx="6" fill="#ECFDF5" stroke="#A7F3D0" stroke-width="1.2"/>
+    <circle cx="68" cy="345" r="9" fill="#10B981"/>
+    <path d="M65 345 L67.5 347.5 L71.5 342.5" stroke="#FFFFFF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="86" y="342" font-family="system-ui, -apple-system, sans-serif" font-size="10" font-weight="700" fill="#065F46">TOTAL RECONCILED (DPP + PPN 11%)</text>
+    <text x="86" y="356" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="800" fill="#047857">Rp 20.535.000</text>
+
+    <!-- Document Thumbnail Preview strip -->
+    <g opacity="0.6">
+      <rect x="48" y="378" width="80" height="54" rx="4" fill="#F8FAFC" stroke="#E2E8F0"/>
+      <line x1="56" y1="390" x2="110" y2="390" stroke="#CBD5E1" stroke-width="2"/>
+      <line x1="56" y1="398" x2="95" y2="398" stroke="#E2E8F0" stroke-width="2"/>
+      <line x1="56" y1="406" x2="115" y2="406" stroke="#E2E8F0" stroke-width="2"/>
+      <rect x="140" y="390" width="150" height="8" rx="2" fill="#E2E8F0"/>
+      <rect x="140" y="406" width="100" height="8" rx="2" fill="#F1F5F9"/>
+    </g>
   </g>
 
-  <!-- Right: Verification Editor Panel -->
-  <g filter="url(#pShadow)">
-    <rect x="384" y="36" width="280" height="348" rx="8" fill="#FFFFFF" stroke="#CBD5E1" stroke-width="1"/>
-    <!-- Panel Header -->
-    <rect x="384" y="36" width="280" height="42" rx="8" fill="#F8FAFC"/>
-    <text x="402" y="62" font-family="system-ui, sans-serif" font-size="12" font-weight="700" fill="#0F172A">Reviewer Editor Form</text>
-    <rect x="590" y="47" width="60" height="20" rx="4" fill="#ECFDF5"/>
-    <text x="596" y="61" font-family="system-ui, sans-serif" font-size="9" font-weight="700" fill="#059669">98% Match</text>
+  <!-- ========================================== -->
+  <!-- CENTER CONNECTOR: Realtime Sync Arrow Badge -->
+  <!-- ========================================== -->
+  <g filter="url(#floatShadow)">
+    <circle cx="430" cy="240" r="22" fill="#FFFFFF" stroke="#4F46E5" stroke-width="2"/>
+    <path d="M422 240 H438 M432 234 L438 240 L432 246" stroke="#4F46E5" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <rect x="405" y="268" width="50" height="16" rx="8" fill="#4F46E5"/>
+    <text x="430" y="279" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="8" font-weight="700" fill="#FFFFFF">SYNC</text>
+  </g>
 
-    <!-- Focused Input Field -->
-    <text x="402" y="104" font-family="system-ui, sans-serif" font-size="10" font-weight="600" fill="#4F46E5">NAMA VENDOR TERDAFTAR</text>
-    <rect x="402" y="112" width="244" height="34" rx="6" fill="#FFFFFF" stroke="#4F46E5" stroke-width="2"/>
-    <text x="412" y="133" font-family="system-ui, sans-serif" font-size="11" font-weight="600" fill="#0F172A">PT Graha Logistik Indonesia</text>
+  <!-- ========================================== -->
+  <!-- RIGHT PANEL: Human Reviewer Verification Form -->
+  <!-- ========================================== -->
+  <g filter="url(#cardShadow)">
+    <rect x="460" y="32" width="364" height="416" rx="12" fill="#FFFFFF" stroke="#CBD5E1" stroke-width="1.2"/>
+    
+    <!-- Panel Header: Reviewer Form Title & AI Confidence Badge -->
+    <rect x="460" y="32" width="364" height="48" rx="12" fill="#F8FAFC"/>
+    <circle cx="482" cy="56" r="6" fill="#10B981"/>
+    <text x="496" y="60" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="700" fill="#0F172A">Reviewer Verification Form</text>
+    <!-- Match Pill -->
+    <rect x="736" y="45" width="74" height="22" rx="11" fill="#ECFDF5" stroke="#A7F3D0"/>
+    <text x="773" y="60" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="10" font-weight="800" fill="#059669">98.4% Match</text>
+    <line x1="460" y1="80" x2="824" y2="80" stroke="#E2E8F0" stroke-width="1"/>
 
-    <!-- Second Input -->
-    <text x="402" y="168" font-family="system-ui, sans-serif" font-size="10" font-weight="600" fill="#64748B">NOMOR INVOICE</text>
-    <rect x="402" y="176" width="244" height="32" rx="6" fill="#F8FAFC" stroke="#E2E8F0" stroke-width="1"/>
-    <text x="412" y="196" font-family="system-ui, sans-serif" font-size="11" fill="#334155">INV/2026/02/GLI-9014</text>
+    <!-- Form Field 1: Focused / Active Input Field -->
+    <text x="480" y="104" font-family="system-ui, -apple-system, sans-serif" font-size="10" font-weight="700" fill="#4F46E5" letter-spacing="0.4">NAMA VENDOR TERDAFTAR (MASTER DATA)</text>
+    <rect x="480" y="112" width="324" height="38" rx="6" fill="#FFFFFF" stroke="#4F46E5" stroke-width="2"/>
+    <text x="494" y="136" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="700" fill="#0F172A">PT Graha Logistik Indonesia</text>
+    <!-- Verified tick inside input -->
+    <circle cx="786" cy="131" r="8" fill="#ECFDF5"/>
+    <path d="M783 131 L785 133 L789 129" stroke="#059669" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
 
-    <!-- Calculation Validation Info -->
-    <rect x="402" y="222" width="244" height="64" rx="6" fill="#F1F5F9" stroke="#E2E8F0" stroke-width="1"/>
-    <text x="412" y="240" font-family="system-ui, sans-serif" font-size="10" font-weight="600" fill="#334155">Validasi Aturan Pajak &amp; Aritmatika</text>
-    <text x="412" y="258" font-family="system-ui, sans-serif" font-size="9" fill="#059669">✓ DPP Rp 18.500.000 + PPN 11% = Tepat</text>
-    <text x="412" y="274" font-family="system-ui, sans-serif" font-size="9" fill="#059669">✓ Vendor terdaftar dalam whitelist master data</text>
+    <!-- Form Field 2: Invoice Number Field -->
+    <text x="480" y="172" font-family="system-ui, -apple-system, sans-serif" font-size="10" font-weight="700" fill="#64748B" letter-spacing="0.4">NOMOR INVOICE / FAKTUR</text>
+    <rect x="480" y="180" width="324" height="36" rx="6" fill="#F8FAFC" stroke="#CBD5E1" stroke-width="1"/>
+    <text x="494" y="203" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="600" fill="#334155">INV/2026/02/GLI-9014</text>
 
-    <!-- Buttons -->
-    <rect x="402" y="306" width="116" height="34" rx="6" fill="#FFFFFF" stroke="#CBD5E1" stroke-width="1"/>
-    <text x="424" y="327" font-family="system-ui, sans-serif" font-size="11" font-weight="600" fill="#475569">Minta Revisi</text>
+    <!-- Calculation & Forensic Validation Card -->
+    <rect x="480" y="230" width="324" height="98" rx="8" fill="#F8FAFC" stroke="#E2E8F0" stroke-width="1"/>
+    <rect x="480" y="230" width="4" height="98" rx="2" fill="#10B981"/>
+    
+    <text x="496" y="248" font-family="system-ui, -apple-system, sans-serif" font-size="10" font-weight="700" fill="#1E293B">Validasi Forensik &amp; Aturan Aritmatika Pajak</text>
+    
+    <g transform="translate(496, 264)">
+      <circle cx="5" cy="5" r="4" fill="#10B981"/>
+      <text x="16" y="8" font-family="system-ui, -apple-system, sans-serif" font-size="10" fill="#047857">DPP Rp 18.500.000 + PPN 11% (Rp 2.035.000) = Cocok</text>
+    </g>
 
-    <rect x="530" y="306" width="116" height="34" rx="6" fill="#059669"/>
-    <text x="548" y="327" font-family="system-ui, sans-serif" font-size="11" font-weight="600" fill="#FFFFFF">✓ Setujui (Approve)</text>
+    <g transform="translate(496, 284)">
+      <circle cx="5" cy="5" r="4" fill="#10B981"/>
+      <text x="16" y="8" font-family="system-ui, -apple-system, sans-serif" font-size="10" fill="#047857">Rekening bank vendor cocok dengan Master Whitelist</text>
+    </g>
+
+    <g transform="translate(496, 304)">
+      <circle cx="5" cy="5" r="4" fill="#3B82F6"/>
+      <text x="16" y="8" font-family="system-ui, -apple-system, sans-serif" font-size="10" fill="#1D4ED8">Riwayat audit: Stempel waktu ISO tercatat untuk AP Lead</text>
+    </g>
+
+    <!-- Reviewer Action Buttons (PREMIUM, NEVER CLIPPED) -->
+    <!-- Reject / Request Revision Button -->
+    <rect x="480" y="344" width="150" height="42" rx="8" fill="#FFFFFF" stroke="#CBD5E1" stroke-width="1.2"/>
+    <path d="M500 365 H512 M504 361 L500 365 L504 369" stroke="#64748B" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="522" y="369" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="700" fill="#475569">Minta Revisi</text>
+
+    <!-- Approve Button (Prominent Green Pill) -->
+    <rect x="644" y="344" width="160" height="42" rx="8" fill="url(#successGrad)"/>
+    <path d="M666 365 L671 370 L680 360" stroke="#FFFFFF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="688" y="370" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="700" fill="#FFFFFF">Setujui (Approve)</text>
+
+    <!-- Bottom reviewer info note -->
+    <text x="642" y="414" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="9" fill="#94A3B8">Reviewer: Rizky Pratama (AP Specialist) • Shift Pagi</text>
   </g>
 </svg>
-
