@@ -7,6 +7,7 @@ import {
   INITIAL_RBAC_USERS,
   ALL_AVAILABLE_PERMISSIONS,
 } from '@/lib/mocks/rbacUsers';
+import { RBACActionMenu } from '@/components/shared/RBACActionMenu';
 import {
   ShieldCheckIcon,
   SearchIcon,
@@ -21,6 +22,7 @@ import {
   CheckIcon,
   AlertTriangleIcon,
   FilterIcon,
+  MoreHorizontalIcon,
 } from '@/components/ui/icons';
 
 export default function UsersManagementPage() {
@@ -59,6 +61,12 @@ export default function UsersManagementPage() {
   const [editUser, setEditUser] = useState<RBACMember | null>(null);
   const [deleteUser, setDeleteUser] = useState<RBACMember | null>(null);
   const [isAddOpen, setIsAddOpen] = useState(false);
+
+  // Active Action Menu (Shared for 3-dot dropdown & right-click context menu)
+  const [activeMenu, setActiveMenu] = useState<{
+    user: RBACMember;
+    position: { x: number; y: number };
+  } | null>(null);
 
   // Form state for Add/Edit
   const [formData, setFormData] = useState({
@@ -313,6 +321,18 @@ export default function UsersManagementPage() {
     setUsers(users.filter((u) => u.id !== deleteUser.id));
     setToast({ message: `Anggota "${deleteUser.name}" berhasil dihapus dari sistem!`, type: 'success' });
     setDeleteUser(null);
+  };
+
+  // Toggle User Status (Aktif <-> Nonaktif)
+  const handleToggleStatus = (targetUser: RBACMember) => {
+    const newStatus = targetUser.status === 'Aktif' ? 'Nonaktif' : 'Aktif';
+    setUsers((prev) =>
+      prev.map((u) => (u.id === targetUser.id ? { ...u, status: newStatus } : u))
+    );
+    setToast({
+      message: `Status "${targetUser.name}" berhasil diubah menjadi ${newStatus}!`,
+      type: 'success',
+    });
   };
 
   // Export CSV
@@ -867,7 +887,17 @@ export default function UsersManagementPage() {
                   </tr>
                 ) : (
                   paginatedUsers.map((user) => (
-                    <tr key={user.id} className="hover:bg-[#F8FAFC] transition-colors">
+                    <tr
+                      key={user.id}
+                      onContextMenu={(e) => {
+                        e.preventDefault();
+                        setActiveMenu({
+                          user,
+                          position: { x: e.clientX, y: e.clientY },
+                        });
+                      }}
+                      className="hover:bg-[#F8FAFC] transition-colors cursor-default"
+                    >
                       {/* 1. Nama Anggota */}
                       <td className="py-3.5 px-5">
                         <div className="font-bold text-[#0F172A]">{user.name}</div>
@@ -935,37 +965,23 @@ export default function UsersManagementPage() {
                         )}
                       </td>
 
-                      {/* 6. Aksi Column */}
+                      {/* 6. Aksi Column with 3-Dot Ellipsis */}
                       <td className="py-3.5 px-5 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
-                          {/* View Button */}
+                        <div className="flex items-center justify-end">
                           <button
                             type="button"
-                            onClick={() => setViewUser(user)}
-                            title="Lihat Detail Profil"
-                            className="p-1.5 rounded-md text-slate-500 hover:text-[#4F46E5] hover:bg-[#EEF2FF] transition-colors"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const rect = e.currentTarget.getBoundingClientRect();
+                              setActiveMenu({
+                                user,
+                                position: { x: rect.right - 200, y: rect.bottom + 6 },
+                              });
+                            }}
+                            title="Aksi Anggota"
+                            className="p-1.5 rounded-lg border border-transparent hover:border-[#CBD5E1] text-slate-500 hover:text-[#4F46E5] hover:bg-[#EEF2FF] focus:outline-none focus:ring-1 focus:ring-[#4F46E5] transition-all"
                           >
-                            <EyeIcon className="w-4 h-4" />
-                          </button>
-
-                          {/* Edit Button */}
-                          <button
-                            type="button"
-                            onClick={() => openEditModal(user)}
-                            title="Edit Data Anggota"
-                            className="p-1.5 rounded-md text-slate-500 hover:text-amber-600 hover:bg-amber-50 transition-colors"
-                          >
-                            <PencilIcon className="w-4 h-4" />
-                          </button>
-
-                          {/* Delete Button */}
-                          <button
-                            type="button"
-                            onClick={() => setDeleteUser(user)}
-                            title="Hapus Anggota"
-                            className="p-1.5 rounded-md text-slate-500 hover:text-rose-600 hover:bg-rose-50 transition-colors"
-                          >
-                            <TrashIcon className="w-4 h-4" />
+                            <MoreHorizontalIcon className="w-4 h-4" />
                           </button>
                         </div>
                       </td>
@@ -1372,6 +1388,20 @@ export default function UsersManagementPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Shared Action Menu (Triggered by 3-dot button or right-click context menu) */}
+      {activeMenu && (
+        <RBACActionMenu
+          isOpen={Boolean(activeMenu)}
+          position={activeMenu.position}
+          user={activeMenu.user}
+          onClose={() => setActiveMenu(null)}
+          onView={(u) => setViewUser(u)}
+          onEdit={(u) => openEditModal(u)}
+          onToggleStatus={(u) => handleToggleStatus(u)}
+          onDelete={(u) => setDeleteUser(u)}
+        />
       )}
     </div>
   );
