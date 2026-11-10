@@ -29,9 +29,11 @@ import {
 import { DocumentQuickDetailModal } from '@/components/dashboard/documents/DocumentQuickDetailModal';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { SectionHeader } from '@/components/shared/SectionHeader';
+import { useAppMode } from '@/context/ModeContext';
 
 export default function DashboardOverviewPage() {
   const router = useRouter();
+  const { isDemo, isProduction, tenantName } = useAppMode();
   const [documents, setDocuments] = useState<DocumentRecord[]>(() => DocumentService.getDocuments());
   const [previewDoc, setPreviewDoc] = useState<DocumentRecord | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' } | null>(null);
@@ -148,11 +150,37 @@ export default function DashboardOverviewPage() {
       />
 
       <main className="flex-1 w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 py-6 sm:py-8 space-y-8 min-w-0">
+        {/* Banner Peringatan Lingkungan Demo */}
+        {isDemo && (
+          <div className="p-3.5 sm:p-4 rounded-xl border border-amber-300 bg-amber-50/80 text-amber-900 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+            <div className="flex items-center gap-2.5">
+              <span className="text-base">⚠️</span>
+              <div>
+                <strong>Lingkungan Simulasi & Evaluasi Produk:</strong> Data dan integrasi di halaman ini adalah simulasi lokal (sandbox) dan tidak memengaruhi pembukuan produksi riil.
+              </div>
+            </div>
+            <Link
+              href="/login"
+              className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg shrink-0 text-center transition-colors shadow-2xs"
+            >
+              Masuk Akun Live
+            </Link>
+          </div>
+        )}
+
         {/* Page Identity Header */}
         <PageHeader
           title="Ringkasan Utama & Analisis Operasional"
-          subtitle="Pantau performa pemrosesan dokumen, akurasi AI, status verifikasi, dan analisis operasional dalam satu dashboard terpadu."
-          badge={{ label: 'Live Enterprise Sync', variant: 'purple' }}
+          subtitle={
+            isProduction
+              ? `Workspace Operasional AP & Pajak untuk ${tenantName}`
+              : 'Pantau performa pemrosesan dokumen, akurasi AI, status verifikasi, dan analisis operasional dalam satu dashboard terpadu.'
+          }
+          badge={
+            isProduction
+              ? { label: 'Live Enterprise Telemetry', variant: 'success' }
+              : { label: 'Simulasi Ekstraksi AI', variant: 'purple' }
+          }
         />
 
         {/* 1. Primary KPI Cards Grid (Interactive & Clickable) */}
@@ -252,7 +280,7 @@ export default function DashboardOverviewPage() {
           <div className="space-y-1.5 min-w-0 flex-1">
             <div className="inline-flex items-center gap-2 text-[11px] uppercase font-extrabold tracking-wider text-[#4F46E5]">
               <span className="w-2 h-2 rounded-full bg-[#4F46E5] animate-pulse" />
-              <span>Simulasi Intelligent Processing</span>
+              <span>{isProduction ? 'Antrean Verifikasi Dokumen Masuk' : 'Simulasi Intelligent Processing'}</span>
             </div>
             <h3 className="text-base sm:text-lg font-bold text-[#0F172A] leading-snug">
               Ada {pendingDocs} dokumen menunggu review mata manusia sebelum ekspor ke SAP ERP

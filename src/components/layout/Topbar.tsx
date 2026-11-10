@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { SearchIcon, RefreshCwIcon, MenuIcon } from '@/components/ui/icons';
 import { MockDocumentService } from '@/lib/mocks/storage';
 import { useSidebar } from '@/context/SidebarContext';
+import { useAppMode } from '@/context/ModeContext';
 
 interface TopbarProps {
   title: string;
@@ -15,6 +16,7 @@ export function Topbar({ title, subtitle, onSearch }: TopbarProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [isResetting, setIsResetting] = useState(false);
   const { toggleSidebar } = useSidebar();
+  const { isDemo, isProduction, tenantName } = useAppMode();
 
   const handleResetData = () => {
     if (confirm('Reset seluruh data demo ke kondisi awal fixtures pabrikan?')) {
@@ -49,9 +51,22 @@ export function Topbar({ title, subtitle, onSearch }: TopbarProps) {
           </button>
 
           <div className="flex flex-col min-w-0">
-            <h1 className="text-sm sm:text-base font-bold text-[#0F172A] dark:text-white leading-tight truncate">
-              {title}
-            </h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-sm sm:text-base font-bold text-[#0F172A] dark:text-white leading-tight truncate">
+                {title}
+              </h1>
+              {/* Environmental Badge */}
+              {isDemo ? (
+                <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-extrabold bg-amber-100 text-amber-900 border border-amber-300">
+                  DEMO SANDBOX
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-extrabold bg-emerald-100 text-emerald-900 border border-emerald-300">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" />
+                  LIVE WORKSPACE
+                </span>
+              )}
+            </div>
             {subtitle && (
               <p className="text-[11px] sm:text-xs text-[#64748B] dark:text-[#94A3B8] truncate hidden sm:block">
                 {subtitle}
@@ -74,17 +89,31 @@ export function Topbar({ title, subtitle, onSearch }: TopbarProps) {
             />
           </div>
 
-          {/* Global Reset Button */}
-          <button
-            type="button"
-            onClick={handleResetData}
-            disabled={isResetting}
-            title="Reset Data Simulasi"
-            className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-md border border-[#E2E8F0] dark:border-[#374151] hover:bg-[#F1F5F9] dark:hover:bg-[#1F2937] text-xs font-medium text-[#475569] dark:text-gray-300 transition-colors shrink-0 cursor-pointer"
-          >
-            <RefreshCwIcon className={`w-3.5 h-3.5 ${isResetting ? 'animate-spin text-[#4F46E5]' : ''}`} />
-            <span className="hidden md:inline">Reset Demo Data</span>
-          </button>
+          {/* Conditional Reset Button (Only in Demo Mode) */}
+          {isDemo && (
+            <button
+              type="button"
+              onClick={handleResetData}
+              disabled={isResetting}
+              title="Reset Data Simulasi"
+              className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-md border border-amber-200 bg-amber-50/50 hover:bg-amber-100 text-xs font-semibold text-amber-800 transition-colors shrink-0 cursor-pointer"
+            >
+              <RefreshCwIcon className={`w-3.5 h-3.5 ${isResetting ? 'animate-spin text-amber-700' : ''}`} />
+              <span className="hidden md:inline">Reset Demo Data</span>
+            </button>
+          )}
+
+          {/* In Production: Show Tenant & Connectivity Badge */}
+          {isProduction && (
+            <div className="hidden md:flex items-center gap-2 pl-2 border-l border-slate-200">
+              <span className="text-[11px] font-semibold text-slate-600 truncate max-w-[200px]">
+                {tenantName}
+              </span>
+              <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700">
+                API 200 OK
+              </span>
+            </div>
+          )}
         </div>
       </div>
     </header>
