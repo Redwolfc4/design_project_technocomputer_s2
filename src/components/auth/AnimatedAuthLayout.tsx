@@ -50,7 +50,7 @@ export const AnimatedAuthLayout: React.FC<AnimatedAuthLayoutProps> = ({
         <div className="hidden lg:block w-full h-full absolute inset-0 pointer-events-none">
           {/* Animated Illustration Panel */}
           <div
-            className={`absolute top-0 bottom-0 w-1/2 bg-gradient-to-br from-[#FAFAFF] via-[#EEF2FF]/60 to-[#E0E7FF]/40 border-r border-[#E2E8F0] transition-all duration-600 ease-in-out pointer-events-auto z-10 flex items-center justify-center ${
+            className={`absolute top-0 bottom-0 w-1/2 bg-gradient-to-br from-[#FAFAFF] via-[#EEF2FF]/60 to-[#E0E7FF]/40 border-r border-[#E2E8F0] transition-all duration-500 ease-in-out pointer-events-auto z-10 flex items-center justify-center ${
               isLogin ? 'left-0 translate-x-0' : 'left-0 translate-x-full border-l border-r-0 border-[#E2E8F0]'
             }`}
           >
@@ -65,7 +65,7 @@ export const AnimatedAuthLayout: React.FC<AnimatedAuthLayoutProps> = ({
 
           {/* Animated Form Slide Track */}
           <div
-            className={`absolute top-0 bottom-0 w-1/2 transition-transform duration-600 ease-in-out pointer-events-auto z-20 flex items-center justify-center overflow-y-auto ${
+            className={`absolute top-0 bottom-0 w-1/2 transition-transform duration-500 ease-in-out pointer-events-auto z-20 flex items-center justify-center overflow-y-auto ${
               isLogin ? 'left-1/2 translate-x-0' : 'left-0 translate-x-0'
             }`}
           >

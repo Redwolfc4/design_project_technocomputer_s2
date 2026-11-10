@@ -1,15 +1,8 @@
-const fg = require('fast-glob');
-const fs = require('fs');
-
-const files = fg.sync(['src/**/*.{js,ts,jsx,tsx,mdx}']);
-const rawContent = files.map((f) => ({
-  raw: fs.readFileSync(f, 'utf-8'),
-  extension: f.endsWith('.tsx') ? 'tsx' : 'ts',
-}));
-
 /** @type {import('tailwindcss').Config} */
 module.exports = {
-  content: rawContent,
+  content: [
+    './src/**/*.{js,ts,jsx,tsx,mdx}',
+  ],
   darkMode: 'class',
   theme: {
     extend: {
