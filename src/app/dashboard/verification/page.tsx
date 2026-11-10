@@ -37,7 +37,7 @@ function VerificationWorkspaceInner() {
   const pendingList = documents.filter((d) => d.status === 'needs_review');
 
   return (
-    <div className="flex-1 flex flex-col h-screen overflow-hidden">
+    <div className="flex-1 flex flex-col min-h-screen lg:h-screen lg:overflow-hidden min-w-0">
       <Topbar
         title="Human-in-the-Loop Verification Workspace"
         subtitle="Verifikasi berdampingan: Pratinjau berkas asli dengan anotasi visual & formulir koreksi nilai AI"
@@ -46,9 +46,8 @@ function VerificationWorkspaceInner() {
       {/* Global Notification Banner */}
       {notification && (
         <div
-          className={`px-8 py-2.5 text-xs font-bold text-white flex items-center justify-between transition-all ${
-            notification.type === 'success' ? 'bg-[#059669]' : 'bg-[#E11D48]'
-          }`}
+          className={`px-8 py-2.5 text-xs font-bold text-white flex items-center justify-between transition-all ${notification.type === 'success' ? 'bg-[#059669]' : 'bg-[#E11D48]'
+            }`}
         >
           <span>{notification.message}</span>
           <button
@@ -61,11 +60,11 @@ function VerificationWorkspaceInner() {
         </div>
       )}
 
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex flex-col xl:flex-row overflow-y-auto lg:overflow-hidden min-w-0">
         {/* ======================================================== */}
         {/* Left Column 1: Verification Queue List                    */}
         {/* ======================================================== */}
-        <div className="w-80 border-r border-[#E2E8F0] bg-white flex flex-col h-full">
+        <div className="w-full xl:w-72 2xl:w-80 border-b xl:border-b-0 xl:border-r border-[#E2E8F0] bg-white flex flex-col shrink-0 max-h-64 xl:max-h-full">
           <div className="p-4 border-b border-[#E2E8F0] bg-[#FAFAFF] flex items-center justify-between">
             <span className="text-xs font-bold uppercase tracking-wider text-[#475569]">
               Antrean Verifikasi ({pendingList.length})
@@ -84,9 +83,8 @@ function VerificationWorkspaceInner() {
                   key={doc.id}
                   type="button"
                   onClick={() => selectDocument(doc.id)}
-                  className={`w-full text-left p-4 transition-colors flex flex-col gap-1.5 ${
-                    isSelected ? 'bg-[#EEF2FF] border-l-4 border-[#4F46E5]' : 'hover:bg-[#F8FAFC]'
-                  }`}
+                  className={`w-full text-left p-4 transition-colors flex flex-col gap-1.5 ${isSelected ? 'bg-[#EEF2FF] border-l-4 border-[#4F46E5]' : 'hover:bg-[#F8FAFC]'
+                    }`}
                 >
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-bold text-[#0F172A]">{doc.fileNumber}</span>
@@ -100,13 +98,12 @@ function VerificationWorkspaceInner() {
                   <div className="flex items-center justify-between text-[11px] pt-1">
                     <span className="font-semibold text-[#0F172A]">{formatIDR(doc.totalAmount)}</span>
                     <span
-                      className={`font-bold ${
-                        doc.confidence >= 90
+                      className={`font-bold ${doc.confidence >= 90
                           ? 'text-[#059669]'
                           : doc.confidence >= 75
-                          ? 'text-[#F59E0B]'
-                          : 'text-[#E11D48]'
-                      }`}
+                            ? 'text-[#F59E0B]'
+                            : 'text-[#E11D48]'
+                        }`}
                     >
                       {doc.confidence}% Match
                     </span>
@@ -120,8 +117,8 @@ function VerificationWorkspaceInner() {
         {/* ======================================================== */}
         {/* Center Column: Visual Document Preview & Extraction Box  */}
         {/* ======================================================== */}
-        <div className="flex-1 bg-[#F1F5F9] p-6 flex flex-col overflow-y-auto items-center justify-start">
-          <div className="w-full max-w-2xl bg-white rounded-xl shadow-lg border border-[#CBD5E1] p-8 relative min-h-[640px] flex flex-col justify-between select-none">
+        <div className="flex-1 bg-[#F1F5F9] p-4 sm:p-6 flex flex-col overflow-y-auto items-center justify-start min-w-0">
+          <div className="w-full max-w-2xl bg-white rounded-xl shadow-lg border border-[#CBD5E1] p-6 sm:p-8 relative min-h-[500px] flex flex-col justify-between select-none">
             <div className="absolute top-3 right-4 flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#EEF2FF] border border-[#CBD5E1] text-[#4F46E5] text-[10px] font-bold uppercase tracking-wider">
               <span>Preview Simulasi IDP</span>
             </div>
@@ -153,11 +150,10 @@ function VerificationWorkspaceInner() {
                         <div
                           key={field.id}
                           onClick={() => setSelectedFieldId(field.id)}
-                          className={`p-3 rounded-lg border-2 transition-all cursor-pointer flex items-center justify-between ${
-                            isHighlighted
+                          className={`p-3 rounded-lg border-2 transition-all cursor-pointer flex items-center justify-between ${isHighlighted
                               ? 'border-[#4F46E5] bg-[#EEF2FF]/60 shadow-md ring-2 ring-[#4F46E5]/20'
                               : 'border-[#E2E8F0] bg-[#FAFAFF] hover:border-[#CBD5E1]'
-                          }`}
+                            }`}
                         >
                           <div>
                             <span className="text-[10px] font-bold uppercase tracking-wider text-[#64748B] block">
@@ -175,13 +171,12 @@ function VerificationWorkspaceInner() {
                               </span>
                             )}
                             <span
-                              className={`text-[10px] font-extrabold px-2 py-0.5 rounded ${
-                                field.confidence >= 0.9
+                              className={`text-[10px] font-extrabold px-2 py-0.5 rounded ${field.confidence >= 0.9
                                   ? 'bg-emerald-50 text-emerald-700'
                                   : field.confidence >= 0.75
-                                  ? 'bg-amber-50 text-amber-700'
-                                  : 'bg-rose-50 text-rose-700'
-                              }`}
+                                    ? 'bg-amber-50 text-amber-700'
+                                    : 'bg-rose-50 text-rose-700'
+                                }`}
                             >
                               {Math.round(field.confidence * 100)}%
                             </span>
@@ -231,7 +226,7 @@ function VerificationWorkspaceInner() {
         {/* ======================================================== */}
         {/* Right Column: Debounced Auto-Sync Editor & Direct Actions */}
         {/* ======================================================== */}
-        <div className="w-96 border-l border-[#E2E8F0] bg-white flex flex-col h-full">
+        <div className="w-full xl:w-96 border-t xl:border-t-0 xl:border-l border-[#E2E8F0] bg-white flex flex-col shrink-0 min-w-0">
           <div className="p-3.5 border-b border-[#E2E8F0] bg-[#FAFAFF] flex items-center justify-between">
             <div className="flex flex-col">
               <span className="text-xs font-bold uppercase tracking-wider text-[#475569]">
@@ -241,8 +236,8 @@ function VerificationWorkspaceInner() {
                 {activeDoc?.status === 'approved' || activeDoc?.status === 'rejected'
                   ? 'Status Final • Terkunci Permanen'
                   : isEditMode
-                  ? 'Mode Edit Aktif'
-                  : 'Mode Read-Only (Default)'}
+                    ? 'Mode Edit Aktif'
+                    : 'Mode Read-Only (Default)'}
               </span>
             </div>
 
@@ -296,42 +291,40 @@ function VerificationWorkspaceInner() {
             {activeDoc && activeDraft && (
               <>
                 <div
-                  className={`p-3.5 rounded-lg border space-y-1 ${
-                    activeDoc.status === 'approved'
+                  className={`p-3.5 rounded-lg border space-y-1 ${activeDoc.status === 'approved'
                       ? 'border-emerald-200 bg-emerald-50/50'
                       : activeDoc.status === 'rejected'
-                      ? 'border-rose-200 bg-rose-50/50'
-                      : 'border-[#CBD5E1] bg-[#FAFAFF]'
-                  }`}
+                        ? 'border-rose-200 bg-rose-50/50'
+                        : 'border-[#CBD5E1] bg-[#FAFAFF]'
+                    }`}
                 >
                   <div className="flex items-center justify-between">
                     <span className="text-[10px] font-bold uppercase tracking-wider text-[#64748B]">
                       Status Verifikasi Dokumen
                     </span>
                     <span
-                      className={`text-[9px] font-extrabold px-2 py-0.5 rounded-full ${
-                        activeDoc.status === 'approved'
+                      className={`text-[9px] font-extrabold px-2 py-0.5 rounded-full ${activeDoc.status === 'approved'
                           ? 'bg-emerald-100 text-emerald-800'
                           : activeDoc.status === 'rejected'
-                          ? 'bg-rose-100 text-rose-800'
-                          : 'bg-amber-100 text-amber-800'
-                      }`}
+                            ? 'bg-rose-100 text-rose-800'
+                            : 'bg-amber-100 text-amber-800'
+                        }`}
                     >
                       {activeDoc.status === 'approved'
                         ? 'Terverifikasi'
                         : activeDoc.status === 'rejected'
-                        ? 'Ditolak'
-                        : 'Perlu Verifikasi'}
+                          ? 'Ditolak'
+                          : 'Perlu Verifikasi'}
                     </span>
                   </div>
                   <div className="text-sm font-extrabold text-[#0F172A] pt-0.5">
                     {activeDoc.status === 'approved'
                       ? '✓ Dokumen Telah Terverifikasi (Final)'
                       : activeDoc.status === 'rejected'
-                      ? '✕ Dokumen Telah Ditolak (Final)'
-                      : isEditMode
-                      ? '✏️ Sedang Mengedit Field Dokumen'
-                      : '🔒 Pratinjau Read-Only'}
+                        ? '✕ Dokumen Telah Ditolak (Final)'
+                        : isEditMode
+                          ? '✏️ Sedang Mengedit Field Dokumen'
+                          : '🔒 Pratinjau Read-Only'}
                   </div>
                 </div>
 
@@ -345,11 +338,10 @@ function VerificationWorkspaceInner() {
                     return (
                       <div
                         key={field.id}
-                        className={`space-y-1.5 p-3 rounded-lg border transition-all ${
-                          selectedFieldId === field.id
+                        className={`space-y-1.5 p-3 rounded-lg border transition-all ${selectedFieldId === field.id
                             ? 'border-[#4F46E5] bg-[#EEF2FF]/30 ring-1 ring-[#4F46E5]/20'
                             : 'border-[#E2E8F0] bg-white'
-                        }`}
+                          }`}
                       >
                         <div className="flex items-center justify-between">
                           <label className="text-[11px] font-bold text-[#475569]">
@@ -362,9 +354,8 @@ function VerificationWorkspaceInner() {
                               </span>
                             )}
                             <span
-                              className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
-                                field.confidence >= 0.9 ? 'text-[#059669]' : 'text-[#F59E0B]'
-                              }`}
+                              className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${field.confidence >= 0.9 ? 'text-[#059669]' : 'text-[#F59E0B]'
+                                }`}
                             >
                               {Math.round(field.confidence * 100)}% Match
                             </span>
@@ -381,11 +372,10 @@ function VerificationWorkspaceInner() {
                             }
                           }}
                           onFocus={() => setSelectedFieldId(field.id)}
-                          className={`w-full text-xs font-semibold px-3 py-2 rounded-md border transition-colors ${
-                            isFieldReadOnly
+                          className={`w-full text-xs font-semibold px-3 py-2 rounded-md border transition-colors ${isFieldReadOnly
                               ? 'border-[#E2E8F0] bg-[#F8FAFC] text-[#1E293B] cursor-default focus:outline-none select-all'
                               : 'border-[#4F46E5] bg-white text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#4F46E5]'
-                          }`}
+                            }`}
                         />
 
                         {field.validationMessage && (
@@ -428,11 +418,10 @@ function VerificationWorkspaceInner() {
                         updateNoteDraft(activeDoc.id, e.target.value);
                       }
                     }}
-                    className={`w-full text-xs px-3 py-2 rounded-md border transition-colors ${
-                      activeDoc.status === 'approved' || activeDoc.status === 'rejected'
+                    className={`w-full text-xs px-3 py-2 rounded-md border transition-colors ${activeDoc.status === 'approved' || activeDoc.status === 'rejected'
                         ? 'border-[#E2E8F0] bg-[#F8FAFC] text-[#334155] cursor-default focus:outline-none'
                         : 'border-[#CBD5E1] bg-white text-[#0F172A] focus:outline-none focus:ring-1 focus:ring-[#4F46E5]'
-                    }`}
+                      }`}
                   />
                 </div>
               </>

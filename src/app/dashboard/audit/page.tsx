@@ -2,9 +2,9 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { Topbar } from '@/components/layout/Topbar';
-import { MockDocumentService } from '@/lib/mocks/storage';
+import { AuditService } from '@/lib/modules/audit/audit.service';
 import { AuditLogEntry } from '@/types';
-import { formatDateTime } from '@/lib/utils/formatters';
+import { formatDateTime, formatActionLabel } from '@/lib/utils/formatters';
 import {
   ShieldCheckIcon,
   EyeIcon,
@@ -24,9 +24,10 @@ import {
   FilterConfig,
 } from '@/components/shared/data-table';
 import { AuditLogDetailModal } from '@/components/dashboard/audit/AuditLogDetailModal';
+import { PageHeader } from '@/components/shared/PageHeader';
 
 export default function AuditTrailPage() {
-  const [logs, setLogs] = useState<AuditLogEntry[]>([]);
+  const [logs, setLogs] = useState<AuditLogEntry[]>(() => AuditService.getLogs());
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [filterAction, setFilterAction] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<string>('all');
@@ -49,7 +50,8 @@ export default function AuditTrailPage() {
   } = useDataTableInteractions<AuditLogEntry>();
 
   useEffect(() => {
-    setLogs(MockDocumentService.getAuditLogs());
+    // Listen to localStorage storage events or refresh
+    setLogs(AuditService.getLogs());
   }, []);
 
   useEffect(() => {
@@ -203,7 +205,13 @@ export default function AuditTrailPage() {
         subtitle="Log aktivitas kepatuhan tidak dapat dimodifikasi untuk setiap tindakan persetujuan dan pengunggahan"
       />
 
-      <main className="flex-1 p-6 lg:p-8 space-y-6 max-w-7xl mx-auto w-full">
+      <main className="flex-1 w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 py-6 sm:py-8 space-y-6 min-w-0">
+        <PageHeader
+          title="Audit Trail Forensik & Rekam Jejak Kepatuhan"
+          subtitle="Log aktivitas kepatuhan tidak dapat dimodifikasi untuk setiap tindakan persetujuan dan pengunggahan."
+          badge={{ label: 'Jalur Forensik Aktif', variant: 'success' }}
+        />
+
         {/* Banner */}
         <div className="p-4 rounded-xl border border-emerald-200 bg-emerald-50/60 flex items-center justify-between text-xs text-emerald-800 shadow-xs">
           <div className="flex items-center gap-2.5">
@@ -276,7 +284,7 @@ export default function AuditTrailPage() {
                         <div className="text-[10px] text-[#64748B]">{log.actorRole}</div>
                       </td>
                       <td className="py-3.5 px-5 font-semibold text-[#4F46E5]">
-                        {log.action}
+                        {formatActionLabel(log.action)}
                       </td>
                       <td className="py-3.5 px-5 font-medium text-[#0F172A]">
                         {log.resourceName}
@@ -291,11 +299,10 @@ export default function AuditTrailPage() {
                       </td>
                       <td className="py-3.5 px-5">
                         <span
-                          className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                            log.status === 'success'
-                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                              : 'bg-rose-50 text-rose-700 border border-rose-200'
-                          }`}
+                          className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${log.status === 'success'
+                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                            : 'bg-rose-50 text-rose-700 border border-rose-200'
+                            }`}
                         >
                           {log.status.toUpperCase()}
                         </span>
@@ -347,7 +354,7 @@ export default function AuditTrailPage() {
           position={activeMenu.position}
           row={activeMenu.row}
           title={activeMenu.title || 'Aksi Audit Log'}
-          subtitle={(l) => `${l.action} - ${l.resourceName}`}
+          subtitle={(l) => `${formatActionLabel(l.action)} - ${l.resourceName}`}
           actions={auditActions}
           onClose={closeMenu}
           onMouseEnter={cancelScheduledClose}

@@ -102,7 +102,7 @@ export function Header() {
             Masuk Akun
           </Link>
           <Link
-            href="/dashboard"
+            href="/demo/login"
             className="flex items-center gap-1.5 bg-[#4F46E5] hover:bg-[#4338CA] text-white text-xs font-semibold px-4 py-2.5 rounded-lg shadow-sm transition-all shadow-[#4F46E5]/20 hover:shadow-md hover:shadow-[#4F46E5]/30"
           >
             <span>Eksplor Dashboard Demo</span>
@@ -186,7 +186,7 @@ export function Header() {
                 Masuk Akun
               </Link>
               <Link
-                href="/dashboard"
+                href="/demo/login"
                 onClick={() => setIsOpen(false)}
                 className="flex items-center justify-center gap-2 bg-[#4F46E5] hover:bg-[#4338CA] text-white text-sm font-semibold py-2.5 px-4 rounded-lg shadow-sm transition-all shadow-[#4F46E5]/20 hover:shadow-md hover:shadow-[#4F46E5]/30"
               >

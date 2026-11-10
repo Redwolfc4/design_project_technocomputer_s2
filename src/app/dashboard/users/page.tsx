@@ -2,11 +2,13 @@
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Topbar } from '@/components/layout/Topbar';
+import { PageHeader } from '@/components/shared/PageHeader';
 import { RBACMember } from '@/types';
 import {
   INITIAL_RBAC_USERS,
   ALL_AVAILABLE_PERMISSIONS,
 } from '@/lib/mocks/rbacUsers';
+import { MemberService } from '@/lib/modules/members/member.service';
 import { RBACActionMenu } from '@/components/shared/RBACActionMenu';
 import {
   DataTableRow,
@@ -35,7 +37,7 @@ import {
 
 export default function UsersManagementPage() {
   // Master data state
-  const [users, setUsers] = useState<RBACMember[]>(INITIAL_RBAC_USERS);
+  const [users, setUsers] = useState<RBACMember[]>(() => MemberService.getMembers());
 
   // Search & Filter state
   const [searchQuery, setSearchQuery] = useState('');
@@ -303,8 +305,7 @@ export default function UsersManagementPage() {
     e.preventDefault();
     if (!validateForm()) return;
 
-    const newUser: RBACMember = {
-      id: `user-${Date.now().toString().slice(-4)}`,
+    const res = MemberService.createMember({
       name: formData.name.trim(),
       email: formData.email.trim().toLowerCase(),
       department: formData.department.trim(),
@@ -312,12 +313,16 @@ export default function UsersManagementPage() {
       roleTitle: formData.roleTitle.trim(),
       status: formData.status,
       permissions: formData.permissions,
-      createdAt: new Date().toISOString().split('T')[0],
-    };
+    });
 
-    setUsers([newUser, ...users]);
+    if (!res.success) {
+      setToast({ message: res.error || 'Gagal menambahkan anggota.', type: 'error' });
+      return;
+    }
+
+    setUsers(MemberService.getMembers());
     setIsAddOpen(false);
-    setToast({ message: `Anggota "${newUser.name}" berhasil ditambahkan!`, type: 'success' });
+    setToast({ message: `Anggota "${formData.name.trim()}" berhasil ditambahkan!`, type: 'success' });
   };
 
   // Submit Edit
@@ -325,22 +330,21 @@ export default function UsersManagementPage() {
     e.preventDefault();
     if (!editUser || !validateForm()) return;
 
-    const updatedUsers = users.map((u) => {
-      if (u.id === editUser.id) {
-        return {
-          ...u,
-          name: formData.name.trim(),
-          email: formData.email.trim().toLowerCase(),
-          department: formData.department.trim(),
-          roleTitle: formData.roleTitle.trim(),
-          status: formData.status,
-          permissions: formData.permissions,
-        };
-      }
-      return u;
+    const res = MemberService.updateMember(editUser.id, {
+      name: formData.name.trim(),
+      email: formData.email.trim().toLowerCase(),
+      department: formData.department.trim(),
+      roleTitle: formData.roleTitle.trim(),
+      status: formData.status,
+      permissions: formData.permissions,
     });
 
-    setUsers(updatedUsers);
+    if (!res.success) {
+      setToast({ message: res.error || 'Gagal memperbarui data.', type: 'error' });
+      return;
+    }
+
+    setUsers(MemberService.getMembers());
     setEditUser(null);
     setToast({ message: `Data "${formData.name}" berhasil diperbarui!`, type: 'success' });
   };
@@ -348,19 +352,27 @@ export default function UsersManagementPage() {
   // Delete User
   const handleDeleteConfirm = () => {
     if (!deleteUser) return;
-    setUsers(users.filter((u) => u.id !== deleteUser.id));
+    const res = MemberService.deleteMember(deleteUser.id);
+    if (!res.success) {
+      setToast({ message: res.error || 'Gagal menghapus anggota.', type: 'error' });
+      return;
+    }
+    setUsers(MemberService.getMembers());
     setToast({ message: `Anggota "${deleteUser.name}" berhasil dihapus dari sistem!`, type: 'success' });
     setDeleteUser(null);
   };
 
   // Toggle User Status (Aktif <-> Nonaktif)
   const handleToggleStatus = (targetUser: RBACMember) => {
-    const newStatus = targetUser.status === 'Aktif' ? 'Nonaktif' : 'Aktif';
-    setUsers((prev) =>
-      prev.map((u) => (u.id === targetUser.id ? { ...u, status: newStatus } : u))
-    );
+    const res = MemberService.toggleStatus(targetUser.id);
+    if (!res.success) {
+      setToast({ message: res.error || 'Gagal mengubah status.', type: 'error' });
+      return;
+    }
+    setUsers(MemberService.getMembers());
+    const nextStatus = targetUser.status === 'Aktif' ? 'Nonaktif' : 'Aktif';
     setToast({
-      message: `Status "${targetUser.name}" berhasil diubah menjadi ${newStatus}!`,
+      message: `Status "${targetUser.name}" berhasil diubah menjadi ${nextStatus}!`,
       type: 'success',
     });
   };
@@ -417,8 +429,8 @@ export default function UsersManagementPage() {
           </thead>
           <tbody>
             ${dataToExport
-              .map(
-                (u) => `
+        .map(
+          (u) => `
               <tr>
                 <td>${u.id}</td>
                 <td>${u.name}</td>
@@ -430,8 +442,8 @@ export default function UsersManagementPage() {
                 <td>${u.createdAt}</td>
               </tr>
             `
-              )
-              .join('')}
+        )
+        .join('')}
           </tbody>
         </table>
       </body>
@@ -519,9 +531,8 @@ export default function UsersManagementPage() {
       {toast && (
         <div className="fixed top-6 right-6 z-50 flex items-center gap-3 px-4 py-3 rounded-xl shadow-xl border bg-white text-[#0F172A] border-slate-200 transition-all animate-bounce">
           <div
-            className={`w-2.5 h-2.5 rounded-full ${
-              toast.type === 'success' ? 'bg-emerald-500' : toast.type === 'error' ? 'bg-rose-500' : 'bg-indigo-500'
-            }`}
+            className={`w-2.5 h-2.5 rounded-full ${toast.type === 'success' ? 'bg-emerald-500' : toast.type === 'error' ? 'bg-rose-500' : 'bg-indigo-500'
+              }`}
           />
           <span className="text-xs font-semibold">{toast.message}</span>
           <button
@@ -533,7 +544,22 @@ export default function UsersManagementPage() {
         </div>
       )}
 
-      <main className="flex-1 p-6 lg:p-8 space-y-6 max-w-7xl mx-auto w-full">
+      <main className="flex-1 w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 py-6 sm:py-8 space-y-6 min-w-0">
+        <PageHeader
+          title="Pengguna, Peran & Hak Akses Tim"
+          subtitle="Kelola izin verifikasi dokumen, tingkat approval keuangan, dan akun auditor eksternal."
+          badge={{ label: `${users.length} Akun Terdaftar`, variant: 'indigo' }}
+          actions={
+            <button
+              onClick={() => setIsAddOpen(true)}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-[#4F46E5] hover:bg-[#4338CA] text-white text-xs font-semibold rounded-lg shadow-sm transition-colors"
+            >
+              <PlusIcon className="w-4 h-4" />
+              <span>Tambah Anggota Baru</span>
+            </button>
+          }
+        />
+
         {/* Info Banner Existing */}
         <div className="p-4 rounded-xl border border-indigo-200 bg-[#EEF2FF]/60 flex items-center justify-between text-xs text-[#4F46E5] shadow-xs">
           <div className="flex items-center gap-2.5">
@@ -690,13 +716,13 @@ export default function UsersManagementPage() {
 
                               {/* Tooltip Content */}
                               {hoveredPermId === user.id && (
-                                <div className="absolute left-0 bottom-full mb-1 w-64 p-2 bg-slate-900 text-white rounded-lg shadow-xl text-[10px] z-30 pointer-events-none">
-                                  <div className="font-bold text-slate-300 pb-1 border-b border-slate-700 mb-1">
+                                <div className="absolute left-0 bottom-full mb-1 w-64 p-2.5 bg-white text-[#0F172A] border border-[#CBD5E1] rounded-lg shadow-xl text-[10px] z-30 pointer-events-none">
+                                  <div className="font-bold text-[#475569] pb-1 border-b border-[#E2E8F0] mb-1.5">
                                     Seluruh Hak Akses:
                                   </div>
                                   <div className="flex flex-wrap gap-1">
                                     {user.permissions.map((p) => (
-                                      <span key={p} className="bg-slate-800 px-1.5 py-0.5 rounded">
+                                      <span key={p} className="bg-[#F1F5F9] text-[#1E293B] border border-[#E2E8F0] font-medium px-1.5 py-0.5 rounded">
                                         {permMap.get(p) || p}
                                       </span>
                                     ))}
@@ -795,11 +821,10 @@ export default function UsersManagementPage() {
                 <span className="text-[10px] font-bold text-[#64748B] uppercase">Status Akun</span>
                 <div>
                   <span
-                    className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                      viewUser.status === 'Aktif'
+                    className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded-full ${viewUser.status === 'Aktif'
                         ? 'text-emerald-700 bg-emerald-50 border border-emerald-200'
                         : 'text-slate-600 bg-slate-100 border border-slate-300'
-                    }`}
+                      }`}
                   >
                     {viewUser.status.toUpperCase()}
                   </span>
@@ -999,9 +1024,8 @@ export default function UsersManagementPage() {
                     return (
                       <label
                         key={perm.key}
-                        className={`flex items-start gap-2 p-2 rounded-lg border transition-colors cursor-pointer text-xs ${
-                          checked ? 'bg-[#EEF2FF] border-indigo-200 text-[#0F172A]' : 'bg-white border-[#E2E8F0] text-slate-600'
-                        }`}
+                        className={`flex items-start gap-2 p-2 rounded-lg border transition-colors cursor-pointer text-xs ${checked ? 'bg-[#EEF2FF] border-indigo-200 text-[#0F172A]' : 'bg-white border-[#E2E8F0] text-slate-600'
+                          }`}
                       >
                         <input
                           type="checkbox"

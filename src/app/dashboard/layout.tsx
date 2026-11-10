@@ -1,5 +1,6 @@
 import React from 'react';
 import { Sidebar } from '@/components/layout/Sidebar';
+import { SidebarProvider } from '@/context/SidebarContext';
 
 export default function DashboardLayout({
   children,
@@ -7,15 +8,16 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="min-h-screen bg-[#FAFAFF] flex">
-      {/* Fixed Sidebar */}
-      <Sidebar />
+    <SidebarProvider>
+      <div className="min-h-screen bg-[#FAFAFF] flex relative w-full overflow-x-hidden">
+        {/* Responsive Drawer Sidebar */}
+        <Sidebar />
 
-      {/* Main Content Area */}
-      <div className="flex-1 ml-64 flex flex-col min-h-screen">
-        {children}
+        {/* Main Content Area: Padding-left 256px on lg (>=1024px) for solid boundary, full width on mobile/tablet */}
+        <div className="flex-1 lg:pl-64 flex flex-col min-h-screen min-w-0 w-full overflow-x-clip">
+          {children}
+        </div>
       </div>
-    </div>
+    </SidebarProvider>
   );
 }
-

@@ -133,9 +133,9 @@ export interface AuditLogEntry {
   id: string;
   timestamp: string;
   actor: string;
-  actorRole: UserRole;
+  actorRole: UserRole | string;
   action: string;
-  resourceType: 'document' | 'workspace_settings' | 'export' | 'user' | 'api_key';
+  resourceType: 'document' | 'workspace_settings' | 'export' | 'user' | 'api_key' | 'system' | 'batch' | string;
   resourceId: string;
   resourceName: string;
   details: string;

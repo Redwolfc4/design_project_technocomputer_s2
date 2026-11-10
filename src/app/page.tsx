@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/icons';
 import { BrandLogo } from '@/components/shared/BrandLogo';
 import { Header } from '@/components/layout/Header';
+import { Footer } from '@/components/layout/Footer';
 
 export default function MarketingHomePage() {
   return (
@@ -301,17 +302,7 @@ export default function MarketingHomePage() {
       </section>
 
       {/* Footer */}
-      <footer className="bg-white border-t border-[#E2E8F0] py-12">
-        <div className="max-w-screen-2xl mx-auto px-6 lg:px-12 flex flex-col md:flex-row items-center justify-between gap-6">
-          <Link href="/" className="hover:opacity-90 transition-opacity">
-            <BrandLogo size={28} showText={true} subtitle="" textSize="sm" />
-          </Link>
-
-          <p className="text-xs text-[#64748B] text-center md:text-right">
-            © 2026 PT Nusantara Teknologi Cipta. Aplikasi Demonstrasi Intelligent Document Processing.
-          </p>
-        </div>
-      </footer>
+      <Footer />
     </div>
   );
 }

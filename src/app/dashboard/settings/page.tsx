@@ -2,18 +2,20 @@
 
 import React, { useState, useEffect } from 'react';
 import { Topbar } from '@/components/layout/Topbar';
-import { MockDocumentService } from '@/lib/mocks/storage';
+import { PageHeader } from '@/components/shared/PageHeader';
+import { SectionHeader } from '@/components/shared/SectionHeader';
+import { SettingService } from '@/lib/modules/settings/setting.service';
 import { WorkspaceSettings } from '@/types';
 import { SettingsIcon, CheckIcon } from '@/components/ui/icons';
 import { WebhookConfigSection } from '@/components/dashboard/settings/WebhookConfigSection';
 
 export default function WorkspaceSettingsPage() {
-  const [settings, setSettings] = useState<WorkspaceSettings>(MockDocumentService.getSettings());
+  const [settings, setSettings] = useState<WorkspaceSettings>(() => SettingService.getSettings());
   const [savedSuccess, setSavedSuccess] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    MockDocumentService.updateSettings(settings);
+    SettingService.updateSettings(settings);
     setSavedSuccess(true);
     setTimeout(() => setSavedSuccess(false), 3000);
   };
@@ -25,12 +27,18 @@ export default function WorkspaceSettingsPage() {
         subtitle="Konfigurasi parameter ambang batas auto-approval, tarif PPN default, dan URL Webhook"
       />
 
-      <main className="flex-1 p-8 max-w-4xl space-y-6">
-        <form onSubmit={handleSubmit} className="p-8 rounded-xl border border-[#CBD5E1] bg-white shadow-sm space-y-6">
-          <div className="border-b border-[#E2E8F0] pb-4">
-            <h2 className="text-base font-bold text-[#0F172A]">Parameter Workspace Enterprise</h2>
-            <p className="text-xs text-[#64748B]">Perubahan pengaturan ini disimpan secara lokal ke peramban demo.</p>
-          </div>
+      <main className="flex-1 w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 py-6 sm:py-8 space-y-6 min-w-0">
+        <PageHeader
+          title="Pengaturan Workspace & Aturan AI"
+          subtitle="Konfigurasi parameter ambang batas auto-approval, tarif PPN default, dan URL Webhook integrasi."
+          badge={{ label: 'Konfigurasi Sistem', variant: 'neutral' }}
+        />
+
+        <form onSubmit={handleSubmit} className="p-6 sm:p-8 rounded-xl border border-[#CBD5E1] bg-white shadow-sm space-y-6">
+          <SectionHeader
+            title="Parameter Workspace Enterprise"
+            description="Perubahan pengaturan ini disimpan secara lokal ke peramban demo."
+          />
 
           <div className="space-y-4">
             <div className="space-y-1.5">

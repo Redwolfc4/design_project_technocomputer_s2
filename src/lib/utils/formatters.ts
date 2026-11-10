@@ -109,3 +109,9 @@ export const getDocumentTypeLabel = (type: string): string => {
   }
 };
 
+export const formatActionLabel = (action: string): string => {
+  if (!action) return '';
+  return action.replace(/_/g, ' ');
+};
+
+

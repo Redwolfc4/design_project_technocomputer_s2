@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { Topbar } from '@/components/layout/Topbar';
 import { FileTextIcon, ArrowRightIcon } from '@/components/ui/icons';
 import { BrandLogo } from '@/components/shared/BrandLogo';
+import { Footer } from '@/components/layout/Footer';
 
 interface MarketingPageProps {
   title: string;
@@ -72,9 +73,7 @@ export function MarketingPageTemplate({ title, subtitle, description, points }: 
         </div>
       </main>
 
-      <footer className="bg-white border-t border-[#E2E8F0] py-8 text-center text-xs text-[#64748B]">
-        © 2026 PT Nusantara Teknologi Cipta. DokumenAI Enterprise Intelligent Document Processing.
-      </footer>
+      <Footer />
     </div>
   );
 }
