@@ -28,6 +28,9 @@ import {
   DataTableActionMenu,
   useDataTableInteractions,
   RowAction,
+  DataTableFilters,
+  DataTableResultCount,
+  FilterConfig,
 } from '@/components/shared/data-table';
 import { DocumentQuickDetailModal } from '@/components/dashboard/documents/DocumentQuickDetailModal';
 import { PageHeader } from '@/components/shared/PageHeader';
@@ -120,6 +123,59 @@ export default function DashboardOverviewPage() {
     setActiveTypeFilter(null);
     setActiveDateRange('all');
   };
+
+  // Filter configurations for standard enterprise DataTableFilterSelect
+  const dashboardFilterConfigs: FilterConfig[] = useMemo(
+    () => [
+      {
+        id: 'dateRange',
+        label: 'Periode',
+        type: 'select',
+        placeholder: 'Semua Waktu',
+        options: [
+          { label: 'Semua Waktu', value: 'all' },
+          { label: 'Hari Ini (48 Jam)', value: 'today' },
+          { label: '7 Hari Terakhir', value: '7days' },
+          { label: 'Bulan Ini (Maret 2026)', value: 'month' },
+        ],
+        selectedValue: activeDateRange,
+        onChange: (val) => setActiveDateRange(val as any),
+      },
+      {
+        id: 'status',
+        label: 'Status Verifikasi',
+        type: 'select',
+        placeholder: 'Semua Status',
+        options: [
+          { label: 'Semua Status', value: 'all' },
+          { label: 'Perlu Verifikasi (HITL)', value: 'needs_review' },
+          { label: 'Telah Disetujui', value: 'approved' },
+          { label: 'Ditolak', value: 'rejected' },
+        ],
+        selectedValue: activeStatusFilter || 'all',
+        onChange: (val) => setActiveStatusFilter(val === 'all' ? null : (val as DocumentStatus)),
+      },
+      {
+        id: 'documentType',
+        label: 'Jenis Dokumen',
+        type: 'select',
+        placeholder: 'Semua Tipe',
+        options: [
+          { label: 'Semua Tipe', value: 'all' },
+          { label: 'Faktur Pajak Standar', value: 'tax_invoice' },
+          { label: 'Invoice Komersial', value: 'commercial_invoice' },
+          { label: 'Purchase Order (PO)', value: 'purchase_order' },
+          { label: 'Perjanjian Kontrak', value: 'contract' },
+          { label: 'Bukti Potong PPh', value: 'withholding_tax' },
+          { label: 'Kuitansi / Receipt', value: 'receipt' },
+        ],
+        selectedValue: activeTypeFilter || 'all',
+        onChange: (val) => setActiveTypeFilter(val === 'all' ? null : val),
+        searchable: true,
+      },
+    ],
+    [activeDateRange, activeStatusFilter, activeTypeFilter]
+  );
 
   // Metrics based on filteredDocuments
   const totalDocs = filteredDocuments.length || 1;
@@ -309,83 +365,25 @@ export default function DashboardOverviewPage() {
           </div>
         </div>
 
-        {/* 2. Baris Filter Reaktif (Di antara Banner dan Card Counter) */}
-        <div className="p-4 rounded-xl border border-[#E2E8F0] bg-white shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3 min-w-0">
-          <div className="flex flex-wrap items-center gap-2.5 min-w-0 flex-1">
-            <div className="flex items-center gap-1.5 text-xs font-bold text-[#475569] shrink-0 mr-1">
-              <FilterIcon className="w-4 h-4 text-[#4F46E5]" />
-              <span>Filter Data:</span>
-            </div>
+        {/* 2. Baris Filter Reaktif Standard Enterprise (DataTableFilters) */}
+        <div className="rounded-xl border border-[#E2E8F0] bg-white p-5 shadow-xs space-y-4 min-w-0">
+          {/* Dropdown Filters Row */}
+          <DataTableFilters filters={dashboardFilterConfigs} />
 
-            {/* Filter Rentang Waktu */}
-            <div className="flex items-center gap-1">
-              <span className="text-[11px] font-semibold text-[#64748B] hidden sm:inline">Periode:</span>
-              <select
-                aria-label="Filter Rentang Waktu"
-                value={activeDateRange}
-                onChange={(e) => setActiveDateRange(e.target.value as any)}
-                className="text-xs bg-[#F8FAFC] hover:bg-slate-100 border border-[#CBD5E1] rounded-lg px-2.5 py-1.5 font-semibold text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer transition-colors"
-              >
-                <option value="all">Semua Waktu</option>
-                <option value="today">Hari Ini (48 Jam)</option>
-                <option value="7days">7 Hari Terakhir</option>
-                <option value="month">Bulan Ini (Maret 2026)</option>
-              </select>
-            </div>
-
-            {/* Filter Status Dokumen */}
-            <div className="flex items-center gap-1">
-              <span className="text-[11px] font-semibold text-[#64748B] hidden sm:inline">Status:</span>
-              <select
-                aria-label="Filter Status Dokumen"
-                value={activeStatusFilter || ''}
-                onChange={(e) => setActiveStatusFilter((e.target.value || null) as DocumentStatus | null)}
-                className="text-xs bg-[#F8FAFC] hover:bg-slate-100 border border-[#CBD5E1] rounded-lg px-2.5 py-1.5 font-semibold text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer transition-colors"
-              >
-                <option value="">Semua Status</option>
-                <option value="needs_review">Perlu Verifikasi (HITL)</option>
-                <option value="approved">Telah Disetujui</option>
-                <option value="rejected">Ditolak</option>
-              </select>
-            </div>
-
-            {/* Filter Kategori / Tipe Dokumen */}
-            <div className="flex items-center gap-1">
-              <span className="text-[11px] font-semibold text-[#64748B] hidden sm:inline">Kategori:</span>
-              <select
-                aria-label="Filter Kategori Dokumen"
-                value={activeTypeFilter || ''}
-                onChange={(e) => setActiveTypeFilter(e.target.value || null)}
-                className="text-xs bg-[#F8FAFC] hover:bg-slate-100 border border-[#CBD5E1] rounded-lg px-2.5 py-1.5 font-semibold text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer transition-colors"
-              >
-                <option value="">Semua Kategori</option>
-                <option value="tax_invoice">Faktur Pajak Standar</option>
-                <option value="commercial_invoice">Invoice Komersial</option>
-                <option value="purchase_order">Purchase Order (PO)</option>
-                <option value="contract">Perjanjian Kontrak</option>
-                <option value="withholding_tax">Bukti Potong PPh</option>
-                <option value="receipt">Kuitansi / Receipt</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Reset Filter Button & Info Counter */}
-          <div className="flex items-center justify-between sm:justify-end gap-2.5 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100">
-            <span className="text-[11px] text-[#64748B]">
-              Menampilkan <strong className="text-[#0F172A] font-bold">{filteredDocuments.length}</strong> dari {documents.length} berkas
-            </span>
-            {isAnyFilterActive && (
+          {/* Action Bar (Hanya tampil saat filter aktif untuk Reset) */}
+          {isAnyFilterActive && (
+            <div className="flex items-center justify-end pt-3 border-t border-[#F1F5F9]">
               <button
                 type="button"
                 onClick={handleResetFilters}
-                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs font-bold border border-rose-200 transition-colors cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs font-bold border border-rose-200 transition-colors cursor-pointer"
                 title="Kembalikan semua filter ke kondisi awal"
               >
                 <RotateCcwIcon className="w-3.5 h-3.5" />
-                <span>Reset Filter</span>
+                <span>Reset Semua Filter</span>
               </button>
-            )}
-          </div>
+            </div>
+          )}
         </div>
 
         {/* 3. Primary KPI Cards Grid (Interactive & Clickable - Dinamis Mengikuti Filter) */}
@@ -555,9 +553,8 @@ export default function DashboardOverviewPage() {
             title="Dokumen Terbaru Diproses"
             description={
               activeStatusFilter || activeTypeFilter
-                ? `Menampilkan dokumen hasil filter interaktif: ${
-                    activeStatusFilter ? `Status [${activeStatusFilter}]` : ''
-                  } ${activeTypeFilter ? `Jenis [${getDocumentTypeLabel(activeTypeFilter)}]` : ''}`
+                ? `Menampilkan dokumen hasil filter interaktif: ${activeStatusFilter ? `Status [${activeStatusFilter}]` : ''
+                } ${activeTypeFilter ? `Jenis [${getDocumentTypeLabel(activeTypeFilter)}]` : ''}`
                 : 'Daftar faktur, invoice, dan kontrak terkini dalam sistem IDP'
             }
             action={
@@ -629,10 +626,10 @@ export default function DashboardOverviewPage() {
                           <td className="py-3.5 px-5">
                             <span
                               className={`font-bold ${doc.confidence >= 90
-                                  ? 'text-[#059669]'
-                                  : doc.confidence >= 75
-                                    ? 'text-[#F59E0B]'
-                                    : 'text-[#E11D48]'
+                                ? 'text-[#059669]'
+                                : doc.confidence >= 75
+                                  ? 'text-[#F59E0B]'
+                                  : 'text-[#E11D48]'
                                 }`}
                             >
                               {doc.confidence}%

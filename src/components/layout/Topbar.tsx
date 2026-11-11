@@ -51,22 +51,9 @@ export function Topbar({ title, subtitle, onSearch }: TopbarProps) {
           </button>
 
           <div className="flex flex-col min-w-0">
-            <div className="flex items-center gap-2">
-              <h1 className="text-sm sm:text-base font-bold text-[#0F172A] dark:text-white leading-tight truncate">
-                {title}
-              </h1>
-              {/* Environmental Badge */}
-              {isDemo ? (
-                <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-extrabold bg-amber-100 text-amber-900 border border-amber-300">
-                  DEMO SANDBOX
-                </span>
-              ) : (
-                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-extrabold bg-emerald-100 text-emerald-900 border border-emerald-300">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" />
-                  LIVE WORKSPACE
-                </span>
-              )}
-            </div>
+            <h1 className="text-sm sm:text-base font-bold text-[#0F172A] dark:text-white leading-tight truncate">
+              {title}
+            </h1>
             {subtitle && (
               <p className="text-[11px] sm:text-xs text-[#64748B] dark:text-[#94A3B8] truncate hidden sm:block">
                 {subtitle}
