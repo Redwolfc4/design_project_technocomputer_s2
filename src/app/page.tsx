@@ -39,14 +39,14 @@ export default function MarketingHomePage() {
 
               <div className="flex flex-wrap items-center gap-3 pt-2">
                 <Link
-                  href="/dashboard"
+                  href="/demo/dashboard"
                   className="flex items-center gap-2 bg-[#4F46E5] hover:bg-[#4338CA] text-white text-xs font-bold px-5 py-3 rounded-lg shadow-md transition-all shadow-[#4F46E5]/25"
                 >
                   <span>Buka Live Interactive Demo</span>
                   <ArrowRightIcon className="w-4 h-4" />
                 </Link>
                 <Link
-                  href="/dashboard/verification"
+                  href="/demo/dashboard/verification"
                   className="flex items-center gap-2 bg-white hover:bg-[#F8FAFC] text-[#0F172A] border border-[#CBD5E1] text-xs font-bold px-5 py-3 rounded-lg shadow-sm transition-all"
                 >
                   <span>Coba Workspace Verifikasi</span>
@@ -171,7 +171,7 @@ export default function MarketingHomePage() {
               </ul>
               <div className="pt-2">
                 <Link
-                  href="/dashboard/verification"
+                  href="/demo/dashboard/verification"
                   className="inline-flex items-center gap-2 text-xs font-bold text-[#4F46E5] hover:text-[#4338CA]"
                 >
                   <span>Buka Antrean Verifikasi Langsung</span>
@@ -253,7 +253,7 @@ export default function MarketingHomePage() {
                   <div>✓ Ekspor CSV Standar</div>
                 </div>
               </div>
-              <Link href="/dashboard" className="mt-8 block text-center py-2.5 px-4 rounded-lg border border-[#CBD5E1] text-xs font-bold text-[#0F172A] hover:bg-[#F8FAFC]">
+              <Link href="/demo/dashboard" className="mt-8 block text-center py-2.5 px-4 rounded-lg border border-[#CBD5E1] text-xs font-bold text-[#0F172A] hover:bg-[#F8FAFC]">
                 Mulai Uji Coba Demo
               </Link>
             </div>
@@ -275,7 +275,7 @@ export default function MarketingHomePage() {
                   <div>✓ Audit Trail 90 Hari</div>
                 </div>
               </div>
-              <Link href="/dashboard" className="mt-8 block text-center py-2.5 px-4 rounded-lg bg-[#4F46E5] text-white text-xs font-bold hover:bg-[#4338CA]">
+              <Link href="/demo/dashboard" className="mt-8 block text-center py-2.5 px-4 rounded-lg bg-[#4F46E5] text-white text-xs font-bold hover:bg-[#4338CA]">
                 Jelajahi Solusi Business
               </Link>
             </div>
@@ -293,7 +293,7 @@ export default function MarketingHomePage() {
                   <div>✓ Manajer Akun Khusus 24/7</div>
                 </div>
               </div>
-              <Link href="/dashboard" className="mt-8 block text-center py-2.5 px-4 rounded-lg border border-[#CBD5E1] text-xs font-bold text-[#0F172A] hover:bg-[#F8FAFC]">
+              <Link href="/login" className="mt-8 block text-center py-2.5 px-4 rounded-lg border border-[#CBD5E1] text-xs font-bold text-[#0F172A] hover:bg-[#F8FAFC]">
                 Hubungi Konsultan Kami
               </Link>
             </div>

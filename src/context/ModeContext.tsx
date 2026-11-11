@@ -20,18 +20,25 @@ interface ModeContextType {
 
 const ModeContext = createContext<ModeContextType | undefined>(undefined);
 
-export const ModeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const ModeProvider: React.FC<{ children: React.ReactNode; defaultMode?: AppEnvironmentMode }> = ({
+  children,
+  defaultMode,
+}) => {
   const pathname = usePathname();
   const router = useRouter();
 
-  // Mode is resolved primarily from route (/demo/* vs /dashboard/*) or session
+  // Mode is resolved primarily from defaultMode prop, pathname (/demo/* vs /dashboard/*), or session
   const [mode, setModeState] = useState<AppEnvironmentMode>(() => {
+    if (defaultMode) return defaultMode;
+    if (pathname?.startsWith('/demo')) return 'demo';
+    if (pathname?.startsWith('/dashboard')) return 'production';
     if (typeof window !== 'undefined') {
       if (window.location.pathname.startsWith('/demo')) return 'demo';
+      if (window.location.pathname.startsWith('/dashboard')) return 'production';
       const savedUser = MockAuthService.getCurrentUser();
       if (savedUser && !savedUser.isDemo) return 'production';
     }
-    return 'demo'; // Default to demo for safety
+    return 'production'; // Live is the main enterprise dashboard path
   });
 
   const [user, setUser] = useState<AuthUser | null>(() => {
@@ -46,12 +53,7 @@ export const ModeProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (pathname.startsWith('/demo')) {
       setModeState('demo');
     } else if (pathname.startsWith('/dashboard')) {
-      const savedUser = MockAuthService.getCurrentUser();
-      if (savedUser && !savedUser.isDemo) {
-        setModeState('production');
-      } else {
-        setModeState('demo');
-      }
+      setModeState('production');
     }
   }, [pathname]);
 
@@ -64,9 +66,9 @@ export const ModeProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const setMode = (newMode: AppEnvironmentMode) => {
     setModeState(newMode);
     if (newMode === 'demo') {
-      router.push('/demo/login');
+      router.push('/demo/dashboard');
     } else {
-      router.push('/login');
+      router.push('/dashboard');
     }
   };
 

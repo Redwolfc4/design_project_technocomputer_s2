@@ -19,9 +19,11 @@ import {
 } from '@/components/ui/icons';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { SectionHeader } from '@/components/shared/SectionHeader';
+import { useAppRoutes } from '@/context/RouteContext';
 
 export default function DocumentUploadPage() {
   const router = useRouter();
+  const { getRoute } = useAppRoutes();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [selectedType, setSelectedType] = useState<DocumentType>('tax_invoice');
@@ -210,7 +212,7 @@ export default function DocumentUploadPage() {
     setBatchDrafts(BatchService.getBatches());
     showToast(`Dokumen ${item.fileNumber} berhasil diproses dan masuk Antrean Verifikasi!`);
     setTimeout(() => {
-      router.push(`/dashboard/verification?docId=${newDoc.id}`);
+      router.push(getRoute(`/verification?docId=${newDoc.id}`));
     }, 800);
   };
 
@@ -326,7 +328,7 @@ export default function DocumentUploadPage() {
 
       DocumentService.createDocument(newDoc);
       setIsProcessing(false);
-      router.push(`/dashboard/verification?docId=${newDoc.id}`);
+      router.push(getRoute(`/verification?docId=${newDoc.id}`));
     }, 1600);
   };
 

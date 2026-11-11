@@ -49,7 +49,7 @@ export const DemoRegisterForm: React.FC<DemoRegisterFormProps> = ({ onSwitchToLo
     setTimeout(() => {
       MockDocumentService.setCurrentUser(newPersona);
       MockAuthService.loginDemo(newPersona);
-      router.push('/dashboard');
+      router.push('/demo/dashboard');
     }, 600);
   };
 

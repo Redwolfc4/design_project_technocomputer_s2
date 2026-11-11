@@ -22,6 +22,7 @@ import { DEMO_PERSONAS } from '@/lib/constants/personas';
 import { UserRole, UserPersona } from '@/types';
 import { useSidebar } from '@/context/SidebarContext';
 import { useAppMode } from '@/context/ModeContext';
+import { useAppRoutes } from '@/context/RouteContext';
 
 interface NavItem {
   label: string;
@@ -33,7 +34,8 @@ interface NavItem {
 export function Sidebar() {
   const pathname = usePathname();
   const { isOpen, closeSidebar } = useSidebar();
-  const { isDemo, isProduction, tenantName, logout } = useAppMode();
+  const { isDemo, isProduction, tenantName, logout, user } = useAppMode();
+  const { getRoute } = useAppRoutes();
 
   const [currentUser, setCurrentUser] = useState<UserPersona>(() => {
     return MockDocumentService.getCurrentUser();
@@ -58,19 +60,19 @@ export function Sidebar() {
   };
 
   const navItems: NavItem[] = [
-    { label: 'Ringkasan Utama', href: '/dashboard', icon: BarChart3Icon },
-    { label: 'Unggah Batch', href: '/dashboard/upload', icon: UploadCloudIcon },
+    { label: 'Ringkasan Utama', href: getRoute(''), icon: BarChart3Icon },
+    { label: 'Unggah Batch', href: getRoute('/upload'), icon: UploadCloudIcon },
     {
       label: 'Antrean Verifikasi',
-      href: '/dashboard/verification',
+      href: getRoute('/verification'),
       icon: CheckSquareIcon,
       badge: pendingCount > 0 ? pendingCount : undefined,
     },
-    { label: 'Repositori Dokumen', href: '/dashboard/documents', icon: FileTextIcon },
-    { label: 'Ekspor & Integrasi', href: '/dashboard/export', icon: DownloadIcon },
-    { label: 'Audit Trail Forensik', href: '/dashboard/audit', icon: ShieldCheckIcon },
-    { label: 'Tim & Hak Akses', href: '/dashboard/users', icon: UsersIcon },
-    { label: 'Pengaturan Workspace', href: '/dashboard/settings', icon: SettingsIcon },
+    { label: 'Repositori Dokumen', href: getRoute('/documents'), icon: FileTextIcon },
+    { label: 'Ekspor & Integrasi', href: getRoute('/export'), icon: DownloadIcon },
+    { label: 'Audit Trail Forensik', href: getRoute('/audit'), icon: ShieldCheckIcon },
+    { label: 'Tim & Hak Akses', href: getRoute('/users'), icon: UsersIcon },
+    { label: 'Pengaturan Workspace', href: getRoute('/settings'), icon: SettingsIcon },
   ];
 
   return (
@@ -179,7 +181,7 @@ export function Sidebar() {
         <div className="p-4 border-t border-[#E2E8F0] dark:border-[#1F2937] bg-[#FAFAFF] dark:bg-[#0D1322]/50 flex items-center justify-between">
           <div className="flex items-center gap-3 min-w-0">
             <div className="w-9 h-9 rounded-full bg-[#4F46E5] text-white flex items-center justify-center font-bold text-sm ring-2 ring-[#EEF2FF] shrink-0 shadow-xs">
-              {currentUser.name
+              {(isProduction && user?.name ? user.name : currentUser.name)
                 .split(' ')
                 .map((n) => n[0])
                 .slice(0, 2)
@@ -187,10 +189,10 @@ export function Sidebar() {
             </div>
             <div className="flex flex-col min-w-0">
               <span className="text-sm font-semibold text-[#0F172A] dark:text-gray-200 truncate">
-                {currentUser.name}
+                {isProduction && user?.name ? user.name : currentUser.name}
               </span>
               <span className="text-xs text-[#64748B] dark:text-[#94A3B8] truncate">
-                {currentUser.roleTitle}
+                {isProduction && user?.roleTitle ? user.roleTitle : currentUser.roleTitle}
               </span>
             </div>
           </div>

@@ -19,6 +19,9 @@ import {
   ClockIcon,
   ShieldCheckIcon,
   ArrowUpRightIcon,
+  FilterIcon,
+  RotateCcwIcon,
+  XIcon,
 } from '@/components/ui/icons';
 import {
   DataTableRow,
@@ -30,6 +33,7 @@ import { DocumentQuickDetailModal } from '@/components/dashboard/documents/Docum
 import { PageHeader } from '@/components/shared/PageHeader';
 import { SectionHeader } from '@/components/shared/SectionHeader';
 import { useAppMode } from '@/context/ModeContext';
+import { useAppRoutes } from '@/context/RouteContext';
 import { StatusDonutChart, StatusDonutItem } from '@/components/dashboard/analytics/charts/StatusDonutChart';
 import { DocumentTypeBarChart, DocumentTypeItem } from '@/components/dashboard/analytics/charts/DocumentTypeBarChart';
 import { DocumentTrendAreaChart } from '@/components/dashboard/analytics/charts/DocumentTrendAreaChart';
@@ -39,12 +43,14 @@ import { DocumentStatus } from '@/types';
 export default function DashboardOverviewPage() {
   const router = useRouter();
   const { isDemo, isProduction, tenantName } = useAppMode();
+  const { getRoute } = useAppRoutes();
   const [documents, setDocuments] = useState<DocumentRecord[]>(() => DocumentService.getDocuments());
   const [previewDoc, setPreviewDoc] = useState<DocumentRecord | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' } | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeStatusFilter, setActiveStatusFilter] = useState<DocumentStatus | null>(null);
   const [activeTypeFilter, setActiveTypeFilter] = useState<string | null>(null);
+  const [activeDateRange, setActiveDateRange] = useState<'all' | 'today' | '7days' | 'month'>('all');
 
   const {
     activeMenu,
@@ -79,24 +85,66 @@ export default function DashboardOverviewPage() {
     }
   };
 
-  // Base metrics
-  const totalDocs = documents.length || 1;
-  const pendingDocs = documents.filter((d) => d.status === 'needs_review').length;
-  const approvedDocs = documents.filter((d) => d.status === 'approved').length;
-  const rejectedDocs = documents.filter((d) => d.status === 'rejected').length;
+  // Filtered documents for KPIs and analytics
+  const filteredDocuments = useMemo(() => {
+    return documents.filter((d) => {
+      if (activeStatusFilter && d.status !== activeStatusFilter) {
+        return false;
+      }
+      if (activeTypeFilter && d.documentType !== activeTypeFilter) {
+        return false;
+      }
+      if (activeDateRange !== 'all') {
+        const docDate = new Date(d.uploadedAt || Date.now()).getTime();
+        const now = new Date('2026-03-05T00:00:00Z').getTime(); // Anchored to mock data period (March 2026)
+        const oneDay = 24 * 60 * 60 * 1000;
 
-  const avgConfidence = documents.length
-    ? Math.round(documents.reduce((acc, d) => acc + d.confidence, 0) / documents.length)
+        if (activeDateRange === 'today') {
+          // Within last 24-48 hours of mock latest date
+          if (now - docDate > 2 * oneDay) return false;
+        } else if (activeDateRange === '7days') {
+          if (now - docDate > 7 * oneDay) return false;
+        } else if (activeDateRange === 'month') {
+          if (now - docDate > 31 * oneDay) return false;
+        }
+      }
+      return true;
+    });
+  }, [documents, activeStatusFilter, activeTypeFilter, activeDateRange]);
+
+  // Is any filter active
+  const isAnyFilterActive = activeStatusFilter !== null || activeTypeFilter !== null || activeDateRange !== 'all';
+
+  const handleResetFilters = () => {
+    setActiveStatusFilter(null);
+    setActiveTypeFilter(null);
+    setActiveDateRange('all');
+  };
+
+  // Metrics based on filteredDocuments
+  const totalDocs = filteredDocuments.length || 1;
+  const pendingDocs = filteredDocuments.filter((d) => d.status === 'needs_review').length;
+  const approvedDocs = filteredDocuments.filter((d) => d.status === 'approved').length;
+  const rejectedDocs = filteredDocuments.filter((d) => d.status === 'rejected').length;
+
+  const avgConfidence = filteredDocuments.length
+    ? Math.round(filteredDocuments.reduce((acc, d) => acc + d.confidence, 0) / filteredDocuments.length)
     : 0;
 
-  const totalValue = documents
+  const totalValue = filteredDocuments
+    .filter((d) => d.status === 'approved')
+    .reduce((acc, d) => acc + d.totalAmount, 0);
+
+  // Unfiltered count for reference
+  const pendingDocsUnfiltered = documents.filter((d) => d.status === 'needs_review').length;
+  const approvedValueUnfiltered = documents
     .filter((d) => d.status === 'approved')
     .reduce((acc, d) => acc + d.totalAmount, 0);
 
   // Operational Analytics breakdown
   const firstPassApprovalRate = Math.round((approvedDocs / totalDocs) * 100);
   const typeCounts: Record<string, number> = {};
-  documents.forEach((d) => {
+  filteredDocuments.forEach((d) => {
     typeCounts[d.documentType] = (typeCounts[d.documentType] || 0) + 1;
   });
 
@@ -159,7 +207,7 @@ export default function DashboardOverviewPage() {
         id: 'open_verification',
         label: 'Buka Workspace Verifikasi',
         icon: <ArrowRightIcon className="w-4 h-4 text-[#4F46E5]" />,
-        onSelect: (doc) => router.push(`/dashboard/verification?docId=${doc.id}`),
+        onSelect: (doc) => router.push(getRoute(`/verification?docId=${doc.id}`)),
       },
       {
         id: 'quick_detail',
@@ -174,7 +222,7 @@ export default function DashboardOverviewPage() {
         onSelect: (doc) => handleCopyText(doc.fileNumber, 'Nomor Faktur'),
       },
     ],
-    [router]
+    [router, getRoute]
   );
 
   return (
@@ -223,16 +271,128 @@ export default function DashboardOverviewPage() {
           }
           badge={
             isProduction
-              ? { label: 'Live Enterprise Telemetry', variant: 'success' }
+              ? { label: 'Live Enterprise Sync', variant: 'success' }
               : { label: 'Simulasi Ekstraksi AI', variant: 'purple' }
           }
         />
 
-        {/* 1. Primary KPI Cards Grid (Interactive & Clickable) */}
+        {/* 1. Intelligent Processing Overview & Quick Actions Banner (Dipindah ke Atas Card Counter) */}
+        <div className="p-6 sm:p-7 rounded-2xl border border-indigo-100 bg-gradient-to-r from-indigo-50/70 via-white to-indigo-50/30 shadow-xs flex flex-col lg:flex-row items-start lg:items-center justify-between gap-5 min-w-0">
+          <div className="space-y-1.5 min-w-0 flex-1">
+            <div className="inline-flex items-center gap-2 text-[11px] uppercase font-extrabold tracking-wider text-[#4F46E5]">
+              <span className="w-2 h-2 rounded-full bg-[#4F46E5] animate-pulse" />
+              <span>{isProduction ? 'Antrean Verifikasi Dokumen Masuk' : 'Simulasi Intelligent Processing'}</span>
+            </div>
+            <h3 className="text-base sm:text-lg font-bold text-[#0F172A] leading-snug">
+              Ada {pendingDocsUnfiltered} dokumen menunggu review mata manusia sebelum ekspor ke SAP ERP
+            </h3>
+            <p className="text-xs sm:text-[13px] text-[#64748B]">
+              Total nominal transaksi yang telah tervalidasi dan siap dibayar:{' '}
+              <strong className="text-[#059669] font-bold">{formatIDR(approvedValueUnfiltered)}</strong>
+            </p>
+          </div>
+          <div className="flex flex-wrap sm:flex-nowrap items-center gap-3 shrink-0 w-full sm:w-auto">
+            <Link
+              href={getRoute('/upload')}
+              className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-[#CBD5E1] hover:bg-[#F8FAFC] text-xs font-bold text-[#0F172A] shadow-2xs hover:border-[#94A3B8] transition-all"
+            >
+              <UploadCloudIcon className="w-4 h-4 text-[#4F46E5]" />
+              <span className="whitespace-nowrap">Unggah Faktur Baru</span>
+            </Link>
+            <Link
+              href={getRoute('/verification')}
+              className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[#4F46E5] hover:bg-[#4338CA] text-xs font-bold text-white shadow-xs transition-all"
+            >
+              <CheckCircleIcon className="w-4 h-4" />
+              <span className="whitespace-nowrap">Buka Reviewer Workspace</span>
+            </Link>
+          </div>
+        </div>
+
+        {/* 2. Baris Filter Reaktif (Di antara Banner dan Card Counter) */}
+        <div className="p-4 rounded-xl border border-[#E2E8F0] bg-white shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3 min-w-0">
+          <div className="flex flex-wrap items-center gap-2.5 min-w-0 flex-1">
+            <div className="flex items-center gap-1.5 text-xs font-bold text-[#475569] shrink-0 mr-1">
+              <FilterIcon className="w-4 h-4 text-[#4F46E5]" />
+              <span>Filter Data:</span>
+            </div>
+
+            {/* Filter Rentang Waktu */}
+            <div className="flex items-center gap-1">
+              <span className="text-[11px] font-semibold text-[#64748B] hidden sm:inline">Periode:</span>
+              <select
+                aria-label="Filter Rentang Waktu"
+                value={activeDateRange}
+                onChange={(e) => setActiveDateRange(e.target.value as any)}
+                className="text-xs bg-[#F8FAFC] hover:bg-slate-100 border border-[#CBD5E1] rounded-lg px-2.5 py-1.5 font-semibold text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer transition-colors"
+              >
+                <option value="all">Semua Waktu</option>
+                <option value="today">Hari Ini (48 Jam)</option>
+                <option value="7days">7 Hari Terakhir</option>
+                <option value="month">Bulan Ini (Maret 2026)</option>
+              </select>
+            </div>
+
+            {/* Filter Status Dokumen */}
+            <div className="flex items-center gap-1">
+              <span className="text-[11px] font-semibold text-[#64748B] hidden sm:inline">Status:</span>
+              <select
+                aria-label="Filter Status Dokumen"
+                value={activeStatusFilter || ''}
+                onChange={(e) => setActiveStatusFilter((e.target.value || null) as DocumentStatus | null)}
+                className="text-xs bg-[#F8FAFC] hover:bg-slate-100 border border-[#CBD5E1] rounded-lg px-2.5 py-1.5 font-semibold text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer transition-colors"
+              >
+                <option value="">Semua Status</option>
+                <option value="needs_review">Perlu Verifikasi (HITL)</option>
+                <option value="approved">Telah Disetujui</option>
+                <option value="rejected">Ditolak</option>
+              </select>
+            </div>
+
+            {/* Filter Kategori / Tipe Dokumen */}
+            <div className="flex items-center gap-1">
+              <span className="text-[11px] font-semibold text-[#64748B] hidden sm:inline">Kategori:</span>
+              <select
+                aria-label="Filter Kategori Dokumen"
+                value={activeTypeFilter || ''}
+                onChange={(e) => setActiveTypeFilter(e.target.value || null)}
+                className="text-xs bg-[#F8FAFC] hover:bg-slate-100 border border-[#CBD5E1] rounded-lg px-2.5 py-1.5 font-semibold text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer transition-colors"
+              >
+                <option value="">Semua Kategori</option>
+                <option value="tax_invoice">Faktur Pajak Standar</option>
+                <option value="commercial_invoice">Invoice Komersial</option>
+                <option value="purchase_order">Purchase Order (PO)</option>
+                <option value="contract">Perjanjian Kontrak</option>
+                <option value="withholding_tax">Bukti Potong PPh</option>
+                <option value="receipt">Kuitansi / Receipt</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Reset Filter Button & Info Counter */}
+          <div className="flex items-center justify-between sm:justify-end gap-2.5 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100">
+            <span className="text-[11px] text-[#64748B]">
+              Menampilkan <strong className="text-[#0F172A] font-bold">{filteredDocuments.length}</strong> dari {documents.length} berkas
+            </span>
+            {isAnyFilterActive && (
+              <button
+                type="button"
+                onClick={handleResetFilters}
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs font-bold border border-rose-200 transition-colors cursor-pointer"
+                title="Kembalikan semua filter ke kondisi awal"
+              >
+                <RotateCcwIcon className="w-3.5 h-3.5" />
+                <span>Reset Filter</span>
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* 3. Primary KPI Cards Grid (Interactive & Clickable - Dinamis Mengikuti Filter) */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 xl:gap-5 [grid-template-columns:repeat(auto-fit,minmax(0,1fr))]">
           {/* Total Documents -> /dashboard/documents */}
           <Link
-            href="/dashboard/documents"
+            href={getRoute('/documents')}
             className="group p-5 sm:p-6 rounded-xl border border-[#E2E8F0] bg-white shadow-xs space-y-3 min-w-0 flex flex-col justify-between hover:border-[#4F46E5] hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-pointer"
           >
             <div className="flex items-center justify-between text-xs font-semibold text-[#64748B] group-hover:text-[#4F46E5] transition-colors">
@@ -245,7 +405,7 @@ export default function DashboardOverviewPage() {
               </div>
             </div>
             <div>
-              <div className="text-2xl sm:text-3xl font-black text-[#0F172A] tracking-tight">{documents.length} Berkas</div>
+              <div className="text-2xl sm:text-3xl font-black text-[#0F172A] tracking-tight">{filteredDocuments.length} Berkas</div>
               <div className="text-[11px] text-[#059669] font-medium flex items-center gap-1 mt-1">
                 <span>↑ +18.4%</span>
                 <span className="text-[#64748B]">volume bulan ini</span>
@@ -255,7 +415,7 @@ export default function DashboardOverviewPage() {
 
           {/* Menunggu Review (HITL) -> /dashboard/verification */}
           <Link
-            href="/dashboard/verification"
+            href={getRoute('/verification')}
             className="group p-5 sm:p-6 rounded-xl border border-[#E2E8F0] bg-white shadow-xs space-y-3 min-w-0 flex flex-col justify-between hover:border-[#F59E0B] hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-pointer"
           >
             <div className="flex items-center justify-between text-xs font-semibold text-[#64748B] group-hover:text-[#F59E0B] transition-colors">
@@ -277,7 +437,7 @@ export default function DashboardOverviewPage() {
 
           {/* Disetujui & Valid -> /dashboard/export */}
           <Link
-            href="/dashboard/export"
+            href={getRoute('/export')}
             className="group p-5 sm:p-6 rounded-xl border border-[#E2E8F0] bg-white shadow-xs space-y-3 min-w-0 flex flex-col justify-between hover:border-[#059669] hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-pointer"
           >
             <div className="flex items-center justify-between text-xs font-semibold text-[#64748B] group-hover:text-[#059669] transition-colors">
@@ -299,7 +459,7 @@ export default function DashboardOverviewPage() {
 
           {/* Akurasi Model AI -> /dashboard/settings */}
           <Link
-            href="/dashboard/settings"
+            href={getRoute('/settings')}
             className="group p-5 sm:p-6 rounded-xl border border-[#E2E8F0] bg-white shadow-xs space-y-3 min-w-0 flex flex-col justify-between hover:border-[#4F46E5] hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-pointer"
           >
             <div className="flex items-center justify-between text-xs font-semibold text-[#64748B] group-hover:text-[#4F46E5] transition-colors">
@@ -320,39 +480,6 @@ export default function DashboardOverviewPage() {
           </Link>
         </div>
 
-        {/* 2. Intelligent Processing Overview & Quick Actions Banner */}
-        <div className="p-6 sm:p-7 rounded-2xl border border-indigo-100 bg-gradient-to-r from-indigo-50/70 via-white to-indigo-50/30 shadow-xs flex flex-col lg:flex-row items-start lg:items-center justify-between gap-5 min-w-0">
-          <div className="space-y-1.5 min-w-0 flex-1">
-            <div className="inline-flex items-center gap-2 text-[11px] uppercase font-extrabold tracking-wider text-[#4F46E5]">
-              <span className="w-2 h-2 rounded-full bg-[#4F46E5] animate-pulse" />
-              <span>{isProduction ? 'Antrean Verifikasi Dokumen Masuk' : 'Simulasi Intelligent Processing'}</span>
-            </div>
-            <h3 className="text-base sm:text-lg font-bold text-[#0F172A] leading-snug">
-              Ada {pendingDocs} dokumen menunggu review mata manusia sebelum ekspor ke SAP ERP
-            </h3>
-            <p className="text-xs sm:text-[13px] text-[#64748B]">
-              Total nominal transaksi yang telah tervalidasi dan siap dibayar:{' '}
-              <strong className="text-[#059669] font-bold">{formatIDR(totalValue)}</strong>
-            </p>
-          </div>
-          <div className="flex flex-wrap sm:flex-nowrap items-center gap-3 shrink-0 w-full sm:w-auto">
-            <Link
-              href="/dashboard/upload"
-              className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-[#CBD5E1] hover:bg-[#F8FAFC] text-xs font-bold text-[#0F172A] shadow-2xs hover:border-[#94A3B8] transition-all"
-            >
-              <UploadCloudIcon className="w-4 h-4 text-[#4F46E5]" />
-              <span className="whitespace-nowrap">Unggah Faktur Baru</span>
-            </Link>
-            <Link
-              href="/dashboard/verification"
-              className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[#4F46E5] hover:bg-[#4338CA] text-xs font-bold text-white shadow-xs transition-all"
-            >
-              <CheckCircleIcon className="w-4 h-4" />
-              <span className="whitespace-nowrap">Buka Reviewer Workspace</span>
-            </Link>
-          </div>
-        </div>
-
         {/* 3. Section: Analisis Operasional & Efisiensi Finansial */}
         <div className="space-y-6 min-w-0">
           <SectionHeader
@@ -364,7 +491,7 @@ export default function DashboardOverviewPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 xl:gap-5 min-w-0">
             {/* Tingkat Persetujuan Pertama -> /dashboard/documents?status=approved */}
             <Link
-              href="/dashboard/documents?status=approved"
+              href={getRoute('/documents?status=approved')}
               className="group p-5 sm:p-6 rounded-xl border border-[#E2E8F0] bg-white shadow-xs space-y-2 min-w-0 hover:border-[#059669] hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-pointer block"
             >
               <div className="flex items-center justify-between text-xs font-semibold text-[#64748B] group-hover:text-[#059669] transition-colors">
@@ -386,7 +513,7 @@ export default function DashboardOverviewPage() {
 
             {/* Estimasi Jam Kerja Hemat -> /dashboard/audit */}
             <Link
-              href="/dashboard/audit"
+              href={getRoute('/audit')}
               className="group p-5 sm:p-6 rounded-xl border border-[#E2E8F0] bg-white shadow-xs space-y-2 min-w-0 hover:border-[#4F46E5] hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-pointer block"
             >
               <div className="flex items-center justify-between text-xs font-semibold text-[#64748B] group-hover:text-[#4F46E5] transition-colors">
@@ -448,7 +575,7 @@ export default function DashboardOverviewPage() {
                   </button>
                 )}
                 <Link
-                  href="/dashboard/documents"
+                  href={getRoute('/documents')}
                   className="text-xs font-bold text-[#4F46E5] hover:text-[#4338CA] inline-flex items-center gap-1"
                 >
                   <span>Lihat Semua Dokumen</span>
@@ -480,7 +607,7 @@ export default function DashboardOverviewPage() {
                         <DataTableRow
                           key={doc.id}
                           row={doc}
-                          onRowDoubleClick={(d) => router.push(`/dashboard/verification?docId=${d.id}`)}
+                          onRowDoubleClick={(d) => router.push(getRoute(`/verification?docId=${d.id}`))}
                           onRowContextMenu={(d, e) => openContextMenu(d, e, 'Aksi Dokumen')}
                         >
                           <td className="py-3.5 px-5">

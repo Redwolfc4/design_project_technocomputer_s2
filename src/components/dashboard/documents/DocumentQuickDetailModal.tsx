@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { DocumentRecord } from '@/types';
 import { formatCurrency, formatIDR, formatDate, getStatusBadgeInfo, getDocumentTypeLabel } from '@/lib/utils/formatters';
 import { XIcon, FileTextIcon, ArrowRightIcon, CopyIcon } from '@/components/ui/icons';
+import { useAppRoutes } from '@/context/RouteContext';
 
 export interface DocumentQuickDetailModalProps {
   document: DocumentRecord | null;
@@ -17,6 +18,7 @@ export function DocumentQuickDetailModal({
   onClose,
   onCopyText,
 }: DocumentQuickDetailModalProps) {
+  const { getRoute } = useAppRoutes();
   React.useEffect(() => {
     if (!document) return;
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -139,7 +141,7 @@ export function DocumentQuickDetailModal({
           </button>
 
           <Link
-            href={`/dashboard/verification?docId=${document.id}`}
+            href={getRoute(`/verification?docId=${document.id}`)}
             className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[#4F46E5] hover:bg-[#4338CA] text-white text-xs font-bold transition-all shadow-xs"
           >
             <span>Buka Workspace Verifikasi</span>

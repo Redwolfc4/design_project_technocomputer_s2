@@ -89,65 +89,67 @@ export const DataTableFilterSelect: React.FC<DataTableFilterSelectProps> = ({ fi
       <button
         type="button"
         onClick={() => setIsOpen((prev) => !prev)}
-        className={`w-full flex items-center justify-between px-3 py-2 bg-[#FAFAFF] border rounded-lg text-xs transition-all duration-150 focus:outline-none shadow-xs group ${
-          isOpen
-            ? 'border-[#4F46E5] ring-2 ring-[#4F46E5]/15 bg-white text-[#0F172A]'
-            : 'border-[#CBD5E1] text-[#0F172A] hover:bg-white hover:border-[#94A3B8]'
-        }`}
+        className={`w-full flex items-center justify-between px-3 py-2 bg-[#FAFAFF] border rounded-lg text-xs transition-all duration-150 focus:outline-none shadow-xs group ${isOpen
+          ? 'border-[#4F46E5] ring-2 ring-[#4F46E5]/15 bg-white text-[#0F172A]'
+          : 'border-[#CBD5E1] text-[#0F172A] hover:bg-white hover:border-[#94A3B8]'
+          }`}
         aria-label={`Filter ${filter.label}`}
         aria-haspopup="listbox"
         aria-expanded={isOpen}
       >
         <span className="truncate font-medium">{getButtonLabel()}</span>
         <ChevronDownIcon
-          className={`w-3.5 h-3.5 text-[#64748B] shrink-0 ml-1.5 transition-transform duration-200 ${
-            isOpen ? 'rotate-180 text-[#4F46E5]' : 'group-hover:text-[#334155]'
-          }`}
+          className={`w-3.5 h-3.5 text-[#64748B] shrink-0 ml-1.5 transition-transform duration-200 ${isOpen ? 'rotate-180 text-[#4F46E5]' : 'group-hover:text-[#334155]'
+            }`}
         />
       </button>
 
       {isOpen && (
-        <div className="absolute left-0 mt-1.5 w-full min-w-[220px] max-w-xs bg-white border border-[#CBD5E1] rounded-xl shadow-xl z-30 p-2 space-y-1.5 animate-in fade-in-50 zoom-in-95 duration-100">
-          {isMulti && (
-            <div className="flex items-center justify-between pb-1.5 px-1 border-b border-slate-100">
-              <span className="text-[11px] font-bold text-slate-600">Pilih {filter.label}</span>
-              {selectedValues.length > 0 && (
-                <button
-                  type="button"
-                  onClick={handleResetMulti}
-                  className="text-[10px] text-[#4F46E5] font-semibold hover:underline cursor-pointer"
-                >
-                  Reset Pilihan
-                </button>
-              )}
-            </div>
-          )}
+        <div className="absolute left-0 mt-1.5 w-full min-w-full max-w-[calc(100vw-32px)] max-h-[min(380px,calc(100vh-140px))] bg-white border border-[#CBD5E1] rounded-xl shadow-xl z-30 p-2 flex flex-col animate-in fade-in-50 zoom-in-95 duration-100">
+          {/* Sticky Header Section */}
+          <div className="shrink-0 space-y-1.5 pb-1.5">
+            {isMulti && (
+              <div className="flex items-center justify-between pb-1 px-1 border-b border-slate-100">
+                <span className="text-[11px] font-bold text-slate-600">Pilih {filter.label}</span>
+                {selectedValues.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleResetMulti}
+                    className="text-[10px] text-[#4F46E5] font-semibold hover:underline cursor-pointer"
+                  >
+                    Reset Pilihan
+                  </button>
+                )}
+              </div>
+            )}
 
-          {isSearchable && (
-            <div className="relative">
-              <SearchIcon className="w-3.5 h-3.5 text-[#94A3B8] absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder={`Cari ${filter.label.toLowerCase()}...`}
-                className="w-full pl-8 pr-7 py-1.5 text-xs bg-[#F8FAFC] border border-[#E2E8F0] rounded-lg focus:outline-none focus:border-[#4F46E5] focus:bg-white focus:ring-1 focus:ring-[#4F46E5] transition-colors"
-                autoFocus
-              />
-              {searchTerm && (
-                <button
-                  type="button"
-                  onClick={() => setSearchTerm('')}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5"
-                  title="Hapus pencarian"
-                >
-                  <XIcon className="w-3 h-3" />
-                </button>
-              )}
-            </div>
-          )}
+            {isSearchable && (
+              <div className="relative">
+                <SearchIcon className="w-3.5 h-3.5 text-[#94A3B8] absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder={`Cari ${filter.label.toLowerCase()}...`}
+                  className="w-full pl-8 pr-7 py-1.5 text-xs bg-[#F8FAFC] border border-[#E2E8F0] rounded-lg focus:outline-none focus:border-[#4F46E5] focus:bg-white focus:ring-1 focus:ring-[#4F46E5] transition-colors"
+                  autoFocus
+                />
+                {searchTerm && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchTerm('')}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5"
+                    title="Hapus pencarian"
+                  >
+                    <XIcon className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
 
-          <div className="max-h-56 overflow-y-auto space-y-0.5 pr-0.5 custom-scrollbar">
+          {/* Scrollable Options List */}
+          <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain space-y-0.5 pr-0.5 custom-scrollbar">
             {filteredOptions.length === 0 ? (
               <div className="px-3 py-4 text-center text-xs text-[#94A3B8]">
                 Tidak ada pilihan yang cocok
@@ -160,9 +162,8 @@ export const DataTableFilterSelect: React.FC<DataTableFilterSelectProps> = ({ fi
                   return (
                     <label
                       key={opt.value}
-                      className={`flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg hover:bg-[#F8FAFC] cursor-pointer text-xs transition-colors ${
-                        isSelected ? 'bg-[#F5F3FF]' : ''
-                      }`}
+                      className={`flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg hover:bg-[#F8FAFC] cursor-pointer text-xs transition-colors ${isSelected ? 'bg-[#F5F3FF]' : ''
+                        }`}
                     >
                       <input
                         type="checkbox"
@@ -187,11 +188,10 @@ export const DataTableFilterSelect: React.FC<DataTableFilterSelectProps> = ({ fi
                     key={opt.value}
                     type="button"
                     onClick={() => handleSelectOption(opt)}
-                    className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs flex items-center justify-between transition-colors ${
-                      isSelected
-                        ? 'bg-[#EEF2FF] text-[#4F46E5] font-semibold'
-                        : 'text-[#334155] hover:bg-[#F8FAFC]'
-                    }`}
+                    className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs flex items-center justify-between transition-colors ${isSelected
+                      ? 'bg-[#EEF2FF] text-[#4F46E5] font-semibold'
+                      : 'text-[#334155] hover:bg-[#F8FAFC]'
+                      }`}
                   >
                     <span className="truncate">{opt.label}</span>
                     {isSelected && <CheckIcon className="w-3.5 h-3.5 text-[#4F46E5] shrink-0 ml-1.5" />}

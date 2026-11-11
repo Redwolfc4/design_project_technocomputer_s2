@@ -30,9 +30,11 @@ import {
 } from '@/components/shared/data-table';
 import { DocumentQuickDetailModal } from '@/components/dashboard/documents/DocumentQuickDetailModal';
 import { PageHeader } from '@/components/shared/PageHeader';
+import { useAppRoutes } from '@/context/RouteContext';
 
 function DocumentRepositoryContent() {
   const router = useRouter();
+  const { getRoute } = useAppRoutes();
   const searchParams = useSearchParams();
   const [documents, setDocuments] = useState<DocumentRecord[]>(() => DocumentService.getDocuments());
   const [statusFilter, setStatusFilter] = useState<string>(() => searchParams.get('status') || 'all');
@@ -318,7 +320,7 @@ function DocumentRepositoryContent() {
         id: 'open_workspace',
         label: 'Buka Workspace Verifikasi',
         icon: <ArrowRightIcon className="w-4 h-4 text-[#4F46E5]" />,
-        onSelect: (doc) => router.push(`/dashboard/verification?docId=${doc.id}`),
+        onSelect: (doc) => router.push(getRoute(`/verification?docId=${doc.id}`)),
       },
       {
         id: 'view_detail',
@@ -385,7 +387,7 @@ function DocumentRepositoryContent() {
           badge={{ label: 'Arsip Aktif', variant: 'info' }}
           actions={
             <button
-              onClick={() => router.push('/dashboard/upload')}
+              onClick={() => router.push(getRoute('/upload'))}
               className="inline-flex items-center gap-2 px-4 py-2 bg-[#4F46E5] hover:bg-[#4338CA] text-white text-xs font-semibold rounded-lg shadow-sm transition-colors"
             >
               + Unggah Dokumen
@@ -410,7 +412,7 @@ function DocumentRepositoryContent() {
           }}
           primaryAction={{
             label: "+ Unggah Dokumen",
-            onClick: () => router.push('/dashboard/upload'),
+            onClick: () => router.push(getRoute('/upload')),
           }}
         />
 
@@ -441,7 +443,7 @@ function DocumentRepositoryContent() {
                         onResetFilters={handleResetFilters}
                         action={{
                           label: "Unggah Dokumen Baru",
-                          onClick: () => router.push('/dashboard/upload'),
+                          onClick: () => router.push(getRoute('/upload')),
                         }}
                       />
                     </td>
@@ -453,7 +455,7 @@ function DocumentRepositoryContent() {
                       <DataTableRow
                         key={doc.id}
                         row={doc}
-                        onRowDoubleClick={(d) => router.push(`/dashboard/verification?docId=${d.id}`)}
+                        onRowDoubleClick={(d) => router.push(getRoute(`/verification?docId=${d.id}`))}
                         onRowContextMenu={(d, e) => openContextMenu(d, e, 'Aksi Dokumen')}
                       >
                         <td className="py-3.5 px-5">

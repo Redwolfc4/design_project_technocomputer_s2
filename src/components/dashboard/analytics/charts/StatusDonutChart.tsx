@@ -19,6 +19,43 @@ interface StatusDonutChartProps {
   onSelectStatus: (status: DocumentStatus | null) => void;
 }
 
+// Polar coordinate math for precision SVG donut sector paths
+function polarToCartesian(centerX: number, centerY: number, radius: number, angleInDegrees: number) {
+  const angleInRadians = ((angleInDegrees - 90) * Math.PI) / 180.0;
+  return {
+    x: centerX + radius * Math.cos(angleInRadians),
+    y: centerY + radius * Math.sin(angleInRadians),
+  };
+}
+
+function describeDonutSector(
+  x: number,
+  y: number,
+  innerRadius: number,
+  outerRadius: number,
+  startAngle: number,
+  endAngle: number
+) {
+  // Cap slightly below 360 to avoid full-circle SVG arc singularity
+  const sweepAngle = Math.min(Math.max(endAngle - startAngle, 0.1), 359.99);
+  const actualEndAngle = startAngle + sweepAngle;
+
+  const startOuter = polarToCartesian(x, y, outerRadius, startAngle);
+  const endOuter = polarToCartesian(x, y, outerRadius, actualEndAngle);
+  const startInner = polarToCartesian(x, y, innerRadius, actualEndAngle);
+  const endInner = polarToCartesian(x, y, innerRadius, startAngle);
+
+  const largeArcFlag = sweepAngle > 180 ? 1 : 0;
+
+  return [
+    `M ${startOuter.x.toFixed(2)} ${startOuter.y.toFixed(2)}`,
+    `A ${outerRadius} ${outerRadius} 0 ${largeArcFlag} 1 ${endOuter.x.toFixed(2)} ${endOuter.y.toFixed(2)}`,
+    `L ${startInner.x.toFixed(2)} ${startInner.y.toFixed(2)}`,
+    `A ${innerRadius} ${innerRadius} 0 ${largeArcFlag} 0 ${endInner.x.toFixed(2)} ${endInner.y.toFixed(2)}`,
+    'Z',
+  ].join(' ');
+}
+
 export const StatusDonutChart: React.FC<StatusDonutChartProps> = ({
   items,
   total,
@@ -27,26 +64,37 @@ export const StatusDonutChart: React.FC<StatusDonutChartProps> = ({
 }) => {
   const [hoveredStatus, setHoveredStatus] = useState<DocumentStatus | null>(null);
 
-  // SVG Geometry
-  const size = 180;
-  const strokeWidth = 24;
-  const radius = (size - strokeWidth) / 2;
-  const circumference = 2 * Math.PI * radius;
+  // SVG Geometry: Clean 200x200 canvas
+  const canvasSize = 200;
+  const center = canvasSize / 2;
+  const innerR = 56;
+  const outerR = 86;
+  const expandedOuterR = 94; // Scale out on hover/active for clear tactile click response
 
-  // Compute stroke offsets
-  let accumulatedPercent = 0;
-  const segments = items.map((item) => {
-    const percent = total > 0 ? (item.count / total) * 100 : 0;
-    const strokeDasharray = `${(percent / 100) * circumference} ${circumference}`;
-    const strokeDashoffset = -((accumulatedPercent / 100) * circumference);
-    accumulatedPercent += percent;
+  // Compute angles
+  let currentAngle = 0;
+  const sectors = items.map((item) => {
+    const fraction = total > 0 ? item.count / total : 0;
+    const sweep = fraction * 360;
+    const startAngle = currentAngle;
+    const endAngle = currentAngle + sweep;
+    currentAngle += sweep;
+
+    const isHovered = hoveredStatus === item.status;
+    const isSelected = activeFilter === item.status;
+    const activeRadius = isHovered || isSelected ? expandedOuterR : outerR;
+
+    const pathData = total > 0 ? describeDonutSector(center, center, innerR, activeRadius, startAngle, endAngle) : '';
 
     return {
       ...item,
-      percent: Math.round(percent),
-      exactPercent: percent.toFixed(1),
-      strokeDasharray,
-      strokeDashoffset,
+      fraction,
+      percent: Math.round(fraction * 100),
+      startAngle,
+      endAngle,
+      pathData,
+      isHovered,
+      isSelected,
     };
   });
 
@@ -55,7 +103,7 @@ export const StatusDonutChart: React.FC<StatusDonutChartProps> = ({
   );
 
   return (
-    <div className="p-5 sm:p-6 rounded-xl border border-[#E2E8F0] bg-white shadow-xs space-y-5 min-w-0 flex flex-col justify-between">
+    <div className="p-5 sm:p-6 rounded-xl border border-[#E2E8F0] bg-white shadow-xs space-y-5 min-w-0 flex flex-col justify-between select-none">
       {/* Header with Title & Reset Button */}
       <div className="flex items-center justify-between gap-2">
         <div>
@@ -63,69 +111,70 @@ export const StatusDonutChart: React.FC<StatusDonutChartProps> = ({
             Distribusi Status Dokumen
           </h3>
           <p className="text-[11px] text-[#64748B] mt-0.5">
-            Klik segmen untuk menyaring tabel dokumen
+            Klik pada cincin grafik atau tombol status untuk memfilter data
           </p>
         </div>
         {activeFilter && (
           <button
             type="button"
             onClick={() => onSelectStatus(null)}
-            className="text-[11px] font-bold text-[#4F46E5] hover:text-[#4338CA] bg-[#EEF2FF] hover:bg-indigo-100 px-2.5 py-1 rounded-md transition-colors cursor-pointer"
+            className="text-[11px] font-bold text-[#4F46E5] hover:text-[#4338CA] bg-[#EEF2FF] hover:bg-indigo-100 px-2.5 py-1 rounded-md transition-all cursor-pointer flex items-center gap-1 shadow-2xs"
           >
-            Reset Filter ✕
+            <span>Reset Filter</span>
+            <span className="font-extrabold">✕</span>
           </button>
         )}
       </div>
 
       {/* Main Chart & Donut Center */}
       <div className="flex flex-col sm:flex-row items-center justify-center gap-6 py-1">
-        {/* SVG Donut Circle */}
-        <div className="relative w-[180px] h-[180px] shrink-0 select-none">
+        {/* SVG Donut Slices */}
+        <div className="relative w-[200px] h-[200px] shrink-0">
           <svg
-            width={size}
-            height={size}
-            viewBox={`0 0 ${size} ${size}`}
-            className="transform -rotate-90"
+            width={canvasSize}
+            height={canvasSize}
+            viewBox={`0 0 ${canvasSize} ${canvasSize}`}
+            className="overflow-visible"
           >
-            {/* Background Empty Ring */}
-            <circle
-              cx={size / 2}
-              cy={size / 2}
-              r={radius}
-              fill="transparent"
-              stroke="#F1F5F9"
-              strokeWidth={strokeWidth}
-            />
+            {/* Background Empty Ring (Fallback if 0 docs) */}
+            {total === 0 && (
+              <circle
+                cx={center}
+                cy={center}
+                r={(innerR + outerR) / 2}
+                fill="none"
+                stroke="#F1F5F9"
+                strokeWidth={outerR - innerR}
+              />
+            )}
 
-            {/* Render Segments */}
+            {/* True SVG Donut Sector Paths */}
             {total > 0 &&
-              segments.map((seg) => {
-                const isHovered = hoveredStatus === seg.status;
-                const isSelected = activeFilter === seg.status;
+              sectors.map((sec) => {
                 const isDimmed =
-                  (hoveredStatus !== null && !isHovered) ||
-                  (activeFilter !== null && !isSelected);
+                  (hoveredStatus !== null && !sec.isHovered) ||
+                  (activeFilter !== null && !sec.isSelected);
 
                 return (
-                  <circle
-                    key={seg.status}
-                    cx={size / 2}
-                    cy={size / 2}
-                    r={radius}
-                    fill="transparent"
-                    stroke={seg.color}
-                    strokeWidth={isHovered || isSelected ? strokeWidth + 4 : strokeWidth}
-                    strokeDasharray={seg.strokeDasharray}
-                    strokeDashoffset={seg.strokeDashoffset}
-                    className="transition-all duration-300 cursor-pointer"
+                  <path
+                    key={sec.status}
+                    d={sec.pathData}
+                    fill={sec.color}
+                    stroke="#FFFFFF"
+                    strokeWidth={2}
+                    className="cursor-pointer transition-all duration-200"
                     style={{
                       opacity: isDimmed ? 0.35 : 1,
-                      filter: isHovered || isSelected ? 'drop-shadow(0 2px 4px rgba(0,0,0,0.15))' : 'none',
+                      filter:
+                        sec.isHovered || sec.isSelected
+                          ? 'drop-shadow(0 4px 6px rgba(0, 0, 0, 0.2))'
+                          : 'none',
+                      transformOrigin: `${center}px ${center}px`,
                     }}
-                    onMouseEnter={() => setHoveredStatus(seg.status)}
+                    onMouseEnter={() => setHoveredStatus(sec.status)}
                     onMouseLeave={() => setHoveredStatus(null)}
                     onClick={() =>
-                      onSelectStatus(activeFilter === seg.status ? null : seg.status)
+                      onSelectStatus(activeFilter === sec.status ? null : sec.status)
                     }
                   />
                 );
@@ -135,68 +184,76 @@ export const StatusDonutChart: React.FC<StatusDonutChartProps> = ({
           {/* Donut Center Counter / Highlight */}
           <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none px-4">
             {activeOrHoveredItem ? (
-              <>
+              <div className="animate-in fade-in zoom-in-95 duration-150">
                 <span
-                  className="text-xs font-bold uppercase tracking-wider truncate max-w-[110px]"
+                  className="text-xs font-bold uppercase tracking-wider truncate block max-w-[110px]"
                   style={{ color: activeOrHoveredItem.color }}
                 >
                   {activeOrHoveredItem.label.split(' ')[0]}
                 </span>
-                <span className="text-2xl font-black text-[#0F172A] tracking-tight leading-none my-0.5">
+                <span className="text-3xl font-black text-[#0F172A] tracking-tight leading-none my-0.5 block">
                   {activeOrHoveredItem.count}
                 </span>
-                <span className="text-[10px] text-[#64748B] font-semibold">
+                <span className="text-[11px] text-[#64748B] font-semibold block">
                   {total > 0
                     ? `${Math.round((activeOrHoveredItem.count / total) * 100)}% porsi`
                     : '0%'}
                 </span>
-              </>
+              </div>
             ) : (
-              <>
-                <span className="text-[11px] font-semibold text-[#64748B] uppercase tracking-wider">
+              <div className="animate-in fade-in duration-150">
+                <span className="text-[11px] font-semibold text-[#64748B] uppercase tracking-wider block">
                   Total Berkas
                 </span>
-                <span className="text-3xl font-black text-[#0F172A] tracking-tight leading-none my-0.5">
+                <span className="text-3xl font-black text-[#0F172A] tracking-tight leading-none my-0.5 block">
                   {total}
                 </span>
-                <span className="text-[10px] text-[#059669] font-bold">
+                <span className="text-[10px] text-[#059669] font-bold block">
                   100% Terpantau
                 </span>
-              </>
+              </div>
             )}
           </div>
         </div>
 
-        {/* Legend / Breakdown List */}
+        {/* Legend / Breakdown List with High-Affordance Click Targets */}
         <div className="flex-1 w-full space-y-2">
-          {segments.map((seg) => {
+          {sectors.map((seg) => {
             const isSelected = activeFilter === seg.status;
             const isHovered = hoveredStatus === seg.status;
 
             return (
-              <div
+              <button
                 key={seg.status}
+                type="button"
                 onMouseEnter={() => setHoveredStatus(seg.status)}
                 onMouseLeave={() => setHoveredStatus(null)}
                 onClick={() =>
                   onSelectStatus(activeFilter === seg.status ? null : seg.status)
                 }
-                className={`p-2 rounded-lg border transition-all cursor-pointer flex items-center justify-between ${
+                className={`w-full text-left p-2.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between ${
                   isSelected
-                    ? 'border-[#4F46E5] bg-[#EEF2FF]/60 shadow-2xs ring-1 ring-[#4F46E5]/20'
+                    ? 'border-[#4F46E5] bg-[#EEF2FF] shadow-sm ring-2 ring-[#4F46E5]/20 font-bold'
                     : isHovered
                     ? 'border-[#CBD5E1] bg-[#F8FAFC]'
-                    : 'border-transparent hover:bg-[#F8FAFC]'
+                    : 'border-[#E2E8F0] hover:border-[#CBD5E1] bg-white'
                 }`}
               >
                 <div className="flex items-center gap-2.5 min-w-0">
                   <span
-                    className="w-3 h-3 rounded-full shrink-0 shadow-2xs"
-                    style={{ backgroundColor: seg.color }}
+                    className="w-3.5 h-3.5 rounded-full shrink-0 shadow-2xs transition-transform duration-200"
+                    style={{
+                      backgroundColor: seg.color,
+                      transform: isSelected || isHovered ? 'scale(1.2)' : 'scale(1)',
+                    }}
                   />
                   <span
-                    className={`text-xs font-semibold truncate ${
-                      isSelected ? 'text-[#4F46E5] font-bold' : 'text-[#334155]'
+                    className={`text-xs truncate ${
+                      isSelected
+                        ? 'text-[#4F46E5] font-extrabold'
+                        : isHovered
+                        ? 'text-[#0F172A] font-bold'
+                        : 'text-[#334155] font-medium'
                     }`}
                   >
                     {seg.label}
@@ -206,11 +263,17 @@ export const StatusDonutChart: React.FC<StatusDonutChartProps> = ({
                   <span className="text-xs font-bold text-[#0F172A]">
                     {seg.count} berkas
                   </span>
-                  <span className="text-[11px] font-semibold text-[#64748B] tabular-nums bg-slate-100 px-1.5 py-0.5 rounded">
+                  <span
+                    className={`text-[11px] font-bold tabular-nums px-2 py-0.5 rounded ${
+                      isSelected
+                        ? 'bg-[#4F46E5] text-white shadow-2xs'
+                        : 'bg-slate-100 text-[#64748B]'
+                    }`}
+                  >
                     {seg.percent}%
                   </span>
                 </div>
-              </div>
+              </button>
             );
           })}
         </div>
@@ -218,4 +281,3 @@ export const StatusDonutChart: React.FC<StatusDonutChartProps> = ({
     </div>
   );
 };
-

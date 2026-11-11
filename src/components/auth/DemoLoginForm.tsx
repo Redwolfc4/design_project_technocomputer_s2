@@ -26,7 +26,7 @@ export const DemoLoginForm: React.FC<DemoLoginFormProps> = ({ onSwitchToRegister
       setTimeout(() => {
         MockDocumentService.setCurrentUser(persona);
         MockAuthService.loginDemo(persona);
-        router.push('/dashboard');
+        router.push('/demo/dashboard');
       }, 500);
     }
   };
