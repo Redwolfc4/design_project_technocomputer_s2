@@ -18,34 +18,35 @@ interface DocumentTrendAreaChartProps {
 export const DocumentTrendAreaChart: React.FC<DocumentTrendAreaChartProps> = ({
   isDemo = false,
 }) => {
-  const [period, setPeriod] = useState<TrendPeriod>('30d');
+  // Independent internal timescale for the trend visualization
+  const [activeTab, setActiveTab] = useState<TrendPeriod>('90d');
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
 
-  // Generate realistic dataset based on period
+  // Realistic enterprise throughput dataset for each timescale
   const trendData: Record<TrendPeriod, DailyTrendPoint[]> = {
     '7d': [
-      { dateLabel: '01 Mar', ingested: 8, approved: 6, needsReview: 2 },
-      { dateLabel: '02 Mar', ingested: 12, approved: 9, needsReview: 3 },
-      { dateLabel: '03 Mar', ingested: 10, approved: 8, needsReview: 2 },
-      { dateLabel: '04 Mar', ingested: 16, approved: 12, needsReview: 4 },
-      { dateLabel: '05 Mar', ingested: 14, approved: 11, needsReview: 3 },
-      { dateLabel: '06 Mar', ingested: 18, approved: 15, needsReview: 3 },
-      { dateLabel: '07 Mar', ingested: 15, approved: 13, needsReview: 2 },
+      { dateLabel: '01 Mar', ingested: 14, approved: 10, needsReview: 4 },
+      { dateLabel: '02 Mar', ingested: 18, approved: 13, needsReview: 5 },
+      { dateLabel: '03 Mar', ingested: 16, approved: 12, needsReview: 4 },
+      { dateLabel: '04 Mar', ingested: 24, approved: 18, needsReview: 6 },
+      { dateLabel: '05 Mar', ingested: 22, approved: 17, needsReview: 5 },
+      { dateLabel: '06 Mar', ingested: 28, approved: 23, needsReview: 5 },
+      { dateLabel: '07 Mar', ingested: 25, approved: 20, needsReview: 5 },
     ],
     '30d': [
-      { dateLabel: 'Minggu 1', ingested: 42, approved: 34, needsReview: 8 },
-      { dateLabel: 'Minggu 2', ingested: 58, approved: 48, needsReview: 10 },
-      { dateLabel: 'Minggu 3', ingested: 72, approved: 60, needsReview: 12 },
-      { dateLabel: 'Minggu 4', ingested: 65, approved: 56, needsReview: 9 },
+      { dateLabel: 'Minggu 1', ingested: 95, approved: 78, needsReview: 17 },
+      { dateLabel: 'Minggu 2', ingested: 142, approved: 118, needsReview: 24 },
+      { dateLabel: 'Minggu 3', ingested: 186, approved: 154, needsReview: 32 },
+      { dateLabel: 'Minggu 4', ingested: 168, approved: 145, needsReview: 23 },
     ],
     '90d': [
-      { dateLabel: 'Januari', ingested: 180, approved: 152, needsReview: 28 },
-      { dateLabel: 'Februari', ingested: 240, approved: 206, needsReview: 34 },
-      { dateLabel: 'Maret', ingested: 295, approved: 260, needsReview: 35 },
+      { dateLabel: 'Januari', ingested: 180, approved: 142, needsReview: 38 },
+      { dateLabel: 'Februari', ingested: 240, approved: 198, needsReview: 42 },
+      { dateLabel: 'Maret', ingested: 295, approved: 252, needsReview: 43 },
     ],
   };
 
-  const points = trendData[period];
+  const points = trendData[activeTab];
   const maxVal = Math.max(...points.map((p) => p.ingested), 10);
 
   // SVG coordinate dimensions
@@ -96,18 +97,18 @@ export const DocumentTrendAreaChart: React.FC<DocumentTrendAreaChartProps> = ({
           </p>
         </div>
 
-        {/* Period Selector Tabs */}
+        {/* Period Selector Tabs (Independent Visual Scale) */}
         <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-lg self-start sm:self-auto">
           {(['7d', '30d', '90d'] as TrendPeriod[]).map((tab) => (
             <button
               key={tab}
               type="button"
               onClick={() => {
-                setPeriod(tab);
+                setActiveTab(tab);
                 setHoveredIndex(null);
               }}
               className={`px-3 py-1 rounded-md text-xs font-bold transition-all cursor-pointer ${
-                period === tab
+                activeTab === tab
                   ? 'bg-white text-[#4F46E5] shadow-2xs'
                   : 'text-[#64748B] hover:text-[#0F172A]'
               }`}

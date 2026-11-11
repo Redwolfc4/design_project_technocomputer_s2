@@ -7,7 +7,7 @@ import { useSidebar } from '@/context/SidebarContext';
 import { useAppMode } from '@/context/ModeContext';
 
 interface TopbarProps {
-  title: string;
+  title?: string;
   subtitle?: string;
   onSearch?: (query: string) => void;
 }
@@ -39,7 +39,7 @@ export function Topbar({ title, subtitle, onSearch }: TopbarProps) {
   return (
     <header className="h-16 border-b border-[#E2E8F0] dark:border-[#1F2937] bg-white dark:bg-[#111827] sticky top-0 z-20 w-full">
       <div className="w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 h-full flex items-center justify-between gap-3">
-        {/* Left: Mobile Hamburger Toggle & Title */}
+        {/* Left: Mobile Hamburger Toggle */}
         <div className="flex items-center gap-3 min-w-0">
           <button
             type="button"
@@ -49,17 +49,6 @@ export function Topbar({ title, subtitle, onSearch }: TopbarProps) {
           >
             <MenuIcon className="w-5 h-5" />
           </button>
-
-          <div className="flex flex-col min-w-0">
-            <h1 className="text-sm sm:text-base font-bold text-[#0F172A] dark:text-white leading-tight truncate">
-              {title}
-            </h1>
-            {subtitle && (
-              <p className="text-[11px] sm:text-xs text-[#64748B] dark:text-[#94A3B8] truncate hidden sm:block">
-                {subtitle}
-              </p>
-            )}
-          </div>
         </div>
 
         {/* Right: Actions */}

@@ -53,7 +53,9 @@ export default function DashboardOverviewPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeStatusFilter, setActiveStatusFilter] = useState<DocumentStatus | null>(null);
   const [activeTypeFilter, setActiveTypeFilter] = useState<string | null>(null);
-  const [activeDateRange, setActiveDateRange] = useState<'all' | 'today' | '7days' | 'month'>('all');
+  const [activeDateRange, setActiveDateRange] = useState<{ preset: string; from?: string; to?: string }>({
+    preset: 'all',
+  });
 
   const {
     activeMenu,
@@ -97,18 +99,27 @@ export default function DashboardOverviewPage() {
       if (activeTypeFilter && d.documentType !== activeTypeFilter) {
         return false;
       }
-      if (activeDateRange !== 'all') {
+      if (activeDateRange.preset !== 'all') {
         const docDate = new Date(d.uploadedAt || Date.now()).getTime();
         const now = new Date('2026-03-05T00:00:00Z').getTime(); // Anchored to mock data period (March 2026)
         const oneDay = 24 * 60 * 60 * 1000;
 
-        if (activeDateRange === 'today') {
+        if (activeDateRange.preset === 'today') {
           // Within last 24-48 hours of mock latest date
           if (now - docDate > 2 * oneDay) return false;
-        } else if (activeDateRange === '7days') {
+        } else if (activeDateRange.preset === '7days') {
           if (now - docDate > 7 * oneDay) return false;
-        } else if (activeDateRange === 'month') {
+        } else if (activeDateRange.preset === 'month') {
           if (now - docDate > 31 * oneDay) return false;
+        } else if (activeDateRange.preset === 'custom') {
+          if (activeDateRange.from) {
+            const fromTime = new Date(activeDateRange.from).getTime();
+            if (docDate < fromTime) return false;
+          }
+          if (activeDateRange.to) {
+            const toTime = new Date(activeDateRange.to).getTime() + oneDay; // End of selected day
+            if (docDate > toTime) return false;
+          }
         }
       }
       return true;
@@ -116,30 +127,27 @@ export default function DashboardOverviewPage() {
   }, [documents, activeStatusFilter, activeTypeFilter, activeDateRange]);
 
   // Is any filter active
-  const isAnyFilterActive = activeStatusFilter !== null || activeTypeFilter !== null || activeDateRange !== 'all';
+  const isAnyFilterActive =
+    activeStatusFilter !== null ||
+    activeTypeFilter !== null ||
+    activeDateRange.preset !== 'all';
 
   const handleResetFilters = () => {
     setActiveStatusFilter(null);
     setActiveTypeFilter(null);
-    setActiveDateRange('all');
+    setActiveDateRange({ preset: 'all' });
   };
 
-  // Filter configurations for standard enterprise DataTableFilterSelect
+  // Filter configurations for standard enterprise DataTableFilterSelect & DataTableDateRangePicker
   const dashboardFilterConfigs: FilterConfig[] = useMemo(
     () => [
       {
         id: 'dateRange',
         label: 'Periode',
-        type: 'select',
+        type: 'date-range',
         placeholder: 'Semua Waktu',
-        options: [
-          { label: 'Semua Waktu', value: 'all' },
-          { label: 'Hari Ini (48 Jam)', value: 'today' },
-          { label: '7 Hari Terakhir', value: '7days' },
-          { label: 'Bulan Ini (Maret 2026)', value: 'month' },
-        ],
         selectedValue: activeDateRange,
-        onChange: (val) => setActiveDateRange(val as any),
+        onChange: (val) => setActiveDateRange(val),
       },
       {
         id: 'status',
@@ -236,15 +244,9 @@ export default function DashboardOverviewPage() {
     count,
   }));
 
-  // Filtered recent documents based on Topbar search & interactive chart filters
+  // Filtered recent documents based on Topbar search & interactive filters (Period, Status, Type)
   const filteredRecentDocs = useMemo(() => {
-    let list = documents;
-    if (activeStatusFilter) {
-      list = list.filter((d) => d.status === activeStatusFilter);
-    }
-    if (activeTypeFilter) {
-      list = list.filter((d) => d.documentType === activeTypeFilter);
-    }
+    let list = filteredDocuments;
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       list = list.filter(
@@ -254,8 +256,8 @@ export default function DashboardOverviewPage() {
           d.title.toLowerCase().includes(q)
       );
     }
-    return list.slice(0, 5);
-  }, [documents, searchQuery, activeStatusFilter, activeTypeFilter]);
+    return list;
+  }, [filteredDocuments, searchQuery]);
 
   const recentDocActions: RowAction<DocumentRecord>[] = useMemo(
     () => [
@@ -527,14 +529,14 @@ export default function DashboardOverviewPage() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 min-w-0">
             <StatusDonutChart
               items={donutItems}
-              total={documents.length}
+              total={filteredDocuments.length}
               activeFilter={activeStatusFilter}
               onSelectStatus={setActiveStatusFilter}
             />
 
             <DocumentTypeBarChart
               items={typeBarItems}
-              total={documents.length}
+              total={filteredDocuments.length}
               activeTypeFilter={activeTypeFilter}
               onSelectType={setActiveTypeFilter}
             />
@@ -543,7 +545,10 @@ export default function DashboardOverviewPage() {
           {/* Row 4: Throughput Trend Area Chart & ROI Operational Efficiency */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 min-w-0">
             <DocumentTrendAreaChart isDemo={isDemo} />
-            <OperationalEfficiencyChart totalDocs={documents.length} />
+            <OperationalEfficiencyChart
+              totalDocs={filteredDocuments.length}
+              totalFilteredValue={totalValue}
+            />
           </div>
         </div>
 

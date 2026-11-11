@@ -16,6 +16,7 @@ import {
   DataTableToolbar,
   DataTablePagination,
   DataTableEmptyState,
+  DataTableExport,
   FilterConfig,
 } from '@/components/shared/data-table';
 import {
@@ -550,13 +551,21 @@ export default function UsersManagementPage() {
           subtitle="Kelola izin verifikasi dokumen, tingkat approval keuangan, dan akun auditor eksternal."
           badge={{ label: `${users.length} Akun Terdaftar`, variant: 'indigo' }}
           actions={
-            <button
-              onClick={() => setIsAddOpen(true)}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-[#4F46E5] hover:bg-[#4338CA] text-white text-xs font-semibold rounded-lg shadow-sm transition-colors"
-            >
-              <PlusIcon className="w-4 h-4" />
-              <span>Tambah Anggota Baru</span>
-            </button>
+            <div className="flex items-center gap-3">
+              <DataTableExport
+                options={{
+                  onExportCSV: handleExportCSV,
+                  onExportExcel: handleExportExcel,
+                }}
+              />
+              <button
+                onClick={() => setIsAddOpen(true)}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-[#4F46E5] hover:bg-[#4338CA] text-white text-xs font-semibold rounded-lg shadow-sm transition-colors cursor-pointer"
+              >
+                <PlusIcon className="w-4 h-4" />
+                <span>Tambah Anggota Baru</span>
+              </button>
+            </div>
           }
         />
 
@@ -581,14 +590,6 @@ export default function UsersManagementPage() {
           entityName="anggota"
           isFilterActive={isFilterActive}
           onResetFilters={handleResetFilters}
-          exportOptions={{
-            onExportCSV: handleExportCSV,
-            onExportExcel: handleExportExcel,
-          }}
-          primaryAction={{
-            label: "+ Tambah Anggota",
-            onClick: openAddModal,
-          }}
         />
 
         {/* RBAC Table Card */}

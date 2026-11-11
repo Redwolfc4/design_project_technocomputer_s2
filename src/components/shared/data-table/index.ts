@@ -4,6 +4,7 @@ export * from './DataTableActionMenu';
 export * from './useDataTableInteractions';
 export * from './DataTableSearch';
 export * from './DataTableFilterSelect';
+export * from './DataTableDateRangePicker';
 export * from './DataTableFilters';
 export * from './DataTableResultCount';
 export * from './DataTableExport';

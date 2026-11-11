@@ -14,12 +14,13 @@ export const DataTableFilterSelect: React.FC<DataTableFilterSelectProps> = ({ fi
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const isMulti = filter.type === 'multi-select';
+  const options = filter.options || [];
   const selectedValues = Array.isArray(filter.selectedValue)
     ? filter.selectedValue
     : [filter.selectedValue];
 
   // Search input is enabled if explicitly true or if undefined and options > 3
-  const isSearchable = filter.searchable !== false && (filter.searchable === true || filter.options.length > 3);
+  const isSearchable = filter.searchable !== false && (filter.searchable === true || options.length > 3);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -37,7 +38,7 @@ export const DataTableFilterSelect: React.FC<DataTableFilterSelectProps> = ({ fi
     };
   }, [isOpen]);
 
-  const filteredOptions = filter.options.filter((opt) => {
+  const filteredOptions = options.filter((opt) => {
     if (!searchTerm.trim()) return true;
     const term = searchTerm.toLowerCase();
     return (
@@ -56,7 +57,7 @@ export const DataTableFilterSelect: React.FC<DataTableFilterSelectProps> = ({ fi
       return `${selectedValues.length} dipilih`;
     }
 
-    const current = filter.options.find((o) => o.value === filter.selectedValue);
+    const current = options.find((o) => o.value === filter.selectedValue);
     return current ? current.label : filter.placeholder || 'Semua';
   };
 

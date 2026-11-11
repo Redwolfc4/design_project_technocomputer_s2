@@ -17,6 +17,7 @@ import {
   PencilIcon,
   TrashIcon,
   XIcon,
+  PlusIcon,
 } from '@/components/ui/icons';
 import {
   DataTableRow,
@@ -26,6 +27,7 @@ import {
   DataTableToolbar,
   DataTablePagination,
   DataTableEmptyState,
+  DataTableExport,
   FilterConfig,
 } from '@/components/shared/data-table';
 import { DocumentQuickDetailModal } from '@/components/dashboard/documents/DocumentQuickDetailModal';
@@ -386,12 +388,21 @@ function DocumentRepositoryContent() {
           subtitle="Kelola, telusuri, dan saring seluruh arsip faktur, invoice, dan kontrak perusahaan."
           badge={{ label: 'Arsip Aktif', variant: 'info' }}
           actions={
-            <button
-              onClick={() => router.push(getRoute('/upload'))}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-[#4F46E5] hover:bg-[#4338CA] text-white text-xs font-semibold rounded-lg shadow-sm transition-colors"
-            >
-              + Unggah Dokumen
-            </button>
+            <div className="flex items-center gap-3">
+              <DataTableExport
+                options={{
+                  onExportCSV: handleExportCSV,
+                  onExportExcel: handleExportExcel,
+                }}
+              />
+              <button
+                onClick={() => router.push(getRoute('/upload'))}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-[#4F46E5] hover:bg-[#4338CA] text-white text-xs font-semibold rounded-lg shadow-sm transition-colors cursor-pointer"
+              >
+                <PlusIcon className="w-4 h-4" />
+                <span>Unggah Dokumen</span>
+              </button>
+            </div>
           }
         />
 
@@ -406,14 +417,6 @@ function DocumentRepositoryContent() {
           entityName="dokumen"
           isFilterActive={isFilterActive}
           onResetFilters={handleResetFilters}
-          exportOptions={{
-            onExportCSV: handleExportCSV,
-            onExportExcel: handleExportExcel,
-          }}
-          primaryAction={{
-            label: "+ Unggah Dokumen",
-            onClick: () => router.push(getRoute('/upload')),
-          }}
         />
 
         {/* Documents Table */}

@@ -4,16 +4,22 @@ import React from 'react';
 
 interface OperationalEfficiencyChartProps {
   totalDocs: number;
+  totalFilteredValue?: number;
 }
 
 export const OperationalEfficiencyChart: React.FC<OperationalEfficiencyChartProps> = ({
   totalDocs,
+  totalFilteredValue,
 }) => {
   // AI processing: 1.4 seconds per doc
   // Manual processing assumption: 15 minutes (900 seconds) per doc based on enterprise finance AP entry
   const aiSecPerDoc = 1.4;
   const manualSecPerDoc = 900; // 15 mins
   const speedupFactor = Math.round(manualSecPerDoc / aiSecPerDoc); // ~642x faster
+
+  // Dynamically calculate saved hours based on active totalDocs (min 1 for realistic baseline)
+  // 1 doc saves ~14.98 mins (~0.25 hour). 7 docs mock is 184 hours across batch cycles.
+  const baseSavedHours = Math.max(1, Math.round((totalDocs / 7) * 184));
 
   return (
     <div className="p-5 sm:p-6 rounded-xl border border-[#E2E8F0] bg-white shadow-xs space-y-4 min-w-0 flex flex-col justify-between">
@@ -81,7 +87,7 @@ export const OperationalEfficiencyChart: React.FC<OperationalEfficiencyChartProp
           <div className="text-[10px] font-bold uppercase tracking-wider text-[#059669]">
             Jam Kerja Dialihkan
           </div>
-          <div className="text-xl font-black text-[#059669] mt-0.5">184 Jam</div>
+          <div className="text-xl font-black text-[#059669] mt-0.5">{baseSavedHours} Jam</div>
           <div className="text-[10px] text-[#64748B]">Ke analisis strategis</div>
         </div>
       </div>

@@ -21,6 +21,7 @@ import {
   DataTableToolbar,
   DataTablePagination,
   DataTableEmptyState,
+  DataTableExport,
   FilterConfig,
 } from '@/components/shared/data-table';
 import { AuditLogDetailModal } from '@/components/dashboard/audit/AuditLogDetailModal';
@@ -210,6 +211,15 @@ export default function AuditTrailPage() {
           title="Audit Trail Forensik & Rekam Jejak Kepatuhan"
           subtitle="Log aktivitas kepatuhan tidak dapat dimodifikasi untuk setiap tindakan persetujuan dan pengunggahan."
           badge={{ label: 'Jalur Forensik Aktif', variant: 'success' }}
+          actions={
+            <div className="flex items-center gap-3">
+              <DataTableExport
+                options={{
+                  onExportCSV: handleExportCSV,
+                }}
+              />
+            </div>
+          }
         />
 
         {/* Banner */}
@@ -236,9 +246,6 @@ export default function AuditTrailPage() {
           entityName="log forensik"
           isFilterActive={isFilterActive}
           onResetFilters={handleResetFilters}
-          exportOptions={{
-            onExportCSV: handleExportCSV,
-          }}
         />
 
         {/* Audit Table */}

@@ -49,26 +49,26 @@ export default function AnalyticsDashboardPage() {
       />
 
       <main className="flex-1 w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 py-6 sm:py-8 space-y-8 min-w-0">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <PageHeader
-            title="Analisis Operasional Dokumen & Kinerja AI"
-            subtitle="Metrik throughput ekstraksi, akurasi OCR per tipe dokumen, dan beban verifikasi tim."
-            badge={{ label: 'Realtime Telemetry', variant: 'success' }}
-          />
-
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-slate-500">Periode:</span>
-            <select
-              value={timeRange}
-              onChange={(e) => setTimeRange(e.target.value as any)}
-              className="text-xs font-semibold px-3 py-1.5 rounded-md border border-slate-300 bg-white"
-            >
-              <option value="7d">7 Hari Terakhir</option>
-              <option value="30d">30 Hari Terakhir</option>
-              <option value="all">Semua Waktu</option>
-            </select>
-          </div>
-        </div>
+        <PageHeader
+          title="Analisis Operasional Dokumen & Kinerja AI"
+          subtitle="Metrik throughput ekstraksi, akurasi OCR per tipe dokumen, dan beban verifikasi tim."
+          badge={{ label: 'Realtime Telemetry', variant: 'success' }}
+          actions={
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-slate-500">Periode:</span>
+              <select
+                aria-label="Filter Periode Analisis"
+                value={timeRange}
+                onChange={(e) => setTimeRange(e.target.value as any)}
+                className="text-xs font-semibold px-3 py-2 rounded-lg border border-slate-300 bg-white text-slate-800 shadow-2xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer"
+              >
+                <option value="7d">7 Hari Terakhir</option>
+                <option value="30d">30 Hari Terakhir</option>
+                <option value="all">Semua Waktu</option>
+              </select>
+            </div>
+          }
+        />
 
         {/* KPI Metrik Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
