@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Topbar } from '@/components/layout/Topbar';
 import { DocumentService } from '@/lib/modules/documents/document.service';
 import { DocumentRecord } from '@/types';
-import { formatIDR, formatDate, getStatusBadgeInfo, getDocumentTypeLabel } from '@/lib/utils/formatters';
+import { formatCurrency, formatIDR, formatDate, getStatusBadgeInfo, getDocumentTypeLabel, parseCurrencyInput } from '@/lib/utils/formatters';
 import {
   ArrowRightIcon,
   FileTextIcon,
@@ -55,12 +55,14 @@ function DocumentRepositoryContent() {
     vendorName: string;
     vendorTaxId: string;
     totalAmount: string;
+    currency: string;
     notes: string;
   }>({
     fileNumber: '',
     vendorName: '',
     vendorTaxId: '',
     totalAmount: '0',
+    currency: 'IDR',
     notes: '',
   });
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' | 'error' } | null>(null);
@@ -106,6 +108,7 @@ function DocumentRepositoryContent() {
       vendorName: doc.vendorName,
       vendorTaxId: doc.vendorTaxId || '',
       totalAmount: doc.totalAmount.toString(),
+      currency: doc.currency || 'IDR',
       notes: '',
     });
   };
@@ -113,12 +116,12 @@ function DocumentRepositoryContent() {
   const handleEditSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!editDoc) return;
-    const num = parseFloat(editFormData.totalAmount) || 0;
+    const parsed = parseCurrencyInput(editFormData.totalAmount, editFormData.currency);
     const res = DocumentService.updateMetadata(editDoc.id, {
       fileNumber: editFormData.fileNumber.trim(),
       vendorName: editFormData.vendorName.trim(),
       vendorTaxId: editFormData.vendorTaxId.trim(),
-      totalAmount: num,
+      totalAmount: parsed.amount,
       notes: editFormData.notes.trim() || undefined,
     });
 
@@ -191,7 +194,7 @@ function DocumentRepositoryContent() {
 
   // Export functions
   const handleExportCSV = () => {
-    const headers = ['Nomor Berkas', 'Nama Berkas', 'Kategori', 'Vendor', 'Tanggal Masuk', 'Total Nominal', 'Akurasi', 'Status'];
+    const headers = ['Nomor Berkas', 'Nama Berkas', 'Kategori', 'Vendor', 'Tanggal Masuk', 'Total Nominal', 'Currency', 'Total Nominal Formatted', 'Akurasi', 'Status'];
     const rows = filteredDocs.map((d) => [
       `"${d.fileNumber}"`,
       `"${d.fileName}"`,
@@ -199,6 +202,8 @@ function DocumentRepositoryContent() {
       `"${d.vendorName}"`,
       `"${d.uploadedAt}"`,
       d.totalAmount,
+      `"${d.currency || 'IDR'}"`,
+      `"${formatCurrency(d.totalAmount, d.currency || 'IDR')}"`,
       `${d.confidence}%`,
       `"${d.status}"`,
     ]);
@@ -228,7 +233,9 @@ function DocumentRepositoryContent() {
               <th>Kategori</th>
               <th>Vendor</th>
               <th>Tanggal Masuk</th>
+              <th>Mata Uang</th>
               <th>Total Nominal</th>
+              <th>Nominal Diformat</th>
               <th>Akurasi</th>
               <th>Status</th>
             </tr>
@@ -243,7 +250,9 @@ function DocumentRepositoryContent() {
                 <td>${getDocumentTypeLabel(d.documentType)}</td>
                 <td>${d.vendorName}</td>
                 <td>${d.uploadedAt}</td>
-                <td>${d.totalAmount}</td>
+                <td style="text-align: center;">${d.currency || 'IDR'}</td>
+                <td style="mso-number-format:'\\#\\,\\#\\#0\\.00'; text-align: right;">${d.totalAmount}</td>
+                <td style="text-align: right;">${formatCurrency(d.totalAmount, d.currency || 'IDR')}</td>
                 <td>${d.confidence}%</td>
                 <td>${d.status}</td>
               </tr>
@@ -415,7 +424,7 @@ function DocumentRepositoryContent() {
                   <th className="py-3 px-5">Kategori</th>
                   <th className="py-3 px-5">Vendor / Lawan Transaksi</th>
                   <th className="py-3 px-5">Tanggal Masuk</th>
-                  <th className="py-3 px-5">Total Nominal</th>
+                  <th className="py-3 px-5 text-right">Total Nominal</th>
                   <th className="py-3 px-5">Akurasi</th>
                   <th className="py-3 px-5">Status</th>
                   <th className="py-3 px-5 text-right">Aksi</th>
@@ -460,8 +469,15 @@ function DocumentRepositoryContent() {
                         <td className="py-3.5 px-5 text-[#64748B]">
                           {formatDate(doc.uploadedAt)}
                         </td>
-                        <td className="py-3.5 px-5 font-bold text-[#0F172A]">
-                          {formatIDR(doc.totalAmount)}
+                        <td className="py-3.5 px-5 font-bold text-[#0F172A] text-right tabular-nums">
+                          <div className="flex items-center justify-end gap-1.5">
+                            <span>{formatCurrency(doc.totalAmount, doc.currency)}</span>
+                            {doc.currency && doc.currency !== 'IDR' && (
+                              <span className="text-[9px] px-1.5 py-0.5 rounded font-black bg-indigo-50 text-indigo-700 border border-indigo-200">
+                                {doc.currency}
+                              </span>
+                            )}
+                          </div>
                         </td>
                         <td className="py-3.5 px-5">
                           <span
@@ -579,15 +595,37 @@ function DocumentRepositoryContent() {
                   className="w-full text-xs px-3 py-2 rounded-md border border-slate-300"
                 />
               </div>
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-700">Total Nilai Transaksi (IDR)</label>
-                <input
-                  type="number"
-                  value={editFormData.totalAmount}
-                  onChange={(e) => setEditFormData({ ...editFormData, totalAmount: e.target.value })}
-                  className="w-full text-xs px-3 py-2 rounded-md border border-slate-300"
-                  required
-                />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-700">Mata Uang</label>
+                  <select
+                    value={editFormData.currency}
+                    onChange={(e) => setEditFormData({ ...editFormData, currency: e.target.value })}
+                    className="w-full text-xs px-3 py-2 rounded-md border border-slate-300 bg-white font-semibold text-slate-800"
+                  >
+                    <option value="IDR">IDR — Rupiah Indonesia</option>
+                    <option value="USD">USD — US Dollar</option>
+                    <option value="EUR">EUR — Euro</option>
+                    <option value="SGD">SGD — Singapore Dollar</option>
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-700">Total Nilai Transaksi</label>
+                  <input
+                    type="text"
+                    value={editFormData.totalAmount}
+                    onChange={(e) => setEditFormData({ ...editFormData, totalAmount: e.target.value })}
+                    placeholder="Contoh: 38850000 atau 1,250.50"
+                    className="w-full text-xs px-3 py-2 rounded-md border border-slate-300 font-semibold"
+                    required
+                  />
+                </div>
+              </div>
+              <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200 text-xs flex items-center justify-between">
+                <span className="text-slate-500 font-medium">Pratinjau Format:</span>
+                <span className="font-bold text-[#059669]">
+                  {formatCurrency(parseCurrencyInput(editFormData.totalAmount, editFormData.currency).amount, editFormData.currency)}
+                </span>
               </div>
               <div className="space-y-1">
                 <label className="text-xs font-bold text-slate-700">Catatan Perubahan</label>

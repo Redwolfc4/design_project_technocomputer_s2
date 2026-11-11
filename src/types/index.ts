@@ -92,6 +92,15 @@ export interface DocumentReviewNote {
   type: 'note' | 'correction_request' | 'system_alert';
 }
 
+export type CurrencyCode = 'IDR' | 'USD' | 'EUR' | 'SGD' | string;
+
+export interface MonetaryValue {
+  amount: number;
+  currency: CurrencyCode;
+  amountString?: string;
+  formatted?: string;
+}
+
 export interface DocumentRecord {
   id: string;
   fileNumber: string; // e.g. INV-2026-0891 or 010.002-26.00000001
@@ -106,7 +115,7 @@ export interface DocumentRecord {
   verifiedAt?: string;
   vendorName: string;
   vendorTaxId?: string; // NPWP
-  currency: 'IDR' | 'USD' | 'EUR' | 'SGD';
+  currency: CurrencyCode;
   subtotal: number;
   taxAmount: number;
   totalAmount: number;

@@ -12,11 +12,11 @@ export default function DashboardLayout({
     <ModeProvider>
       <SidebarProvider>
         <div className="min-h-screen bg-[#FAFAFF] flex relative w-full overflow-x-hidden">
-          {/* Responsive Drawer Sidebar */}
+          {/* Responsive Drawer Sidebar: w-72 (288px) on lg screen */}
           <Sidebar />
 
-          {/* Main Content Area: Padding-left 256px on lg (>=1024px) for solid boundary, full width on mobile/tablet */}
-          <div className="flex-1 lg:pl-64 flex flex-col min-h-screen min-w-0 w-full overflow-x-clip">
+          {/* Main Content Area: Padding-left 288px (lg:pl-72) on lg (>=1024px) for solid boundary, full width on mobile/tablet */}
+          <div className="flex-1 lg:pl-72 flex flex-col min-h-screen min-w-0 w-full overflow-x-clip">
             {children}
           </div>
         </div>

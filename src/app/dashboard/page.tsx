@@ -30,6 +30,11 @@ import { DocumentQuickDetailModal } from '@/components/dashboard/documents/Docum
 import { PageHeader } from '@/components/shared/PageHeader';
 import { SectionHeader } from '@/components/shared/SectionHeader';
 import { useAppMode } from '@/context/ModeContext';
+import { StatusDonutChart, StatusDonutItem } from '@/components/dashboard/analytics/charts/StatusDonutChart';
+import { DocumentTypeBarChart, DocumentTypeItem } from '@/components/dashboard/analytics/charts/DocumentTypeBarChart';
+import { DocumentTrendAreaChart } from '@/components/dashboard/analytics/charts/DocumentTrendAreaChart';
+import { OperationalEfficiencyChart } from '@/components/dashboard/analytics/charts/OperationalEfficiencyChart';
+import { DocumentStatus } from '@/types';
 
 export default function DashboardOverviewPage() {
   const router = useRouter();
@@ -38,6 +43,8 @@ export default function DashboardOverviewPage() {
   const [previewDoc, setPreviewDoc] = useState<DocumentRecord | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' } | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [activeStatusFilter, setActiveStatusFilter] = useState<DocumentStatus | null>(null);
+  const [activeTypeFilter, setActiveTypeFilter] = useState<string | null>(null);
 
   const {
     activeMenu,
@@ -93,9 +100,47 @@ export default function DashboardOverviewPage() {
     typeCounts[d.documentType] = (typeCounts[d.documentType] || 0) + 1;
   });
 
-  // Filtered recent documents based on Topbar search
+  const donutItems: StatusDonutItem[] = [
+    {
+      status: 'approved',
+      label: 'Terverifikasi & Siap Bayar',
+      count: approvedDocs,
+      color: '#059669',
+      hoverColor: '#047857',
+      bgLight: '#ECFDF5',
+    },
+    {
+      status: 'needs_review',
+      label: 'Perlu Validasi Reviewer',
+      count: pendingDocs,
+      color: '#F59E0B',
+      hoverColor: '#D97706',
+      bgLight: '#FFFBEB',
+    },
+    {
+      status: 'rejected',
+      label: 'Ditolak Karena Buram / Cacat',
+      count: rejectedDocs,
+      color: '#E11D48',
+      hoverColor: '#BE123C',
+      bgLight: '#FFF1F2',
+    },
+  ];
+
+  const typeBarItems: DocumentTypeItem[] = Object.entries(typeCounts).map(([type, count]) => ({
+    type,
+    count,
+  }));
+
+  // Filtered recent documents based on Topbar search & interactive chart filters
   const filteredRecentDocs = useMemo(() => {
     let list = documents;
+    if (activeStatusFilter) {
+      list = list.filter((d) => d.status === activeStatusFilter);
+    }
+    if (activeTypeFilter) {
+      list = list.filter((d) => d.documentType === activeTypeFilter);
+    }
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       list = list.filter(
@@ -106,7 +151,7 @@ export default function DashboardOverviewPage() {
       );
     }
     return list.slice(0, 5);
-  }, [documents, searchQuery]);
+  }, [documents, searchQuery, activeStatusFilter, activeTypeFilter]);
 
   const recentDocActions: RowAction<DocumentRecord>[] = useMemo(
     () => [
@@ -353,95 +398,27 @@ export default function DashboardOverviewPage() {
             </Link>
           </div>
 
-          {/* Breakdown Distribution Grid */}
+          {/* Breakdown Distribution Grid: Interactive Donut & Horizontal Bar */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 min-w-0">
-            {/* Status Distribution */}
-            <div className="p-5 sm:p-6 rounded-xl border border-[#E2E8F0] bg-white shadow-xs space-y-4 min-w-0">
-              <h3 className="text-xs sm:text-sm font-bold text-[#0F172A]">Distribusi Status Dokumen</h3>
-              <div className="space-y-3.5">
-                {/* Approved Link */}
-                <Link
-                  href="/dashboard/documents?status=approved"
-                  className="group block p-2 -mx-2 rounded-lg hover:bg-[#F8FAFC] transition-colors cursor-pointer"
-                >
-                  <div className="flex justify-between text-xs font-semibold mb-1">
-                    <span className="text-[#059669] group-hover:underline flex items-center gap-1">
-                      Terverifikasi & Siap Bayar
-                      <ArrowUpRightIcon className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity text-[#059669]" />
-                    </span>
-                    <span className="tabular-nums text-[#0F172A]">{approvedDocs} berkas ({Math.round((approvedDocs / totalDocs) * 100)}%)</span>
-                  </div>
-                  <div className="w-full h-2 rounded-full bg-slate-100 overflow-hidden">
-                    <div
-                      className="h-full bg-[#059669] rounded-full transition-all duration-500"
-                      style={{ width: `${(approvedDocs / totalDocs) * 100}%` }}
-                    />
-                  </div>
-                </Link>
+            <StatusDonutChart
+              items={donutItems}
+              total={documents.length}
+              activeFilter={activeStatusFilter}
+              onSelectStatus={setActiveStatusFilter}
+            />
 
-                {/* Pending Link */}
-                <Link
-                  href="/dashboard/verification"
-                  className="group block p-2 -mx-2 rounded-lg hover:bg-[#F8FAFC] transition-colors cursor-pointer"
-                >
-                  <div className="flex justify-between text-xs font-semibold mb-1">
-                    <span className="text-[#F59E0B] group-hover:underline flex items-center gap-1">
-                      Perlu Validasi Reviewer
-                      <ArrowUpRightIcon className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity text-[#F59E0B]" />
-                    </span>
-                    <span className="tabular-nums text-[#0F172A]">{pendingDocs} berkas ({Math.round((pendingDocs / totalDocs) * 100)}%)</span>
-                  </div>
-                  <div className="w-full h-2 rounded-full bg-slate-100 overflow-hidden">
-                    <div
-                      className="h-full bg-[#F59E0B] rounded-full transition-all duration-500"
-                      style={{ width: `${(pendingDocs / totalDocs) * 100}%` }}
-                    />
-                  </div>
-                </Link>
+            <DocumentTypeBarChart
+              items={typeBarItems}
+              total={documents.length}
+              activeTypeFilter={activeTypeFilter}
+              onSelectType={setActiveTypeFilter}
+            />
+          </div>
 
-                {/* Rejected Link */}
-                <Link
-                  href="/dashboard/documents?status=rejected"
-                  className="group block p-2 -mx-2 rounded-lg hover:bg-[#F8FAFC] transition-colors cursor-pointer"
-                >
-                  <div className="flex justify-between text-xs font-semibold mb-1">
-                    <span className="text-[#E11D48] group-hover:underline flex items-center gap-1">
-                      Ditolak Karena Buram / Cacat
-                      <ArrowUpRightIcon className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity text-[#E11D48]" />
-                    </span>
-                    <span className="tabular-nums text-[#0F172A]">{rejectedDocs} berkas ({Math.round((rejectedDocs / totalDocs) * 100)}%)</span>
-                  </div>
-                  <div className="w-full h-2 rounded-full bg-slate-100 overflow-hidden">
-                    <div
-                      className="h-full bg-[#E11D48] rounded-full transition-all duration-500"
-                      style={{ width: `${(rejectedDocs / totalDocs) * 100}%` }}
-                    />
-                  </div>
-                </Link>
-              </div>
-            </div>
-
-            {/* Volume by Document Type */}
-            <div className="p-6 rounded-xl border border-[#E2E8F0] bg-white shadow-xs space-y-4">
-              <h3 className="text-xs sm:text-sm font-bold text-[#0F172A]">Volume Berdasarkan Jenis Berkas</h3>
-              <div className="space-y-2.5">
-                {Object.entries(typeCounts).map(([type, count]) => (
-                  <Link
-                    key={type}
-                    href={`/dashboard/documents?type=${type}`}
-                    className="group flex items-center justify-between text-xs p-2.5 rounded-lg bg-[#F8FAFC] hover:bg-[#EEF2FF] border border-transparent hover:border-indigo-200 transition-all cursor-pointer block"
-                  >
-                    <span className="font-semibold text-[#334155] group-hover:text-[#4F46E5] flex items-center gap-1.5 transition-colors">
-                      {getDocumentTypeLabel(type)}
-                      <ArrowUpRightIcon className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity text-[#4F46E5]" />
-                    </span>
-                    <span className="font-bold text-[#0F172A] group-hover:text-[#4F46E5] bg-white px-2.5 py-0.5 rounded border border-[#CBD5E1] group-hover:border-indigo-200 transition-colors">
-                      {count} Berkas
-                    </span>
-                  </Link>
-                ))}
-              </div>
-            </div>
+          {/* Row 4: Throughput Trend Area Chart & ROI Operational Efficiency */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 min-w-0">
+            <DocumentTrendAreaChart isDemo={isDemo} />
+            <OperationalEfficiencyChart totalDocs={documents.length} />
           </div>
         </div>
 
@@ -449,15 +426,35 @@ export default function DashboardOverviewPage() {
         <div className="space-y-4">
           <SectionHeader
             title="Dokumen Terbaru Diproses"
-            description="Daftar faktur, invoice, dan kontrak terkini dalam sistem IDP"
+            description={
+              activeStatusFilter || activeTypeFilter
+                ? `Menampilkan dokumen hasil filter interaktif: ${
+                    activeStatusFilter ? `Status [${activeStatusFilter}]` : ''
+                  } ${activeTypeFilter ? `Jenis [${getDocumentTypeLabel(activeTypeFilter)}]` : ''}`
+                : 'Daftar faktur, invoice, dan kontrak terkini dalam sistem IDP'
+            }
             action={
-              <Link
-                href="/dashboard/documents"
-                className="text-xs font-bold text-[#4F46E5] hover:text-[#4338CA] inline-flex items-center gap-1"
-              >
-                <span>Lihat Semua Dokumen</span>
-                <ArrowRightIcon className="w-3.5 h-3.5" />
-              </Link>
+              <div className="flex items-center gap-3">
+                {(activeStatusFilter || activeTypeFilter) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveStatusFilter(null);
+                      setActiveTypeFilter(null);
+                    }}
+                    className="text-xs font-bold text-[#E11D48] hover:underline cursor-pointer"
+                  >
+                    Hapus Filter Chart ✕
+                  </button>
+                )}
+                <Link
+                  href="/dashboard/documents"
+                  className="text-xs font-bold text-[#4F46E5] hover:text-[#4338CA] inline-flex items-center gap-1"
+                >
+                  <span>Lihat Semua Dokumen</span>
+                  <ArrowRightIcon className="w-3.5 h-3.5" />
+                </Link>
+              </div>
             }
           />
 

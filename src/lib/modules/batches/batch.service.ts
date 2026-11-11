@@ -10,6 +10,7 @@ export interface BatchItemDraft {
   vendorName: string;
   fileNumber: string;
   nominal: number;
+  currency?: string;
   status: 'draft' | 'ready' | 'processing' | 'completed' | 'failed';
   createdAt: string;
 }
@@ -23,6 +24,7 @@ export const INITIAL_BATCH_ITEMS: BatchItemDraft[] = [
     vendorName: 'PT Telkom Prima Nusantara',
     fileNumber: '010.002-26.99410123',
     nominal: 35000000,
+    currency: 'IDR',
     status: 'draft',
     createdAt: new Date().toISOString(),
   },
@@ -34,6 +36,7 @@ export const INITIAL_BATCH_ITEMS: BatchItemDraft[] = [
     vendorName: 'PT Jawa Angkutan Express',
     fileNumber: 'PO-2026-03-8821',
     nominal: 14250000,
+    currency: 'IDR',
     status: 'draft',
     createdAt: new Date().toISOString(),
   },
