@@ -402,6 +402,42 @@ export const PlusIcon = ({ className = 'w-4 h-4', size, ...props }: IconProps) =
   </svg>
 );
 
+export const ChevronLeftIcon = ({ className = 'w-4 h-4', size, ...props }: IconProps) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width={size || 16}
+    height={size || 16}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+    {...props}
+  >
+    <polyline points="15 18 9 12 15 6" />
+  </svg>
+);
+
+export const ChevronRightIcon = ({ className = 'w-4 h-4', size, ...props }: IconProps) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width={size || 16}
+    height={size || 16}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+    {...props}
+  >
+    <polyline points="9 18 15 12 9 6" />
+  </svg>
+);
+
 export const ChevronDownIcon = ({ className = 'w-4 h-4', size, ...props }: IconProps) => (
   <svg
     xmlns="http://www.w3.org/2000/svg"

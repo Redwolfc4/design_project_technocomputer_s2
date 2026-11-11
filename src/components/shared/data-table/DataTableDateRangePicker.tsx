@@ -1,8 +1,13 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { FilterConfig, DateRangeValue } from './types';
-import { CalendarIcon, ChevronDownIcon, XIcon, CheckCircleIcon } from '@/components/ui/icons';
+import { CalendarIcon } from '@/components/ui/icons';
+import { DualCalendarView } from './date-picker/DualCalendarView';
+import {
+  formatToDisplayDate,
+  compareDates,
+} from './date-picker/dateUtils';
 
 export interface DataTableDateRangePickerProps {
   filter: FilterConfig;
@@ -12,14 +17,23 @@ export const DataTableDateRangePicker: React.FC<DataTableDateRangePickerProps> =
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  const currentValue: DateRangeValue =
-    typeof filter.selectedValue === 'object' && filter.selectedValue !== null
-      ? (filter.selectedValue as DateRangeValue)
-      : { preset: (filter.selectedValue as string) || 'all' };
+  // Parse currentValue
+  const currentValue: DateRangeValue = useMemo(() => {
+    if (typeof filter.selectedValue === 'object' && filter.selectedValue !== null) {
+      return filter.selectedValue as DateRangeValue;
+    }
+    return { preset: (filter.selectedValue as string) || 'all' };
+  }, [filter.selectedValue]);
 
-  const [tempFrom, setTempFrom] = useState(currentValue.from || '');
-  const [tempTo, setTempTo] = useState(currentValue.to || '');
-  const [tempPreset, setTempPreset] = useState(currentValue.preset || 'all');
+  // Draft state while popover is open
+  const [draftPreset, setDraftPreset] = useState<string>(currentValue.preset || 'all');
+  const [draftStart, setDraftStart] = useState<string | undefined>(currentValue.from);
+  const [draftEnd, setDraftEnd] = useState<string | undefined>(currentValue.to);
+  const [hoverDate, setHoverDate] = useState<string | null>(null);
+
+  // Left calendar view year & month (Default to November 2026 matching user preference)
+  const [viewYear, setViewYear] = useState<number>(2026);
+  const [viewMonth, setViewMonth] = useState<number>(10); // 10 = November
 
   // Close when clicking outside
   useEffect(() => {
@@ -28,78 +42,151 @@ export const DataTableDateRangePicker: React.FC<DataTableDateRangePickerProps> =
         setIsOpen(false);
       }
     };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsOpen(false);
+      }
+    };
     if (isOpen) {
       document.addEventListener('mousedown', handleClickOutside);
+      window.addEventListener('keydown', handleKeyDown);
     }
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
+      window.removeEventListener('keydown', handleKeyDown);
     };
   }, [isOpen]);
 
-  // Sync internal state with external prop changes
+  // Sync draft state on open
   useEffect(() => {
-    if (typeof filter.selectedValue === 'object' && filter.selectedValue !== null) {
-      const val = filter.selectedValue as DateRangeValue;
-      setTempFrom(val.from || '');
-      setTempTo(val.to || '');
-      setTempPreset(val.preset || 'custom');
+    if (isOpen) {
+      setDraftPreset(currentValue.preset || 'all');
+      setDraftStart(currentValue.from);
+      setDraftEnd(currentValue.to);
+
+      if (currentValue.from) {
+        const d = new Date(currentValue.from);
+        if (!isNaN(d.getTime())) {
+          setViewYear(d.getFullYear());
+          setViewMonth(d.getMonth());
+        }
+      } else {
+        setViewYear(2026);
+        setViewMonth(10);
+      }
+    }
+  }, [isOpen, currentValue]);
+
+  // Month navigation (Moves both calendars together by 1 month)
+  const handlePrevMonth = () => {
+    if (viewMonth === 0) {
+      setViewMonth(11);
+      setViewYear((prev) => prev - 1);
     } else {
-      setTempPreset((filter.selectedValue as string) || 'all');
-      setTempFrom('');
-      setTempTo('');
+      setViewMonth((prev) => prev - 1);
     }
-  }, [filter.selectedValue]);
-
-  // Format label shown on trigger button
-  const getButtonLabel = () => {
-    if (tempPreset === 'today') return 'Hari Ini (48 Jam)';
-    if (tempPreset === '7days') return '7 Hari Terakhir';
-    if (tempPreset === 'month') return 'Bulan Ini (Maret 2026)';
-    if (tempPreset === 'custom' && (tempFrom || tempTo)) {
-      if (tempFrom && tempTo) return `${tempFrom} s/d ${tempTo}`;
-      if (tempFrom) return `Dari ${tempFrom}`;
-      return `Sampai ${tempTo}`;
-    }
-    return filter.placeholder || 'Semua Waktu';
   };
 
-  const isCustomActive = tempPreset === 'custom';
+  const handleNextMonth = () => {
+    if (viewMonth === 11) {
+      setViewMonth(0);
+      setViewYear((prev) => prev + 1);
+    } else {
+      setViewMonth((prev) => prev + 1);
+    }
+  };
 
+  // Calendar date selection: auto applies when both start & end are selected
+  const handleSelectDate = (dateISO: string) => {
+    setDraftPreset('custom');
+
+    if (!draftStart || (draftStart && draftEnd)) {
+      setDraftStart(dateISO);
+      setDraftEnd(undefined);
+      return;
+    }
+
+    if (draftStart && !draftEnd) {
+      let finalStart = draftStart;
+      let finalEnd = dateISO;
+      if (compareDates(dateISO, draftStart) < 0) {
+        finalStart = dateISO;
+        finalEnd = draftStart;
+      }
+      setDraftStart(finalStart);
+      setDraftEnd(finalEnd);
+      // Auto apply immediately without closing popover
+      filter.onChange({
+        preset: 'custom',
+        from: finalStart,
+        to: finalEnd,
+      });
+    }
+  };
+
+  // Preset shortcuts: applies without auto-closing popover
   const handleSelectPreset = (presetKey: string) => {
-    setTempPreset(presetKey);
-    if (presetKey === 'all') {
-      filter.onChange({ preset: 'all', from: '', to: '' });
-      setIsOpen(false);
-    } else if (presetKey === 'today') {
-      filter.onChange({ preset: 'today', from: '2026-03-05', to: '2026-03-06' });
-      setIsOpen(false);
-    } else if (presetKey === '7days') {
-      filter.onChange({ preset: '7days', from: '2026-02-27', to: '2026-03-06' });
-      setIsOpen(false);
-    } else if (presetKey === 'month') {
-      filter.onChange({ preset: 'month', from: '2026-03-01', to: '2026-03-31' });
-      setIsOpen(false);
-    } else if (presetKey === 'custom') {
-      // Keep open for user to select dates
+    setDraftPreset(presetKey);
+
+    let start: string | undefined;
+    let end: string | undefined;
+
+    if (presetKey === 'today') {
+      start = '2026-11-11';
+      end = '2026-11-11';
+      setViewYear(2026);
+      setViewMonth(10);
+    } else if (presetKey === 'this_week') {
+      start = '2026-11-09';
+      end = '2026-11-15';
+      setViewYear(2026);
+      setViewMonth(10);
+    } else if (presetKey === 'last_week') {
+      start = '2026-11-02';
+      end = '2026-11-08';
+      setViewYear(2026);
+      setViewMonth(10);
+    } else if (presetKey === 'last_7_days') {
+      start = '2026-11-05';
+      end = '2026-11-11';
+      setViewYear(2026);
+      setViewMonth(10);
+    } else if (presetKey === 'current_month') {
+      start = '2026-11-01';
+      end = '2026-11-30';
+      setViewYear(2026);
+      setViewMonth(10);
+    } else if (presetKey === 'reset') {
+      start = undefined;
+      end = undefined;
+      setViewYear(2026);
+      setViewMonth(10);
     }
-  };
 
-  const handleApplyCustom = () => {
+    setDraftStart(start);
+    setDraftEnd(end);
+
+    // Apply immediately without auto-closing
     filter.onChange({
-      preset: 'custom',
-      from: tempFrom,
-      to: tempTo,
+      preset: presetKey === 'reset' ? 'all' : presetKey,
+      from: start,
+      to: end,
     });
-    setIsOpen(false);
   };
 
-  const handleReset = () => {
-    setTempPreset('all');
-    setTempFrom('');
-    setTempTo('');
-    filter.onChange({ preset: 'all', from: '', to: '' });
-    setIsOpen(false);
-  };
+  // Trigger text: format dd/mm/yyyy - dd/mm/yyyy or placeholder
+  const isSelected = Boolean(currentValue.from && currentValue.to);
+  const triggerDisplay = isSelected
+    ? `${formatToDisplayDate(currentValue.from)} - ${formatToDisplayDate(currentValue.to)}`
+    : 'dd/mm/yyyy - dd/mm/yyyy';
+
+  const quickNavItems = [
+    { key: 'today', label: 'Today' },
+    { key: 'this_week', label: 'This Week' },
+    { key: 'last_week', label: 'Last Week' },
+    { key: 'last_7_days', label: 'Last 7 Days' },
+    { key: 'current_month', label: 'Current Month' },
+  ];
 
   return (
     <div className="relative w-full" ref={dropdownRef}>
@@ -107,129 +194,96 @@ export const DataTableDateRangePicker: React.FC<DataTableDateRangePickerProps> =
         {filter.label}
       </label>
 
+      {/* Trigger Button: Placeholder dd/mm/yyyy - dd/mm/yyyy + Calendar Icon */}
       <button
         type="button"
         onClick={() => setIsOpen((prev) => !prev)}
-        className={`w-full flex items-center justify-between px-3 py-2 bg-[#FAFAFF] border rounded-lg text-xs transition-all duration-150 focus:outline-none shadow-xs group ${
-          isOpen
-            ? 'border-[#4F46E5] ring-2 ring-[#4F46E5]/15 bg-white text-[#0F172A]'
-            : 'border-[#CBD5E1] text-[#0F172A] hover:bg-white hover:border-[#94A3B8]'
-        }`}
+        className={`w-full flex items-center justify-between px-3 py-2 bg-[#FAFAFF] border rounded-lg text-xs transition-all duration-150 focus:outline-none shadow-xs group cursor-pointer ${isOpen
+          ? 'border-[#4F46E5] ring-2 ring-[#4F46E5]/15 bg-white text-[#0F172A]'
+          : 'border-[#CBD5E1] hover:bg-white hover:border-[#94A3B8]'
+          }`}
         aria-label={`Filter ${filter.label}`}
         aria-haspopup="dialog"
         aria-expanded={isOpen}
       >
-        <div className="flex items-center gap-2 truncate">
-          <CalendarIcon className="w-3.5 h-3.5 text-[#4F46E5] shrink-0" />
-          <span className="truncate font-medium">{getButtonLabel()}</span>
-        </div>
-        <ChevronDownIcon
-          className={`w-3.5 h-3.5 text-[#64748B] shrink-0 ml-1.5 transition-transform duration-200 ${
-            isOpen ? 'rotate-180 text-[#4F46E5]' : 'group-hover:text-[#334155]'
-          }`}
-        />
+        <span
+          className={`truncate font-medium tracking-wide ${isSelected ? 'text-[#0F172A]' : 'text-[#94A3B8]'
+            }`}
+        >
+          {triggerDisplay}
+        </span>
+        <CalendarIcon className="w-3.5 h-3.5 text-[#64748B] group-hover:text-[#4F46E5] shrink-0 ml-2 transition-colors" />
       </button>
 
+      {/* Popover: Clean Dual Calendar (Left) + Sidebar Quick Selection List (Right), No Footer */}
       {isOpen && (
-        <div className="absolute left-0 mt-1.5 w-[320px] sm:w-[420px] max-w-[calc(100vw-32px)] bg-white border border-[#CBD5E1] rounded-xl shadow-xl z-40 p-3 sm:p-4 flex flex-col gap-3 animate-in fade-in-50 zoom-in-95 duration-100">
-          <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-            <div className="flex items-center gap-1.5 text-xs font-bold text-[#0F172A]">
-              <CalendarIcon className="w-4 h-4 text-[#4F46E5]" />
-              <span>Pilih Rentang Tanggal</span>
+        <div className="absolute left-0 mt-1.5 w-[330px] sm:w-[620px] md:w-[650px] max-w-[calc(100vw-32px)] bg-white text-[#0F172A] border border-[#CBD5E1] rounded-2xl shadow-xl z-50 p-4 sm:p-5 flex flex-col animate-in fade-in-50 zoom-in-95 duration-100">
+          {/* Main Layout: Left = Dual Calendar, Right = Sidebar List */}
+          <div className="flex flex-col sm:flex-row gap-4 sm:gap-4 items-stretch">
+            {/* Left Column: Dual Calendar View (No Header) */}
+            <div className="flex-1 w-full min-w-0">
+              <DualCalendarView
+                currentLeftYear={viewYear}
+                currentLeftMonth={viewMonth}
+                onPrevMonth={handlePrevMonth}
+                onNextMonth={handleNextMonth}
+                startDate={draftStart}
+                endDate={draftEnd}
+                hoverDate={hoverDate}
+                onSelectDate={handleSelectDate}
+                onHoverDate={setHoverDate}
+              />
             </div>
-            {tempPreset !== 'all' && (
-              <button
-                type="button"
-                onClick={handleReset}
-                className="text-[11px] font-bold text-rose-600 hover:underline"
-              >
-                Reset
-              </button>
-            )}
-          </div>
 
-          {/* Quick Presets Grid */}
-          <div className="space-y-1">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-[#64748B]">
-              Preset Cepat:
-            </span>
-            <div className="grid grid-cols-2 gap-1.5">
-              {[
-                { key: 'all', label: 'Semua Waktu' },
-                { key: 'today', label: 'Hari Ini (48 Jam)' },
-                { key: '7days', label: '7 Hari Terakhir' },
-                { key: 'month', label: 'Bulan Ini' },
-              ].map((p) => (
+            {/* Right Column: Sidebar Quick Selection List (Desktop Right Sidebar) */}
+            <div className="w-full sm:w-[130px] md:w-[140px] shrink-0 border-t sm:border-t-0 sm:border-l border-slate-100 sm:pl-3 pt-3 sm:pt-0 flex flex-col justify-between">
+              {/* Top/Main Items List */}
+              <div className="flex flex-col gap-0.5">
+                <div className="text-[10px] font-bold uppercase tracking-wider text-[#94A3B8] px-2.5 py-1 hidden sm:block">
+                  Quick Range
+                </div>
+                {quickNavItems.map((item) => {
+                  const isActive = draftPreset === item.key;
+                  return (
+                    <button
+                      key={item.key}
+                      type="button"
+                      onClick={() => handleSelectPreset(item.key)}
+                      className={`w-full text-left px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors cursor-pointer ${isActive
+                        ? 'bg-[#EEF2FF] text-[#4F46E5] font-semibold'
+                        : 'text-[#475569] hover:bg-slate-50 hover:text-[#0F172A]'
+                        }`}
+                    >
+                      {item.label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Bottom Divider & Reset / Selesai Actions */}
+              <div className="pt-2 mt-2 border-t border-slate-100 flex flex-col gap-1.5">
                 <button
-                  key={p.key}
                   type="button"
-                  onClick={() => handleSelectPreset(p.key)}
-                  className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold text-left transition-colors flex items-center justify-between ${
-                    tempPreset === p.key
-                      ? 'bg-indigo-50 text-[#4F46E5] border border-indigo-200'
-                      : 'bg-slate-50 hover:bg-slate-100 text-[#334155] border border-transparent'
-                  }`}
+                  onClick={() => handleSelectPreset('reset')}
+                  className={`w-full text-left px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors cursor-pointer ${draftPreset === 'reset' || (!draftStart && !draftEnd && draftPreset === 'all')
+                    ? 'bg-rose-50 text-rose-600 font-semibold'
+                    : 'text-[#64748B] hover:bg-rose-50/60 hover:text-rose-600'
+                    }`}
                 >
-                  <span className="truncate">{p.label}</span>
-                  {tempPreset === p.key && <CheckCircleIcon className="w-3.5 h-3.5 text-[#4F46E5]" />}
+                  Reset
                 </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Custom Date Inputs */}
-          <div className="pt-2 border-t border-slate-100 space-y-2">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-[#64748B]">
-              Kustom Rentang Tanggal:
-            </span>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              <div className="space-y-1">
-                <label className="text-[11px] font-medium text-slate-600">Dari Tanggal</label>
-                <input
-                  type="date"
-                  value={tempFrom}
-                  onChange={(e) => {
-                    setTempFrom(e.target.value);
-                    setTempPreset('custom');
-                  }}
-                  className="w-full text-xs px-2.5 py-1.5 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-[11px] font-medium text-slate-600">Sampai Tanggal</label>
-                <input
-                  type="date"
-                  value={tempTo}
-                  onChange={(e) => {
-                    setTempTo(e.target.value);
-                    setTempPreset('custom');
-                  }}
-                  className="w-full text-xs px-2.5 py-1.5 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
-                />
+                <button
+                  type="button"
+                  onClick={() => setIsOpen(false)}
+                  className="w-full px-2.5 py-1.5 bg-[#4F46E5] hover:bg-[#4338CA] text-white rounded-md text-xs font-semibold text-center transition-colors cursor-pointer shadow-2xs"
+                >
+                  Selesai
+                </button>
               </div>
             </div>
-          </div>
-
-          {/* Action Footer */}
-          <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
-            <button
-              type="button"
-              onClick={() => setIsOpen(false)}
-              className="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-100"
-            >
-              Batal
-            </button>
-            <button
-              type="button"
-              onClick={handleApplyCustom}
-              className="px-3.5 py-1.5 rounded-lg text-xs font-bold bg-[#4F46E5] hover:bg-[#4338CA] text-white shadow-xs transition-colors"
-            >
-              Terapkan Rentang
-            </button>
           </div>
         </div>
       )}
     </div>
   );
 };
-
