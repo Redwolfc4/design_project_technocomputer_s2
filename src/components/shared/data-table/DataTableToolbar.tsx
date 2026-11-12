@@ -21,13 +21,18 @@ export const DataTableToolbar: React.FC<DataTableToolbarProps> = ({
   exportOptions,
   primaryAction,
   extraActions,
+  compact = false,
   className = '',
 }) => {
   const showSearch = typeof searchQuery === 'string' && typeof onSearchChange === 'function';
   const hasFilters = filters.length > 0;
 
   return (
-    <div className={`rounded-xl border border-[#E2E8F0] bg-white p-5 shadow-xs space-y-4 ${className}`}>
+    <div
+      className={`rounded-xl border border-[#E2E8F0] bg-white shadow-xs ${
+        compact ? 'p-3.5 sm:p-4 space-y-3' : 'p-5 space-y-4'
+      } ${className}`}
+    >
       {/* 1. Search Bar */}
       {showSearch && (
         <DataTableSearch
