@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { DocumentRecord, ExtractedField, DocumentStatus } from '@/types';
+import { DocumentRecord, ExtractedField } from '@/types';
 import { MockDocumentService } from '@/lib/mocks/storage';
 
 export interface DocumentDraft {
@@ -59,41 +59,48 @@ export function VerificationProvider({
 
   // Load initial documents from MockDocumentService (localStorage persistence)
   useEffect(() => {
-    const loadedDocs = MockDocumentService.getDocuments();
-    setDocuments(loadedDocs);
+    const timer = setTimeout(() => {
+      const loadedDocs = MockDocumentService.getDocuments();
+      setDocuments(loadedDocs);
 
-    // Initialize drafts dictionary per documentId
-    const initialDrafts: Record<string, DocumentDraft> = {};
-    loadedDocs.forEach((doc) => {
-      const latestNote = doc.notes.length > 0 ? doc.notes[doc.notes.length - 1].message : '';
-      initialDrafts[doc.id] = {
-        fields: JSON.parse(JSON.stringify(doc.fields)),
-        reviewerNote: latestNote,
-        isSaving: false,
-        lastSavedAt: new Date(),
-      };
-    });
-    setDrafts(initialDrafts);
+      // Initialize drafts dictionary per documentId
+      const initialDrafts: Record<string, DocumentDraft> = {};
+      loadedDocs.forEach((doc) => {
+        const latestNote = doc.notes.length > 0 ? doc.notes[doc.notes.length - 1].message : '';
+        initialDrafts[doc.id] = {
+          fields: JSON.parse(JSON.stringify(doc.fields)),
+          reviewerNote: latestNote,
+          isSaving: false,
+          lastSavedAt: new Date(),
+        };
+      });
+      setDrafts(initialDrafts);
 
-    // Determine initial active document
-    let targetDocId: string | null = null;
-    if (initialDocId) {
-      const found = loadedDocs.find((d) => d.id === initialDocId);
-      if (found) targetDocId = found.id;
-    }
-
-    if (!targetDocId) {
-      const firstPending = loadedDocs.find((d) => d.status === 'needs_review') || loadedDocs[0];
-      if (firstPending) targetDocId = firstPending.id;
-    }
-
-    if (targetDocId) {
-      setActiveDocId(targetDocId);
-      const targetDoc = loadedDocs.find((d) => d.id === targetDocId);
-      if (targetDoc && targetDoc.fields.length > 0) {
-        setSelectedFieldId(targetDoc.fields[0].id);
+      // Determine initial active document
+      let targetDocId: string | null = null;
+      if (initialDocId) {
+        const found = loadedDocs.find((d) => d.id === initialDocId);
+        if (found) targetDocId = found.id;
       }
-    }
+
+      if (!targetDocId) {
+        const firstPending = loadedDocs.find((d) => d.status === 'needs_review') || loadedDocs[0];
+        if (firstPending) targetDocId = firstPending.id;
+      }
+
+      if (targetDocId) {
+        setActiveDocId(targetDocId);
+        const targetDoc = loadedDocs.find((d) => d.id === targetDocId);
+        const isFinal = targetDoc?.status === 'approved' || targetDoc?.status === 'rejected';
+        if (targetDoc && !isFinal && targetDoc.fields.length > 0) {
+          setSelectedFieldId(targetDoc.fields[0].id);
+        } else {
+          setSelectedFieldId(null);
+        }
+      }
+    }, 0);
+
+    return () => clearTimeout(timer);
   }, [initialDocId]);
 
   // Derived active document
@@ -208,60 +215,88 @@ export function VerificationProvider({
     }, 400);
   }, [commitSave]);
 
+  // Guard field highlight selection when active document is locked in final status
+  const handleSelectField = useCallback(
+    (id: string | null) => {
+      if (activeDoc && (activeDoc.status === 'approved' || activeDoc.status === 'rejected')) {
+        setSelectedFieldId(null);
+        return;
+      }
+      setSelectedFieldId(id);
+    },
+    [activeDoc]
+  );
+
   // Update a single field in draft with immediate debounced auto-save
-  const updateFieldDraft = useCallback((documentId: string, fieldId: string, value: string) => {
-    setDrafts((prev) => {
-      const currentDraft = prev[documentId];
-      if (!currentDraft) return prev;
+  const updateFieldDraft = useCallback(
+    (documentId: string, fieldId: string, value: string) => {
+      const targetDoc = documents.find((d) => d.id === documentId);
+      if (targetDoc && (targetDoc.status === 'approved' || targetDoc.status === 'rejected')) {
+        return;
+      }
 
-      const updatedFields = currentDraft.fields.map((f) => {
-        if (f.id === fieldId) {
-          return {
-            ...f,
-            value,
-            isEdited: true,
-            validationStatus: 'valid' as const,
-            validationMessage: undefined,
-          };
-        }
-        return f;
+      setDrafts((prev) => {
+        const currentDraft = prev[documentId];
+        if (!currentDraft) return prev;
+
+        const updatedFields = currentDraft.fields.map((f) => {
+          if (f.id === fieldId) {
+            return {
+              ...f,
+              value,
+              isEdited: true,
+              validationStatus: 'valid' as const,
+              validationMessage: undefined,
+            };
+          }
+          return f;
+        });
+
+        const nextDraft: DocumentDraft = {
+          ...currentDraft,
+          fields: updatedFields,
+          isSaving: true,
+        };
+
+        triggerDebouncedAutoSave(documentId, nextDraft);
+
+        return {
+          ...prev,
+          [documentId]: nextDraft,
+        };
       });
-
-      const nextDraft: DocumentDraft = {
-        ...currentDraft,
-        fields: updatedFields,
-        isSaving: true,
-      };
-
-      triggerDebouncedAutoSave(documentId, nextDraft);
-
-      return {
-        ...prev,
-        [documentId]: nextDraft,
-      };
-    });
-  }, [triggerDebouncedAutoSave]);
+    },
+    [documents, triggerDebouncedAutoSave]
+  );
 
   // Update note in draft with immediate debounced auto-save
-  const updateNoteDraft = useCallback((documentId: string, note: string) => {
-    setDrafts((prev) => {
-      const currentDraft = prev[documentId];
-      if (!currentDraft) return prev;
+  const updateNoteDraft = useCallback(
+    (documentId: string, note: string) => {
+      const targetDoc = documents.find((d) => d.id === documentId);
+      if (targetDoc && (targetDoc.status === 'approved' || targetDoc.status === 'rejected')) {
+        return;
+      }
 
-      const nextDraft: DocumentDraft = {
-        ...currentDraft,
-        reviewerNote: note,
-        isSaving: true,
-      };
+      setDrafts((prev) => {
+        const currentDraft = prev[documentId];
+        if (!currentDraft) return prev;
 
-      triggerDebouncedAutoSave(documentId, nextDraft);
+        const nextDraft: DocumentDraft = {
+          ...currentDraft,
+          reviewerNote: note,
+          isSaving: true,
+        };
 
-      return {
-        ...prev,
-        [documentId]: nextDraft,
-      };
-    });
-  }, [triggerDebouncedAutoSave]);
+        triggerDebouncedAutoSave(documentId, nextDraft);
+
+        return {
+          ...prev,
+          [documentId]: nextDraft,
+        };
+      });
+    },
+    [documents, triggerDebouncedAutoSave]
+  );
 
   // Select document seamlessly (flush any pending debounce on previous document)
   const selectDocument = useCallback((id: string) => {
@@ -279,7 +314,8 @@ export function VerificationProvider({
 
     setActiveDocId(id);
     const targetDoc = documents.find((d) => d.id === id);
-    if (targetDoc && targetDoc.fields.length > 0) {
+    const isFinal = targetDoc?.status === 'approved' || targetDoc?.status === 'rejected';
+    if (targetDoc && !isFinal && targetDoc.fields.length > 0) {
       setSelectedFieldId(targetDoc.fields[0].id);
     } else {
       setSelectedFieldId(null);
@@ -377,6 +413,8 @@ export function VerificationProvider({
 
     if (updated) {
       setDocuments((prev) => prev.map((d) => (d.id === documentId ? updated : d)));
+      setIsEditMode(false);
+      setSelectedFieldId(null);
       setNotification({
         message: `Dokumen ${updated.fileNumber} berhasil disetujui dan disinkronkan ke seluruh sistem!`,
         type: 'success',
@@ -420,6 +458,8 @@ export function VerificationProvider({
 
     if (updated) {
       setDocuments((prev) => prev.map((d) => (d.id === documentId ? updated : d)));
+      setIsEditMode(false);
+      setSelectedFieldId(null);
       setNotification({
         message: `Dokumen ${updated.fileNumber} ditolak dan status tersinkronisasi.`,
         type: 'error',
@@ -441,7 +481,7 @@ export function VerificationProvider({
       notification,
       isEditMode,
       selectDocument,
-      setSelectedFieldId,
+      setSelectedFieldId: handleSelectField,
       setIsEditMode,
       toggleEditMode,
       cancelEdit,
@@ -462,6 +502,7 @@ export function VerificationProvider({
       notification,
       isEditMode,
       selectDocument,
+      handleSelectField,
       toggleEditMode,
       cancelEdit,
       saveEdit,

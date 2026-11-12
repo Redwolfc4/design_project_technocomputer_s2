@@ -22,15 +22,20 @@ import {
   DataTableEmptyState,
   DataTableExport,
   FilterConfig,
+  DateRangeValue,
 } from '@/components/shared/data-table';
 import { AuditLogDetailModal } from '@/components/dashboard/audit/AuditLogDetailModal';
 import { PageHeader } from '@/components/shared/PageHeader';
+import { useAppScope } from '@/context/ScopeContext';
 
 export default function AuditTrailPage() {
+  const { activeCompanyId, activeDepartment } = useAppScope();
   const [logs, setLogs] = useState<AuditLogEntry[]>(() => AuditService.getLogs());
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [filterAction, setFilterAction] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [filterRole, setFilterRole] = useState<string>('all');
+  const [dateRange, setDateRange] = useState<DateRangeValue>({ preset: 'all' });
   const [selectedLog, setSelectedLog] = useState<AuditLogEntry | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' } | null>(null);
 
@@ -74,8 +79,37 @@ export default function AuditTrailPage() {
 
   const filteredLogs = useMemo(() => {
     return logs.filter((log) => {
+      // 0. Scope Filtering
+      if (activeCompanyId !== 'all') {
+        const logComp = (log as any).companyId || 'comp-01';
+        if (logComp !== activeCompanyId) return false;
+      }
+      if (activeDepartment && activeDepartment.id !== 'all') {
+        const logDept = (log as any).department;
+        if (logDept && logDept.toLowerCase() !== activeDepartment.name.toLowerCase()) {
+          return false;
+        }
+      }
+
       if (filterAction !== 'all' && !log.action.toLowerCase().includes(filterAction.toLowerCase())) return false;
       if (filterStatus !== 'all' && log.status !== filterStatus) return false;
+      if (filterRole !== 'all' && log.actorRole !== filterRole) return false;
+
+      // Filter Rentang Waktu Kejadian
+      if (dateRange && dateRange.preset !== 'all' && log.timestamp) {
+        const logDate = new Date(log.timestamp);
+        if (dateRange.from) {
+          const fromDate = new Date(dateRange.from);
+          fromDate.setHours(0, 0, 0, 0);
+          if (logDate < fromDate) return false;
+        }
+        if (dateRange.to) {
+          const toDate = new Date(dateRange.to);
+          toDate.setHours(23, 59, 59, 999);
+          if (logDate > toDate) return false;
+        }
+      }
+
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase().trim();
         const matchActor = log.actor.toLowerCase().includes(q);
@@ -86,7 +120,7 @@ export default function AuditTrailPage() {
       }
       return true;
     });
-  }, [logs, filterAction, filterStatus, searchQuery]);
+  }, [logs, filterAction, filterStatus, filterRole, dateRange, searchQuery]);
 
   // Pagination slice
   const totalItems = filteredLogs.length;
@@ -97,14 +131,21 @@ export default function AuditTrailPage() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, filterAction, filterStatus, pageSize]);
+  }, [searchQuery, filterAction, filterStatus, filterRole, dateRange, activeCompanyId, activeDepartment, pageSize]);
 
-  const isFilterActive = searchQuery.trim() !== '' || filterAction !== 'all' || filterStatus !== 'all';
+  const isFilterActive =
+    searchQuery.trim() !== '' ||
+    filterAction !== 'all' ||
+    filterStatus !== 'all' ||
+    filterRole !== 'all' ||
+    Boolean(dateRange && dateRange.preset !== 'all');
 
   const handleResetFilters = () => {
     setSearchQuery('');
     setFilterAction('all');
     setFilterStatus('all');
+    setFilterRole('all');
+    setDateRange({ preset: 'all' });
     setCurrentPage(1);
     showToast('Filter jejak audit forensik berhasil direset', 'info');
   };
@@ -163,6 +204,31 @@ export default function AuditTrailPage() {
       ],
       selectedValue: filterStatus,
       onChange: (val) => setFilterStatus(val),
+    },
+    {
+      id: 'role',
+      label: 'Peran Aktor (Role)',
+      type: 'select',
+      placeholder: 'Semua Peran',
+      options: [
+        { label: 'Semua Peran Aktor', value: 'all' },
+        { label: 'Super Admin / CISO', value: 'super_admin' },
+        { label: 'Finance & Tax Supervisor', value: 'finance_supervisor' },
+        { label: 'Document Reviewer (HITL)', value: 'document_reviewer' },
+        { label: 'Auditor Eksternal', value: 'auditor' },
+        { label: 'System AI Engine', value: 'system' },
+      ],
+      selectedValue: filterRole,
+      onChange: (val) => setFilterRole(val),
+      searchable: true,
+    },
+    {
+      id: 'dateRange',
+      label: 'Rentang Waktu Audit',
+      type: 'date-range',
+      placeholder: 'Semua Waktu',
+      selectedValue: dateRange,
+      onChange: (val) => setDateRange(val as DateRangeValue),
     },
   ];
 

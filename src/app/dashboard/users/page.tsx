@@ -3,6 +3,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Topbar } from '@/components/layout/Topbar';
 import { PageHeader } from '@/components/shared/PageHeader';
+import { useAppScope } from '@/context/ScopeContext';
 import { RBACMember } from '@/types';
 import {
   INITIAL_RBAC_USERS,
@@ -36,6 +37,7 @@ import {
 } from '@/components/ui/icons';
 
 export default function UsersManagementPage() {
+  const { activeCompanyId, activeDepartment } = useAppScope();
   // Master data state
   const [users, setUsers] = useState<RBACMember[]>(() => MemberService.getMembers());
 
@@ -159,6 +161,17 @@ export default function UsersManagementPage() {
   // Filter & Search Logic
   const filteredUsers = useMemo(() => {
     return users.filter((user) => {
+      // 0. Scope Isolation: Company & Department
+      if (activeCompanyId !== 'all') {
+        const userComp = (user as any).companyId || 'comp-01';
+        if (userComp !== activeCompanyId) return false;
+      }
+      if (activeDepartment && activeDepartment.id !== 'all') {
+        if (user.department.toLowerCase() !== activeDepartment.name.toLowerCase()) {
+          return false;
+        }
+      }
+
       // 1. Text Search across name, email, department, roleTitle
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase().trim();
@@ -217,10 +230,10 @@ export default function UsersManagementPage() {
     return sortedUsers.slice(start, start + pageSize);
   }, [sortedUsers, currentPage, pageSize]);
 
-  // Reset page when filter/search/sort changes
+  // Reset page when filter/search/sort/scope changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, selectedDept, selectedRole, selectedStatus, selectedPermissions, pageSize]);
+  }, [searchQuery, selectedDept, selectedRole, selectedStatus, selectedPermissions, activeCompanyId, activeDepartment, pageSize]);
 
   // Sort handler
   const handleSort = (column: 'name' | 'department' | 'roleTitle' | 'status') => {

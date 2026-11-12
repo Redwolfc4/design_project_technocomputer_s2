@@ -13,6 +13,7 @@ import {
   MoreHorizontalIcon,
   CopyIcon,
   CheckCircleIcon,
+  XCircleIcon,
   DownloadIcon,
   PencilIcon,
   TrashIcon,
@@ -29,18 +30,23 @@ import {
   DataTableEmptyState,
   DataTableExport,
   FilterConfig,
+  DateRangeValue,
 } from '@/components/shared/data-table';
 import { DocumentQuickDetailModal } from '@/components/dashboard/documents/DocumentQuickDetailModal';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { useAppRoutes } from '@/context/RouteContext';
+import { useAppScope } from '@/context/ScopeContext';
 
 function DocumentRepositoryContent() {
   const router = useRouter();
   const { getRoute } = useAppRoutes();
+  const { activeCompanyId, activeDepartment } = useAppScope();
   const searchParams = useSearchParams();
   const [documents, setDocuments] = useState<DocumentRecord[]>(() => DocumentService.getDocuments());
   const [statusFilter, setStatusFilter] = useState<string>(() => searchParams.get('status') || 'all');
   const [typeFilter, setTypeFilter] = useState<string>(() => searchParams.get('type') || 'all');
+  const [dateRange, setDateRange] = useState<DateRangeValue>({ preset: 'all' });
+  const [confidenceFilter, setConfidenceFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
@@ -161,8 +167,41 @@ function DocumentRepositoryContent() {
 
   const filteredDocs = useMemo(() => {
     return documents.filter((doc) => {
+      // 0. Scope Filtering: Company & Department Isolation
+      if (activeCompanyId !== 'all') {
+        const docCompanyId = (doc as any).companyId || 'comp-01';
+        if (docCompanyId !== activeCompanyId) return false;
+      }
+      if (activeDepartment && activeDepartment.id !== 'all') {
+        const docDept = (doc as any).department;
+        if (docDept && docDept.toLowerCase() !== activeDepartment.name.toLowerCase()) {
+          return false;
+        }
+      }
+
       if (statusFilter !== 'all' && doc.status !== statusFilter) return false;
       if (typeFilter !== 'all' && doc.documentType !== typeFilter) return false;
+
+      // Filter Akurasi AI
+      if (confidenceFilter === 'high' && doc.confidence < 90) return false;
+      if (confidenceFilter === 'medium' && (doc.confidence < 80 || doc.confidence >= 90)) return false;
+      if (confidenceFilter === 'low' && doc.confidence >= 80) return false;
+
+      // Filter Rentang Tanggal
+      if (dateRange && dateRange.preset !== 'all' && doc.uploadedAt) {
+        const docDate = new Date(doc.uploadedAt);
+        if (dateRange.from) {
+          const fromDate = new Date(dateRange.from);
+          fromDate.setHours(0, 0, 0, 0);
+          if (docDate < fromDate) return false;
+        }
+        if (dateRange.to) {
+          const toDate = new Date(dateRange.to);
+          toDate.setHours(23, 59, 59, 999);
+          if (docDate > toDate) return false;
+        }
+      }
+
       if (searchQuery) {
         const q = searchQuery.toLowerCase();
         const matchNumber = doc.fileNumber.toLowerCase().includes(q);
@@ -172,7 +211,7 @@ function DocumentRepositoryContent() {
       }
       return true;
     });
-  }, [documents, statusFilter, typeFilter, searchQuery]);
+  }, [documents, statusFilter, typeFilter, confidenceFilter, dateRange, searchQuery]);
 
   // Pagination slice
   const totalItems = filteredDocs.length;
@@ -181,17 +220,24 @@ function DocumentRepositoryContent() {
     return filteredDocs.slice(start, start + pageSize);
   }, [filteredDocs, currentPage, pageSize]);
 
-  // Reset page when filter/search changes
+  // Reset page when filter/search/scope changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, statusFilter, typeFilter, pageSize]);
+  }, [searchQuery, statusFilter, typeFilter, confidenceFilter, dateRange, activeCompanyId, activeDepartment, pageSize]);
 
-  const isFilterActive = searchQuery.trim() !== '' || statusFilter !== 'all' || typeFilter !== 'all';
+  const isFilterActive =
+    searchQuery.trim() !== '' ||
+    statusFilter !== 'all' ||
+    typeFilter !== 'all' ||
+    confidenceFilter !== 'all' ||
+    Boolean(dateRange && dateRange.preset !== 'all');
 
   const handleResetFilters = () => {
     setSearchQuery('');
     setStatusFilter('all');
     setTypeFilter('all');
+    setConfidenceFilter('all');
+    setDateRange({ preset: 'all' });
     setCurrentPage(1);
     showToast('Filter repositori dokumen berhasil direset', 'info');
   };
@@ -313,6 +359,28 @@ function DocumentRepositoryContent() {
       onChange: (val) => setTypeFilter(val),
       searchable: true,
     },
+    {
+      id: 'dateRange',
+      label: 'Rentang Tanggal Masuk',
+      type: 'date-range',
+      placeholder: 'Semua Waktu',
+      selectedValue: dateRange,
+      onChange: (val) => setDateRange(val as DateRangeValue),
+    },
+    {
+      id: 'confidence',
+      label: 'Tingkat Akurasi AI',
+      type: 'select',
+      placeholder: 'Semua Skor',
+      options: [
+        { label: 'Semua Skor Akurasi', value: 'all' },
+        { label: 'Tinggi (≥ 90%)', value: 'high' },
+        { label: 'Perlu Tinjauan (80% - 89%)', value: 'medium' },
+        { label: 'Kritis / Rendah (< 80%)', value: 'low' },
+      ],
+      selectedValue: confidenceFilter,
+      onChange: (val) => setConfidenceFilter(val),
+    },
   ];
 
   // Row Actions Definition
@@ -355,11 +423,36 @@ function DocumentRepositoryContent() {
         id: 'quick_approve',
         label: 'Persetujuan Cepat (Instant Approve)',
         icon: <CheckCircleIcon className="w-4 h-4 text-emerald-600" />,
-        disabled: (doc) => doc.status === 'approved',
+        disabled: (doc) => doc.status === 'approved' || doc.status === 'rejected',
         onSelect: (doc) => {
-          DocumentService.updateStatus(doc.id, 'approved', 'Reviewer Tim');
+          const res = DocumentService.updateStatus(doc.id, 'approved', 'Reviewer Tim');
+          if (!res.success) {
+            showToast(res.error || 'Gagal menyetujui dokumen.', 'error');
+            return;
+          }
           setDocuments(DocumentService.getDocuments());
           showToast(`Dokumen ${doc.fileNumber} berhasil disetujui!`, 'success');
+        },
+      },
+      {
+        id: 'quick_reject',
+        label: 'Penolakan Cepat (Instant Reject)',
+        icon: <XCircleIcon className="w-4 h-4 text-rose-600" />,
+        destructive: true,
+        disabled: (doc) => doc.status === 'approved' || doc.status === 'rejected',
+        onSelect: (doc) => {
+          const res = DocumentService.updateStatus(
+            doc.id,
+            'rejected',
+            'Reviewer Tim',
+            'Ditolak cepat melalui repositori dokumen'
+          );
+          if (!res.success) {
+            showToast(res.error || 'Gagal menolak dokumen.', 'error');
+            return;
+          }
+          setDocuments(DocumentService.getDocuments());
+          showToast(`Dokumen ${doc.fileNumber} berhasil ditolak.`, 'error');
         },
       },
     ],
@@ -371,7 +464,11 @@ function DocumentRepositoryContent() {
       {/* Toast Notification */}
       {toast && (
         <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2 bg-[#0F172A] text-white px-4 py-3 rounded-xl shadow-2xl text-xs border border-slate-700 animate-in fade-in slide-in-from-bottom-3 duration-200">
-          <CheckCircleIcon className="w-4 h-4 text-emerald-400 shrink-0" />
+          {toast.type === 'error' ? (
+            <XCircleIcon className="w-4 h-4 text-rose-400 shrink-0" />
+          ) : (
+            <CheckCircleIcon className="w-4 h-4 text-emerald-400 shrink-0" />
+          )}
           <span className="font-medium">{toast.message}</span>
         </div>
       )}

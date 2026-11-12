@@ -36,6 +36,7 @@ function VerificationWorkspaceInner() {
   } = useVerification();
 
   const pendingList = documents.filter((d) => d.status === 'needs_review');
+  const isFinalStatus = activeDoc?.status === 'approved' || activeDoc?.status === 'rejected';
 
   return (
     <div className="flex-1 flex flex-col min-h-screen xl:h-screen xl:overflow-hidden min-w-0">
@@ -152,20 +153,25 @@ function VerificationWorkspaceInner() {
 
                   <div className="space-y-4">
                     <div className="text-xs font-bold text-[#64748B] uppercase tracking-wider">
-                      Area Ekstraksi Bidang Data (Klik bidang untuk sorot):
+                      {isFinalStatus
+                        ? 'Area Ekstraksi Bidang Data (Read-Only Permanen):'
+                        : 'Area Ekstraksi Bidang Data (Klik bidang untuk sorot):'}
                     </div>
 
                     <div className="grid grid-cols-1 gap-3">
                       {(activeDraft?.fields || activeDoc.fields).map((field) => {
-                        const isHighlighted = selectedFieldId === field.id;
+                        const isHighlighted = !isFinalStatus && selectedFieldId === field.id;
                         return (
                           <div
                             key={field.id}
-                            onClick={() => setSelectedFieldId(field.id)}
-                            className={`p-3 rounded-lg border-2 transition-all cursor-pointer flex items-center justify-between ${isHighlighted
-                              ? 'border-[#4F46E5] bg-[#EEF2FF]/60 shadow-md ring-2 ring-[#4F46E5]/20'
-                              : 'border-[#E2E8F0] bg-[#FAFAFF] hover:border-[#CBD5E1]'
-                              }`}
+                            onClick={!isFinalStatus ? () => setSelectedFieldId(field.id) : undefined}
+                            className={`p-3 rounded-lg transition-all flex items-center justify-between ${
+                              isFinalStatus
+                                ? 'border border-[#E2E8F0] bg-[#FAFAFF] cursor-default select-none pointer-events-none'
+                                : isHighlighted
+                                  ? 'border-2 border-[#4F46E5] bg-[#EEF2FF]/60 shadow-md ring-2 ring-[#4F46E5]/20 cursor-pointer'
+                                  : 'border-2 border-[#E2E8F0] bg-[#FAFAFF] hover:border-[#CBD5E1] cursor-pointer'
+                            }`}
                           >
                             <div>
                               <span className="text-[10px] font-bold uppercase tracking-wider text-[#64748B] block">
@@ -245,8 +251,8 @@ function VerificationWorkspaceInner() {
                   Detail & Editor Dokumen
                 </span>
                 <span className="text-[10px] text-[#64748B]">
-                  {activeDoc?.status === 'approved' || activeDoc?.status === 'rejected'
-                    ? 'Status Final • Terkunci Permanen'
+                  {isFinalStatus
+                    ? 'Status Final • Read-Only Permanen'
                     : isEditMode
                       ? 'Mode Edit Aktif'
                       : 'Mode Read-Only (Default)'}
@@ -255,7 +261,7 @@ function VerificationWorkspaceInner() {
 
               <div className="flex items-center gap-2">
                 {/* Tombol Edit / Batal & Simpan di Pojok Kanan Atas */}
-                {activeDoc && activeDoc.status !== 'approved' && activeDoc.status !== 'rejected' && (
+                {activeDoc && !isFinalStatus && (
                   <>
                     {!isEditMode ? (
                       <button
@@ -290,7 +296,7 @@ function VerificationWorkspaceInner() {
                 )}
 
                 {/* Status Sync / Saving feedback indicator */}
-                {isEditMode && activeDraft?.isSaving && (
+                {!isFinalStatus && isEditMode && activeDraft?.isSaving && (
                   <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-indigo-50 text-[#4F46E5] border border-indigo-200 animate-pulse flex items-center gap-1">
                     <span className="w-1.5 h-1.5 rounded-full bg-[#4F46E5] animate-ping" />
                     <span>Menyimpan...</span>
@@ -340,20 +346,22 @@ function VerificationWorkspaceInner() {
                     </div>
                   </div>
 
-                  {/* Form Fields: Read-Only Secara Default, Editable Hanya di Edit Mode */}
+                  {/* Form Fields: Read-Only Permanen pada status final; Editable hanya di Edit Mode */}
                   <div className="space-y-4">
                     {activeDraft.fields.map((field) => {
-                      const isFinalStatus =
-                        activeDoc.status === 'approved' || activeDoc.status === 'rejected';
                       const isFieldReadOnly = !isEditMode || isFinalStatus;
+                      const isHighlighted = !isFinalStatus && selectedFieldId === field.id;
 
                       return (
                         <div
                           key={field.id}
-                          className={`space-y-1.5 p-3 rounded-lg border transition-all ${selectedFieldId === field.id
-                            ? 'border-[#4F46E5] bg-[#EEF2FF]/30 ring-1 ring-[#4F46E5]/20'
-                            : 'border-[#E2E8F0] bg-white'
-                            }`}
+                          className={`space-y-1.5 p-3 rounded-lg border transition-all ${
+                            isFinalStatus
+                              ? 'border-[#E2E8F0] bg-[#F8FAFC]/60 cursor-default select-none pointer-events-none'
+                              : isHighlighted
+                                ? 'border-[#4F46E5] bg-[#EEF2FF]/30 ring-1 ring-[#4F46E5]/20'
+                                : 'border-[#E2E8F0] bg-white'
+                          }`}
                         >
                           <div className="flex items-center justify-between">
                             <label className="text-[11px] font-bold text-[#475569]">
@@ -366,29 +374,43 @@ function VerificationWorkspaceInner() {
                                 </span>
                               )}
                               <span
-                                className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${field.confidence >= 0.9 ? 'text-[#059669]' : 'text-[#F59E0B]'
-                                  }`}
+                                className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
+                                  field.confidence >= 0.9 ? 'text-[#059669]' : 'text-[#F59E0B]'
+                                }`}
                               >
                                 {Math.round(field.confidence * 100)}% Match
                               </span>
                             </div>
                           </div>
 
-                          <input
-                            type="text"
-                            value={field.value}
-                            readOnly={isFieldReadOnly}
-                            onChange={(e) => {
-                              if (!isFieldReadOnly) {
-                                updateFieldDraft(activeDoc.id, field.id, e.target.value);
-                              }
-                            }}
-                            onFocus={() => setSelectedFieldId(field.id)}
-                            className={`w-full text-xs font-semibold px-3 py-2 rounded-md border transition-colors ${isFieldReadOnly
-                              ? 'border-[#E2E8F0] bg-[#F8FAFC] text-[#1E293B] cursor-default focus:outline-none select-all'
-                              : 'border-[#4F46E5] bg-white text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#4F46E5]'
-                              }`}
-                          />
+                          {isFinalStatus ? (
+                            <div
+                              aria-readonly="true"
+                              className="w-full text-xs font-semibold px-3 py-2 rounded-md border border-[#E2E8F0] bg-[#F8FAFC] text-[#475569] cursor-default select-none pointer-events-none"
+                            >
+                              {field.value === '' || field.value === null || field.value === undefined
+                                ? '-'
+                                : String(field.value)}
+                            </div>
+                          ) : !isEditMode ? (
+                            <div
+                              onClick={() => setSelectedFieldId(field.id)}
+                              aria-readonly="true"
+                              className="w-full text-xs font-semibold px-3 py-2 rounded-md border border-[#E2E8F0] bg-[#F8FAFC] text-[#1E293B] cursor-pointer select-none"
+                            >
+                              {field.value === '' || field.value === null || field.value === undefined
+                                ? '-'
+                                : String(field.value)}
+                            </div>
+                          ) : (
+                            <input
+                              type="text"
+                              value={field.value}
+                              onChange={(e) => updateFieldDraft(activeDoc.id, field.id, e.target.value)}
+                              onFocus={() => setSelectedFieldId(field.id)}
+                              className="w-full text-xs font-semibold px-3 py-2 rounded-md border border-[#4F46E5] bg-white text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#4F46E5]"
+                            />
+                          )}
 
                           {field.validationMessage && (
                             <p className="text-[10px] text-[#F59E0B] font-medium flex items-center gap-1">
@@ -401,14 +423,18 @@ function VerificationWorkspaceInner() {
                     })}
                   </div>
 
-                  {/* Catatan Verifikator — Pengecualian Khusus: Editable saat pending, read-only saat final */}
-                  <div className="space-y-1.5 pt-2">
+                  {/* Catatan Verifikator — Editable saat pending, strictly read-only & non-clickable saat final */}
+                  <div
+                    className={`space-y-1.5 pt-2 ${
+                      isFinalStatus ? 'cursor-default select-none pointer-events-none' : ''
+                    }`}
+                  >
                     <div className="flex items-center justify-between">
                       <label className="text-xs font-bold text-[#475569]">
                         Catatan Verifikator
                       </label>
-                      {(activeDoc.status === 'approved' || activeDoc.status === 'rejected') ? (
-                        <span className="text-[9px] font-bold text-[#94A3B8]">Terkunci (Final)</span>
+                      {isFinalStatus ? (
+                        <span className="text-[9px] font-bold text-[#94A3B8]">Read-Only (Final)</span>
                       ) : (
                         <span className="text-[9px] font-semibold text-[#059669]">
                           Editable (Autosave)
@@ -416,68 +442,53 @@ function VerificationWorkspaceInner() {
                       )}
                     </div>
 
-                    <textarea
-                      rows={3}
-                      placeholder={
-                        activeDoc.status === 'approved' || activeDoc.status === 'rejected'
-                          ? 'Catatan verifikator terkunci pada status final.'
-                          : 'Tuliskan catatan rekonsiliasi atau alasan penolakan/revisi...'
-                      }
-                      value={activeDraft.reviewerNote}
-                      readOnly={activeDoc.status === 'approved' || activeDoc.status === 'rejected'}
-                      onChange={(e) => {
-                        if (activeDoc.status !== 'approved' && activeDoc.status !== 'rejected') {
-                          updateNoteDraft(activeDoc.id, e.target.value);
-                        }
-                      }}
-                      className={`w-full text-xs px-3 py-2 rounded-md border transition-colors ${activeDoc.status === 'approved' || activeDoc.status === 'rejected'
-                        ? 'border-[#E2E8F0] bg-[#F8FAFC] text-[#334155] cursor-default focus:outline-none'
-                        : 'border-[#CBD5E1] bg-white text-[#0F172A] focus:outline-none focus:ring-1 focus:ring-[#4F46E5]'
-                        }`}
-                    />
+                    {isFinalStatus ? (
+                      <div
+                        aria-readonly="true"
+                        className="w-full min-h-[72px] text-xs px-3 py-2 rounded-md border border-[#E2E8F0] bg-[#F8FAFC] text-[#475569] whitespace-pre-wrap cursor-default select-none pointer-events-none"
+                      >
+                        {activeDraft.reviewerNote?.trim()
+                          ? activeDraft.reviewerNote
+                          : 'Tidak ada catatan verifikator.'}
+                      </div>
+                    ) : (
+                      <textarea
+                        rows={3}
+                        placeholder="Tuliskan catatan rekonsiliasi atau alasan penolakan/revisi..."
+                        value={activeDraft.reviewerNote}
+                        onChange={(e) => updateNoteDraft(activeDoc.id, e.target.value)}
+                        className="w-full text-xs px-3 py-2 rounded-md border border-[#CBD5E1] bg-white text-[#0F172A] focus:outline-none focus:ring-1 focus:ring-[#4F46E5] transition-colors"
+                      />
+                    )}
                   </div>
                 </>
               )}
             </div>
 
-            {/* Action Buttons: Kunci Total pada Status Final ('approved' / 'rejected') */}
-            <div className="p-4 border-t border-[#E2E8F0] bg-[#FAFAFF]">
-              {activeDoc && (
-                <>
-                  {activeDoc.status === 'approved' ? (
-                    <div className="py-2.5 px-3 rounded-lg bg-emerald-50 border border-emerald-200 text-center text-xs font-bold text-emerald-800 flex items-center justify-center gap-1.5">
-                      <CheckIcon className="w-4 h-4 text-emerald-600" />
-                      <span>Dokumen Telah Disetujui • Keputusan Terkunci</span>
-                    </div>
-                  ) : activeDoc.status === 'rejected' ? (
-                    <div className="py-2.5 px-3 rounded-lg bg-rose-50 border border-rose-200 text-center text-xs font-bold text-rose-800 flex items-center justify-center gap-1.5">
-                      <XIcon className="w-4 h-4 text-rose-600" />
-                      <span>Dokumen Telah Ditolak • Keputusan Terkunci</span>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-3">
-                      <button
-                        type="button"
-                        onClick={() => rejectDocument(activeDoc.id)}
-                        className="flex-1 flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-lg border border-[#E11D48] text-[#E11D48] hover:bg-rose-50 text-xs font-bold transition-colors cursor-pointer"
-                      >
-                        <XIcon className="w-4 h-4" />
-                        <span>Tolak Faktur</span>
-                      </button>
+            {/* Action Buttons: Tidak muncul sama sekali pada status final ('approved' / 'rejected') */}
+            {activeDoc && !isFinalStatus && (
+              <div className="p-4 border-t border-[#E2E8F0] bg-[#FAFAFF]">
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => rejectDocument(activeDoc.id)}
+                    className="flex-1 flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-lg border border-[#E11D48] text-[#E11D48] hover:bg-rose-50 text-xs font-bold transition-colors cursor-pointer"
+                  >
+                    <XIcon className="w-4 h-4" />
+                    <span>Tolak Faktur</span>
+                  </button>
 
-                      <button
-                        type="button"
-                        onClick={() => approveDocument(activeDoc.id)}
-                        className="flex-1 flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-lg bg-[#059669] hover:bg-[#047857] text-white text-xs font-bold shadow-sm transition-colors cursor-pointer"
-                      >
-                        <CheckIcon className="w-4 h-4" />
-                        <span>Setujui (Approve)</span>
-                      </button>
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
+                  <button
+                    type="button"
+                    onClick={() => approveDocument(activeDoc.id)}
+                    className="flex-1 flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-lg bg-[#059669] hover:bg-[#047857] text-white text-xs font-bold shadow-sm transition-colors cursor-pointer"
+                  >
+                    <CheckIcon className="w-4 h-4" />
+                    <span>Setujui (Approve)</span>
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </main>

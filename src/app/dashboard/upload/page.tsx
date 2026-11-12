@@ -18,6 +18,7 @@ import {
   PencilIcon,
   MoreHorizontalIcon,
   SparklesIcon,
+  ChevronDownIcon,
 } from '@/components/ui/icons';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { SectionHeader } from '@/components/shared/SectionHeader';
@@ -26,21 +27,22 @@ import {
   DataTableActionMenu,
   useDataTableInteractions,
   RowAction,
+  DataTableToolbar,
+  FilterConfig,
 } from '@/components/shared/data-table';
 import { useAppRoutes } from '@/context/RouteContext';
+import { useAppScope } from '@/context/ScopeContext';
 
 const DEFAULT_FORM_VALUES: {
   selectedType: DocumentType;
   vendorName: string;
   fileNumber: string;
   nominal: string;
-  status: 'draft' | 'ready';
 } = {
   selectedType: 'tax_invoice',
   vendorName: 'PT Telkom Prima Nusantara',
   fileNumber: '010.002-26.99410123',
   nominal: '35000000',
-  status: 'ready',
 };
 
 function createDocumentFromBatchDraft(item: BatchItemDraft): DocumentRecord {
@@ -140,6 +142,7 @@ function createDocumentFromBatchDraft(item: BatchItemDraft): DocumentRecord {
 export default function DocumentUploadPage() {
   const router = useRouter();
   const { getRoute } = useAppRoutes();
+  const { activeCompanyId, activeDepartment } = useAppScope();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
@@ -147,7 +150,8 @@ export default function DocumentUploadPage() {
   const [vendorName, setVendorName] = useState(DEFAULT_FORM_VALUES.vendorName);
   const [fileNumber, setFileNumber] = useState(DEFAULT_FORM_VALUES.fileNumber);
   const [nominal, setNominal] = useState(DEFAULT_FORM_VALUES.nominal);
-  const [draftStatus, setDraftStatus] = useState<'draft' | 'ready'>(DEFAULT_FORM_VALUES.status);
+  const [isSavePopoverOpen, setIsSavePopoverOpen] = useState(false);
+  const savePopoverRef = useRef<HTMLDivElement>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [progressStage, setProgressStage] = useState('');
 
@@ -158,6 +162,8 @@ export default function DocumentUploadPage() {
   // Batch Drafts State
   const [batchDrafts, setBatchDrafts] = useState<BatchItemDraft[]>(INITIAL_BATCH_ITEMS);
   const [statusFilter, setStatusFilter] = useState<'all' | 'non_draft' | 'draft'>('all');
+  const [typeFilter, setTypeFilter] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState<string>('');
   const [editingDraft, setEditingDraft] = useState<BatchItemDraft | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' | 'error' } | null>(null);
 
@@ -181,14 +187,75 @@ export default function DocumentUploadPage() {
   );
 
   const filteredDrafts = useMemo(() => {
-    if (statusFilter === 'draft') {
-      return batchDrafts.filter((b) => b.status === 'draft');
-    }
-    if (statusFilter === 'non_draft') {
-      return batchDrafts.filter((b) => b.status !== 'draft');
-    }
-    return batchDrafts;
-  }, [batchDrafts, statusFilter]);
+    return batchDrafts.filter((b) => {
+      // 0. Scope Filter
+      if (activeCompanyId !== 'all') {
+        const batchComp = (b as any).companyId || 'comp-01';
+        if (batchComp !== activeCompanyId) return false;
+      }
+      if (activeDepartment && activeDepartment.id !== 'all') {
+        const batchDept = (b as any).department;
+        if (batchDept && batchDept.toLowerCase() !== activeDepartment.name.toLowerCase()) {
+          return false;
+        }
+      }
+
+      if (statusFilter === 'draft' && b.status !== 'draft') return false;
+      if (statusFilter === 'non_draft' && b.status === 'draft') return false;
+      if (typeFilter !== 'all' && b.documentType !== typeFilter) return false;
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase().trim();
+        const matchName = b.fileName.toLowerCase().includes(q);
+        const matchVendor = b.vendorName.toLowerCase().includes(q);
+        const matchNumber = b.fileNumber.toLowerCase().includes(q);
+        if (!matchName && !matchVendor && !matchNumber) return false;
+      }
+      return true;
+    });
+  }, [batchDrafts, statusFilter, typeFilter, searchQuery]);
+
+  const isFilterActive = searchQuery.trim() !== '' || statusFilter !== 'all' || typeFilter !== 'all';
+
+  const handleResetFilters = () => {
+    setSearchQuery('');
+    setStatusFilter('all');
+    setTypeFilter('all');
+    showToast('Filter antrean batch berhasil direset', 'info');
+  };
+
+  const batchFilterConfigs: FilterConfig[] = [
+    {
+      id: 'status',
+      label: 'Status Kesiapan',
+      type: 'select',
+      placeholder: 'Semua Status',
+      options: [
+        { label: 'Semua Status', value: 'all' },
+        { label: 'Siap Proses', value: 'non_draft' },
+        { label: 'Draft Disimpan', value: 'draft' },
+      ],
+      selectedValue: statusFilter,
+      onChange: (val) => setStatusFilter(val as any),
+    },
+    {
+      id: 'documentType',
+      label: 'Jenis Dokumen',
+      type: 'select',
+      placeholder: 'Semua Jenis',
+      options: [
+        { label: 'Semua Jenis', value: 'all' },
+        { label: 'Faktur Pajak (e-Faktur)', value: 'tax_invoice' },
+        { label: 'Invoice Komersial', value: 'commercial_invoice' },
+        { label: 'Purchase Order (PO)', value: 'purchase_order' },
+        { label: 'Kontrak Perjanjian', value: 'contract' },
+        { label: 'Bukti Potong PPh 23', value: 'withholding_tax' },
+        { label: 'Kuitansi / Nota', value: 'receipt' },
+      ],
+      selectedValue: typeFilter,
+      onChange: (val) => setTypeFilter(val),
+      searchable: true,
+    },
+  ];
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -206,13 +273,30 @@ export default function DocumentUploadPage() {
   useEffect(() => {
     if (!isUploadModalOpen) return;
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && !isProcessing) {
-        setIsUploadModalOpen(false);
+      if (event.key === 'Escape') {
+        if (isSavePopoverOpen) {
+          setIsSavePopoverOpen(false);
+          return;
+        }
+        if (!isProcessing) {
+          setIsUploadModalOpen(false);
+        }
       }
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isUploadModalOpen, isProcessing]);
+  }, [isUploadModalOpen, isSavePopoverOpen, isProcessing]);
+
+  useEffect(() => {
+    if (!isSavePopoverOpen) return;
+    const handleClickOutside = (event: MouseEvent) => {
+      if (savePopoverRef.current && !savePopoverRef.current.contains(event.target as Node)) {
+        setIsSavePopoverOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isSavePopoverOpen]);
 
   const showToast = (message: string, type: 'success' | 'info' | 'error' = 'success') => {
     setToast({ message, type });
@@ -224,7 +308,7 @@ export default function DocumentUploadPage() {
     setVendorName(DEFAULT_FORM_VALUES.vendorName);
     setFileNumber(DEFAULT_FORM_VALUES.fileNumber);
     setNominal(DEFAULT_FORM_VALUES.nominal);
-    setDraftStatus(DEFAULT_FORM_VALUES.status);
+    setIsSavePopoverOpen(false);
     setUploadedFile(null);
     setIsDragging(false);
     setProgressStage('');
@@ -237,7 +321,7 @@ export default function DocumentUploadPage() {
     setVendorName(item.vendorName);
     setFileNumber(item.fileNumber);
     setNominal(String(item.nominal));
-    setDraftStatus(item.status === 'draft' ? 'draft' : 'ready');
+    setIsSavePopoverOpen(false);
     setUploadedFile(null);
     setIsDragging(false);
     setProgressStage('');
@@ -246,6 +330,7 @@ export default function DocumentUploadPage() {
 
   const handleCloseUploadModal = () => {
     if (isProcessing) return;
+    setIsSavePopoverOpen(false);
     setIsUploadModalOpen(false);
   };
 
@@ -286,9 +371,9 @@ export default function DocumentUploadPage() {
     }
   };
 
-  // Add or update current form in Batch Queue Draft
-  const handleSaveToBatchDraft = (e: React.MouseEvent) => {
-    e.preventDefault();
+  // Add or update current form in Batch Queue with chosen status ('ready' | 'draft')
+  const handleSaveToBatchDraft = (targetStatus: 'ready' | 'draft') => {
+    setIsSavePopoverOpen(false);
     const num = parseFloat(nominal) || 10000000;
 
     if (editingDraft) {
@@ -299,7 +384,7 @@ export default function DocumentUploadPage() {
         vendorName: vendorName || 'Vendor Rekanan',
         fileNumber: fileNumber || editingDraft.fileNumber,
         nominal: num,
-        status: draftStatus,
+        status: targetStatus,
       });
 
       if (res.success) {
@@ -308,7 +393,7 @@ export default function DocumentUploadPage() {
         setIsUploadModalOpen(false);
         setEditingDraft(null);
         showToast(
-          draftStatus === 'draft'
+          targetStatus === 'draft'
             ? `Berkas "${fileNumber}" disimpan sebagai Draft!`
             : `Berkas "${fileNumber}" diperbarui dengan status Siap Proses!`
         );
@@ -318,7 +403,7 @@ export default function DocumentUploadPage() {
       return;
     }
 
-    const prefix = draftStatus === 'draft' ? 'Draf' : 'Berkas';
+    const prefix = targetStatus === 'draft' ? 'Draf' : 'Berkas';
     const res = BatchService.addBatchDraft({
       fileName: uploadedFile ? uploadedFile.name : `${prefix}_${fileNumber}.pdf`,
       fileSize: uploadedFile ? uploadedFile.size : 1500000,
@@ -326,7 +411,7 @@ export default function DocumentUploadPage() {
       vendorName: vendorName || 'Vendor Rekanan',
       fileNumber: fileNumber || `DRAFT-${Date.now().toString().slice(-4)}`,
       nominal: num,
-      status: draftStatus,
+      status: targetStatus,
     });
 
     if (res.success) {
@@ -334,7 +419,7 @@ export default function DocumentUploadPage() {
       setUploadedFile(null);
       setIsUploadModalOpen(false);
       showToast(
-        draftStatus === 'draft'
+        targetStatus === 'draft'
           ? 'Berkas disimpan sebagai Draft di Antrean Batch!'
           : 'Berkas Siap Proses dimasukkan ke Antrean Batch!'
       );
@@ -657,49 +742,23 @@ export default function DocumentUploadPage() {
 
         {/* Section Riwayat Antrean Draf Batch (CRUD Modul Upload) */}
         <div className="p-6 sm:p-8 rounded-xl border border-[#E2E8F0] bg-white shadow-sm space-y-5">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <SectionHeader
-              title="Antrean Draf Batch Siap Proses"
-              description="Daftar berkas berstatus Draft maupun Siap Proses sebelum dieksekusi ke mesin AI."
-            />
+          <SectionHeader
+            title="Antrean Draf Batch Siap Proses"
+            description="Daftar berkas berstatus Draft maupun Siap Proses sebelum dieksekusi ke mesin AI."
+          />
 
-            {/* Status Filter Pills: Draft vs Bukan Draft */}
-            <div className="inline-flex items-center p-1 rounded-lg bg-[#F8FAFC] border border-[#E2E8F0] self-start md:self-auto shrink-0">
-              <button
-                type="button"
-                onClick={() => setStatusFilter('all')}
-                className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors cursor-pointer ${
-                  statusFilter === 'all'
-                    ? 'bg-white text-[#0F172A] shadow-sm border border-[#E2E8F0]'
-                    : 'text-[#64748B] hover:text-[#0F172A]'
-                }`}
-              >
-                Semua ({batchDrafts.length})
-              </button>
-              <button
-                type="button"
-                onClick={() => setStatusFilter('non_draft')}
-                className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors cursor-pointer ${
-                  statusFilter === 'non_draft'
-                    ? 'bg-white text-emerald-700 shadow-sm border border-emerald-200'
-                    : 'text-[#64748B] hover:text-[#0F172A]'
-                }`}
-              >
-                Siap Proses ({nonDraftCount})
-              </button>
-              <button
-                type="button"
-                onClick={() => setStatusFilter('draft')}
-                className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors cursor-pointer ${
-                  statusFilter === 'draft'
-                    ? 'bg-white text-[#0F172A] shadow-sm border border-slate-300'
-                    : 'text-[#64748B] hover:text-[#0F172A]'
-                }`}
-              >
-                Draft ({draftCount})
-              </button>
-            </div>
-          </div>
+          {/* Standardized DataTableToolbar for Batch Drafts */}
+          <DataTableToolbar
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            searchPlaceholder="Cari nama berkas, nomor draf, atau vendor..."
+            filters={batchFilterConfigs}
+            totalFiltered={filteredDrafts.length}
+            totalUnfiltered={batchDrafts.length}
+            entityName="draf berkas"
+            isFilterActive={isFilterActive}
+            onResetFilters={handleResetFilters}
+          />
 
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
@@ -931,44 +990,6 @@ export default function DocumentUploadPage() {
                     required
                   />
                 </div>
-
-                <div className="space-y-1.5 md:col-span-2">
-                  <label className="text-xs font-bold text-[#475569]">Status Berkas</label>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                    <button
-                      type="button"
-                      onClick={() => setDraftStatus('ready')}
-                      className={`flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg border text-xs font-semibold transition-all cursor-pointer ${
-                        draftStatus === 'ready'
-                          ? 'border-emerald-500 bg-emerald-50 text-emerald-700 shadow-sm'
-                          : 'border-[#CBD5E1] bg-white text-[#64748B] hover:bg-slate-50'
-                      }`}
-                    >
-                      <span
-                        className={`w-2 h-2 rounded-full ${
-                          draftStatus === 'ready' ? 'bg-emerald-500' : 'bg-slate-300'
-                        }`}
-                      />
-                      <span>Siap Proses (Bukan Draft)</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setDraftStatus('draft')}
-                      className={`flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg border text-xs font-semibold transition-all cursor-pointer ${
-                        draftStatus === 'draft'
-                          ? 'border-slate-500 bg-slate-100 text-slate-800 shadow-sm'
-                          : 'border-[#CBD5E1] bg-white text-[#64748B] hover:bg-slate-50'
-                      }`}
-                    >
-                      <span
-                        className={`w-2 h-2 rounded-full ${
-                          draftStatus === 'draft' ? 'bg-slate-500' : 'bg-slate-300'
-                        }`}
-                      />
-                      <span>Draft (Masih Disusun)</span>
-                    </button>
-                  </div>
-                </div>
               </div>
 
               {isProcessing && (
@@ -982,21 +1003,84 @@ export default function DocumentUploadPage() {
               )}
 
               <div className="pt-3 flex flex-col-reverse sm:flex-row items-center justify-between gap-3 border-t border-slate-100">
-                <button
-                  type="button"
-                  disabled={isProcessing}
-                  onClick={handleSaveToBatchDraft}
-                  className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-[#CBD5E1] hover:bg-slate-50 text-slate-700 text-xs font-bold transition-all disabled:opacity-50 cursor-pointer"
-                >
-                  {!editingDraft && <PlusIcon className="w-4 h-4 text-indigo-600" />}
-                  <span>
-                    {editingDraft
-                      ? 'Simpan Perubahan'
-                      : draftStatus === 'draft'
-                      ? 'Simpan sebagai Draft'
-                      : 'Simpan ke Antrean Siap Proses'}
-                  </span>
-                </button>
+                <div className="relative w-full sm:w-auto" ref={savePopoverRef}>
+                  <button
+                    type="button"
+                    disabled={isProcessing}
+                    onClick={() => setIsSavePopoverOpen((prev) => !prev)}
+                    aria-expanded={isSavePopoverOpen}
+                    aria-haspopup="menu"
+                    className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-[#CBD5E1] bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold transition-all disabled:opacity-50 cursor-pointer"
+                  >
+                    {!editingDraft && <PlusIcon className="w-4 h-4 text-indigo-600" />}
+                    <span>{editingDraft ? 'Simpan Perubahan' : 'Simpan ke Antrean'}</span>
+                    <ChevronDownIcon
+                      className={`w-3.5 h-3.5 text-slate-500 transition-transform duration-150 ${
+                        isSavePopoverOpen ? 'rotate-180' : ''
+                      }`}
+                    />
+                  </button>
+
+                  {isSavePopoverOpen && (
+                    <div
+                      role="menu"
+                      aria-label="Pilih status penyimpanan berkas"
+                      className="absolute bottom-full left-0 mb-2 w-full sm:w-72 bg-white border border-[#CBD5E1] rounded-xl shadow-xl z-30 p-2 space-y-1 animate-in fade-in zoom-in-95 duration-100"
+                    >
+                      <div className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-[#64748B] border-b border-slate-100 mb-1">
+                        Pilih Status Berkas
+                      </div>
+
+                      <button
+                        type="button"
+                        role="menuitem"
+                        onClick={() => handleSaveToBatchDraft('ready')}
+                        className="w-full text-left px-3 py-2.5 rounded-lg hover:bg-emerald-50/70 border border-transparent hover:border-emerald-200 transition-colors flex items-start gap-2.5 cursor-pointer group"
+                      >
+                        <span className="w-2 h-2 rounded-full bg-emerald-500 mt-1 shrink-0" />
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-xs font-bold text-[#0F172A] group-hover:text-emerald-800">
+                              Siap Proses (Bukan Draft)
+                            </span>
+                            {editingDraft && editingDraft.status !== 'draft' && (
+                              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700">
+                                Saat ini
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[11px] text-[#64748B] mt-0.5 leading-snug">
+                            Masuk antrean siap ekstraksi AI
+                          </p>
+                        </div>
+                      </button>
+
+                      <button
+                        type="button"
+                        role="menuitem"
+                        onClick={() => handleSaveToBatchDraft('draft')}
+                        className="w-full text-left px-3 py-2.5 rounded-lg hover:bg-slate-100 border border-transparent hover:border-slate-300 transition-colors flex items-start gap-2.5 cursor-pointer group"
+                      >
+                        <span className="w-2 h-2 rounded-full bg-slate-500 mt-1 shrink-0" />
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-xs font-bold text-[#0F172A]">
+                              Draft (Masih Disusun)
+                            </span>
+                            {editingDraft && editingDraft.status === 'draft' && (
+                              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-200 text-slate-700">
+                                Saat ini
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[11px] text-[#64748B] mt-0.5 leading-snug">
+                            Simpan sebagai draf untuk dilengkapi nanti
+                          </p>
+                        </div>
+                      </button>
+                    </div>
+                  )}
+                </div>
                 <button
                   type="submit"
                   disabled={isProcessing}
