@@ -5,7 +5,6 @@ import { SearchIcon, RefreshCwIcon, MenuIcon } from '@/components/ui/icons';
 import { MockDocumentService } from '@/lib/mocks/storage';
 import { useSidebar } from '@/context/SidebarContext';
 import { useAppMode } from '@/context/ModeContext';
-import { ScopeSelectorBar } from '@/components/shared/ScopeSelectorBar';
 
 interface TopbarProps {
   title?: string;
@@ -40,7 +39,7 @@ export function Topbar({ title, subtitle, onSearch }: TopbarProps) {
   return (
     <header className="h-16 border-b border-[#E2E8F0] dark:border-[#1F2937] bg-white dark:bg-[#111827] sticky top-0 z-20 w-full">
       <div className="w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 h-full flex items-center justify-between gap-3">
-        {/* Left: Mobile Hamburger Toggle & Scope Selector */}
+        {/* Left: Mobile Hamburger Toggle */}
         <div className="flex items-center gap-3 min-w-0">
           <button
             type="button"
@@ -50,9 +49,6 @@ export function Topbar({ title, subtitle, onSearch }: TopbarProps) {
           >
             <MenuIcon className="w-5 h-5" />
           </button>
-          <div className="hidden sm:block">
-            <ScopeSelectorBar compact={true} />
-          </div>
         </div>
 
         {/* Right: Actions */}

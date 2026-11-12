@@ -29,7 +29,17 @@ import { useAppScope } from '@/context/ScopeContext';
 import { useToast } from '@/context/ToastContext';
 
 export default function AuditTrailPage() {
-  const { activeCompanyId, activeDepartment } = useAppScope();
+  const {
+    activeCompanyId,
+    setActiveCompanyId,
+    allowedCompanies,
+    canChangeCompany,
+    activeDepartmentId,
+    setActiveDepartmentId,
+    allowedDepartments,
+    canChangeDepartment,
+    activeDepartment,
+  } = useAppScope();
   const toast = useToast();
   const [logs, setLogs] = useState<AuditLogEntry[]>(() => AuditService.getLogs());
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -170,6 +180,40 @@ export default function AuditTrailPage() {
   };
 
   const filterConfigs: FilterConfig[] = [
+    ...(canChangeCompany
+      ? [
+          {
+            id: 'companyScope',
+            label: 'Perusahaan (Scope)',
+            type: 'select' as const,
+            placeholder: 'Semua Perusahaan',
+            options: [
+              { label: 'Semua Perusahaan', value: 'all' },
+              ...allowedCompanies.map((c) => ({ label: `${c.code} · ${c.name}`, value: c.id })),
+            ],
+            selectedValue: activeCompanyId,
+            onChange: (val: string | string[]) => setActiveCompanyId(val as string),
+            searchable: true,
+          },
+        ]
+      : []),
+    ...(canChangeDepartment
+      ? [
+          {
+            id: 'departmentScope',
+            label: 'Departemen (Scope)',
+            type: 'select' as const,
+            placeholder: 'Semua Departemen',
+            options: [
+              { label: 'Semua Departemen', value: 'all' },
+              ...allowedDepartments.map((d) => ({ label: `${d.code} - ${d.name}`, value: d.id })),
+            ],
+            selectedValue: activeDepartmentId,
+            onChange: (val: string | string[]) => setActiveDepartmentId(val as string),
+            searchable: true,
+          },
+        ]
+      : []),
     {
       id: 'action',
       label: 'Tipe Tindakan',

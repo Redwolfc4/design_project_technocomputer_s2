@@ -38,7 +38,17 @@ import {
 } from '@/components/ui/icons';
 
 export default function UsersManagementPage() {
-  const { activeCompanyId, activeDepartment } = useAppScope();
+  const {
+    activeCompanyId,
+    setActiveCompanyId,
+    allowedCompanies,
+    canChangeCompany,
+    activeDepartmentId,
+    setActiveDepartmentId,
+    allowedDepartments,
+    canChangeDepartment,
+    activeDepartment,
+  } = useAppScope();
   const toast = useToast();
   // Master data state
   const [users, setUsers] = useState<RBACMember[]>(() => MemberService.getMembers());
@@ -488,17 +498,36 @@ export default function UsersManagementPage() {
 
   // Filter configurations for DataTableToolbar
   const filterConfigs: FilterConfig[] = [
+    ...(canChangeCompany
+      ? [
+          {
+            id: 'companyScope',
+            label: 'Perusahaan (Scope)',
+            type: 'select' as const,
+            placeholder: 'Semua Perusahaan',
+            options: [
+              { label: 'Semua Perusahaan', value: 'all' },
+              ...allowedCompanies.map((c) => ({ label: `${c.code} · ${c.name}`, value: c.id })),
+            ],
+            selectedValue: activeCompanyId,
+            onChange: (val: string | string[]) => setActiveCompanyId(val as string),
+            searchable: true,
+          },
+        ]
+      : []),
     {
       id: 'department',
       label: 'Departemen',
-      type: 'select',
-      placeholder: 'Semua',
+      type: 'select' as const,
+      placeholder: 'Semua Departemen',
       options: [
         { label: 'Semua Departemen', value: 'Semua' },
-        ...uniqueDepartments.map((d) => ({ label: d, value: d })),
+        ...(canChangeDepartment
+          ? allowedDepartments.map((d) => ({ label: d.name, value: d.name }))
+          : uniqueDepartments.map((d) => ({ label: d, value: d }))),
       ],
       selectedValue: selectedDept,
-      onChange: (val) => setSelectedDept(val),
+      onChange: (val: string | string[]) => setSelectedDept(val as string),
       searchable: true,
     },
     {

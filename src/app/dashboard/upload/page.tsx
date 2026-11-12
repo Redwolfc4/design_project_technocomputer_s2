@@ -147,7 +147,17 @@ function createDocumentFromBatchDraft(item: BatchItemDraft): DocumentRecord {
 export default function DocumentUploadPage() {
   const router = useRouter();
   const { getRoute, isDemo } = useAppRoutes();
-  const { activeCompanyId, activeDepartment } = useAppScope();
+  const {
+    activeCompanyId,
+    setActiveCompanyId,
+    allowedCompanies,
+    canChangeCompany,
+    activeDepartmentId,
+    setActiveDepartmentId,
+    allowedDepartments,
+    canChangeDepartment,
+    activeDepartment,
+  } = useAppScope();
   const toast = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -229,6 +239,40 @@ export default function DocumentUploadPage() {
   };
 
   const batchFilterConfigs: FilterConfig[] = [
+    ...(canChangeCompany
+      ? [
+          {
+            id: 'companyScope',
+            label: 'Perusahaan (Scope)',
+            type: 'select' as const,
+            placeholder: 'Semua Perusahaan',
+            options: [
+              { label: 'Semua Perusahaan', value: 'all' },
+              ...allowedCompanies.map((c) => ({ label: `${c.code} · ${c.name}`, value: c.id })),
+            ],
+            selectedValue: activeCompanyId,
+            onChange: (val: string | string[]) => setActiveCompanyId(val as string),
+            searchable: true,
+          },
+        ]
+      : []),
+    ...(canChangeDepartment
+      ? [
+          {
+            id: 'departmentScope',
+            label: 'Departemen (Scope)',
+            type: 'select' as const,
+            placeholder: 'Semua Departemen',
+            options: [
+              { label: 'Semua Departemen', value: 'all' },
+              ...allowedDepartments.map((d) => ({ label: `${d.code} - ${d.name}`, value: d.id })),
+            ],
+            selectedValue: activeDepartmentId,
+            onChange: (val: string | string[]) => setActiveDepartmentId(val as string),
+            searchable: true,
+          },
+        ]
+      : []),
     {
       id: 'status',
       label: 'Status Kesiapan',

@@ -73,13 +73,13 @@ const STORAGE_KEY_DEPARTMENT = 'dokumenai_scope_department';
 export const ScopeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user } = useAppMode();
 
-  // Resolve Role Tier: Developer (global), Admin (company), Supervisor (department)
+  // Resolve Role Tier: Developer (global), Admin (company), Supervisor/Member (department)
   const roleTier: ScopeRoleTier = useMemo(() => {
-    if (!user) return 'admin';
+    if (!user) return 'supervisor';
     const r = user.role.toLowerCase();
     if (r === 'developer' || r === 'dev' || r.includes('developer')) return 'developer';
-    if (r === 'super_admin' || r === 'admin' || r === 'enterprise_member' || r.includes('admin')) return 'admin';
-    return 'supervisor'; // finance_supervisor, document_reviewer, auditor, etc.
+    if (r === 'super_admin' || r === 'ciso' || (r.includes('admin') && !r.includes('member'))) return 'admin';
+    return 'supervisor'; // enterprise_member, finance_supervisor, document_reviewer, auditor, etc.
   }, [user]);
 
   const canChangeCompany = roleTier === 'developer';
