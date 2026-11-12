@@ -1,10 +1,12 @@
 'use client';
 
 import React, { useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { BrandLogo } from '@/components/shared/BrandLogo';
 import { EyeIcon, CheckCircleIcon, ArrowRightIcon } from '@/components/ui/icons';
 import { MockAuthService } from '@/lib/services/mockAuth';
+import { useToast } from '@/context/ToastContext';
 
 interface LoginFormProps {
   onSwitchToRegister: () => void;
@@ -13,6 +15,7 @@ interface LoginFormProps {
 
 export const LoginForm: React.FC<LoginFormProps> = ({ onSwitchToRegister, isDemo = false }) => {
   const router = useRouter();
+  const toast = useToast();
   const [email, setEmail] = useState(() => MockAuthService.getRememberEmail() || 'finance@nusantara-tech.co.id');
   const [password, setPassword] = useState('EnterprisePass2026!');
   const [showPassword, setShowPassword] = useState(false);
@@ -25,32 +28,47 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSwitchToRegister, isDemo
     e.preventDefault();
     setErrorMsg('');
 
-    if (!email.trim() || !email.includes('@')) {
-      setErrorMsg('Harap masukkan alamat email perusahaan yang valid.');
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      const msg = 'Harap masukkan alamat email perusahaan yang valid.';
+      setErrorMsg(msg);
+      toast.error(msg, {
+        title: 'Autentikasi Gagal',
+        badge: isDemo ? 'Demo Sandbox' : 'Akun Enterprise',
+      });
       return;
     }
 
     if (!password || password.length < 6) {
-      setErrorMsg('Kata sandi harus terdiri dari minimal 6 karakter.');
+      const msg = 'Kata sandi harus terdiri dari minimal 6 karakter.';
+      setErrorMsg(msg);
+      toast.error(msg, {
+        title: 'Autentikasi Gagal',
+        badge: isDemo ? 'Demo Sandbox' : 'Akun Enterprise',
+      });
       return;
     }
 
     setIsLoading(true);
 
     if (rememberMe) {
-      MockAuthService.setRememberEmail(email);
+      MockAuthService.setRememberEmail(trimmedEmail);
     } else {
       MockAuthService.clearRememberEmail();
     }
 
     setTimeout(() => {
-      MockAuthService.loginAccount(email);
+      MockAuthService.loginAccount(trimmedEmail);
+      toast.success(`Selamat datang kembali di workspace DokumenAI Enterprise (${trimmedEmail}).`, {
+        title: 'Login Berhasil',
+        badge: isDemo ? 'Demo Sandbox' : 'Akun Enterprise',
+      });
       router.push('/dashboard');
     }, 600);
   };
 
   return (
-    <div className="w-full max-w-md mx-auto p-6 sm:p-8 flex flex-col justify-between h-full">
+    <div className="w-full max-w-md mx-auto p-6 sm:p-8 flex flex-col justify-between gap-6">
       <div className="space-y-6">
         {/* Brand Header */}
         <div className="space-y-2">
@@ -71,7 +89,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSwitchToRegister, isDemo
         )}
 
         {/* Login Form */}
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} noValidate className="space-y-4">
           <div className="space-y-1.5">
             <label className="text-xs font-bold text-[#475569]">Email Address</label>
             <input
@@ -161,15 +179,15 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSwitchToRegister, isDemo
         </p>
 
         <div>
-          <a href="/" className="text-[11px] text-[#94A3B8] hover:text-[#475569] font-medium transition-colors">
+          <Link href="/" className="text-[11px] text-[#94A3B8] hover:text-[#475569] font-medium transition-colors">
             ← Kembali ke Beranda DokumenAI
-          </a>
+          </Link>
         </div>
       </div>
 
       {/* Forgot Password Modal Notice */}
       {showForgotModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 animate-in fade-in duration-150">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
           <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl p-6 max-w-sm w-full space-y-4">
             <div className="flex items-center gap-2.5 text-[#4F46E5]">
               <CheckCircleIcon className="w-5 h-5 text-[#4F46E5]" />

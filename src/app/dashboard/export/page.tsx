@@ -17,7 +17,6 @@ import { formatIDR, getDocumentTypeLabel, formatSystemTypeLabel } from '@/lib/ut
 import {
   DownloadIcon,
   ChevronDownIcon,
-  CheckCircleIcon,
   PlusIcon,
   PencilIcon,
   TrashIcon,
@@ -31,8 +30,10 @@ import {
   useDataTableInteractions,
   RowAction,
 } from '@/components/shared/data-table';
+import { useToast } from '@/context/ToastContext';
 
 export default function ExportIntegrationsPage() {
+  const toast = useToast();
   const [documents, setDocuments] = useState<DocumentRecord[]>([]);
   const [integrations, setIntegrations] = useState<IntegrationEndpoint[]>(() => IntegrationService.getIntegrations());
   const [targetSystem, setTargetSystem] = useState<'sap' | 'oracle' | 'djp_tax' | 'generic'>('sap');
@@ -67,7 +68,6 @@ export default function ExportIntegrationsPage() {
     format: 'json',
     status: 'active',
   });
-  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   // 3-dot Floating Action Menu Interactions
   const {
@@ -79,8 +79,11 @@ export default function ExportIntegrationsPage() {
   } = useDataTableInteractions<IntegrationEndpoint>();
 
   useEffect(() => {
-    setDocuments(DocumentService.getDocuments());
-    setIntegrations(IntegrationService.getIntegrations());
+    const timer = setTimeout(() => {
+      setDocuments(DocumentService.getDocuments());
+      setIntegrations(IntegrationService.getIntegrations());
+    }, 0);
+    return () => clearTimeout(timer);
   }, []);
 
   useEffect(() => {
@@ -118,14 +121,9 @@ export default function ExportIntegrationsPage() {
   const approvedDocs = documents.filter((d) => d.status === 'approved');
   const totalApprovedAmount = approvedDocs.reduce((acc, d) => acc + d.totalAmount, 0);
 
-  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 3500);
-  };
-
   const handleDownload = (format: 'csv' | 'json' | 'xlsx') => {
     if (approvedDocs.length === 0) {
-      showToast('Tidak ada dokumen terverifikasi yang siap diekspor.', 'error');
+      toast.error('Tidak ada dokumen terverifikasi yang siap diekspor.', { title: 'Ekspor Gagal' });
       return;
     }
 
@@ -192,7 +190,9 @@ export default function ExportIntegrationsPage() {
       });
 
       setIsExporting(false);
-      showToast(`Berkas ${filename} berhasil diunduh & dicatat di Audit Trail!`);
+      toast.success(`Berkas ${filename} berhasil diunduh & dicatat di Audit Trail!`, {
+        title: 'Ekspor ERP Selesai',
+      });
     }, 450);
   };
 
@@ -245,7 +245,7 @@ export default function ExportIntegrationsPage() {
     if (confirm(`Yakin ingin menghapus konfigurasi konektor "${item.name}"?`)) {
       IntegrationService.deleteIntegration(item.id);
       setIntegrations(IntegrationService.getIntegrations());
-      showToast(`Konektor ${item.name} berhasil dihapus.`);
+      toast.success(`Konektor ${item.name} berhasil dihapus.`, { title: 'Konektor Dihapus' });
     }
   };
 
@@ -268,7 +268,20 @@ export default function ExportIntegrationsPage() {
   const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name.trim() || !formData.endpointUrl.trim()) {
-      showToast('Nama dan URL Endpoint wajib diisi.', 'error');
+      toast.error('Nama dan URL Endpoint wajib diisi.', { title: 'Validasi Konektor Gagal' });
+      return;
+    }
+
+    try {
+      const parsedEndpoint = new URL(formData.endpointUrl.trim());
+      if (parsedEndpoint.protocol !== 'http:' && parsedEndpoint.protocol !== 'https:') {
+        toast.error('URL Endpoint harus menggunakan protokol http:// atau https://.', {
+          title: 'URL Endpoint Tidak Valid',
+        });
+        return;
+      }
+    } catch {
+      toast.error('Format URL Endpoint tidak valid.', { title: 'URL Endpoint Tidak Valid' });
       return;
     }
 
@@ -276,7 +289,7 @@ export default function ExportIntegrationsPage() {
     if (formData.authMethod === 'bearer') {
       const token = formData.authConfig.bearerToken?.trim() || '';
       if (!token) {
-        showToast('Bearer Token wajib diisi.', 'error');
+        toast.error('Bearer Token wajib diisi.', { title: 'Kredensial Tidak Lengkap' });
         return;
       }
       cleanedAuthConfig = { bearerToken: token };
@@ -284,7 +297,9 @@ export default function ExportIntegrationsPage() {
       const headerName = formData.authConfig.apiKeyHeaderName?.trim() || '';
       const keyValue = formData.authConfig.apiKeyValue?.trim() || '';
       if (!headerName || !keyValue) {
-        showToast('Nama Header dan Nilai API Key wajib diisi.', 'error');
+        toast.error('Nama Header dan Nilai API Key wajib diisi.', {
+          title: 'Kredensial Tidak Lengkap',
+        });
         return;
       }
       cleanedAuthConfig = { apiKeyHeaderName: headerName, apiKeyValue: keyValue };
@@ -292,7 +307,9 @@ export default function ExportIntegrationsPage() {
       const username = formData.authConfig.basicUsername?.trim() || '';
       const password = formData.authConfig.basicPassword?.trim() || '';
       if (!username || !password) {
-        showToast('Username dan Password wajib diisi untuk Basic Auth.', 'error');
+        toast.error('Username dan Password wajib diisi untuk Basic Auth.', {
+          title: 'Kredensial Tidak Lengkap',
+        });
         return;
       }
       cleanedAuthConfig = { basicUsername: username, basicPassword: password };
@@ -300,15 +317,21 @@ export default function ExportIntegrationsPage() {
 
     const payload = {
       ...formData,
+      name: formData.name.trim(),
+      endpointUrl: formData.endpointUrl.trim(),
       authConfig: cleanedAuthConfig,
     };
 
     if (editingItem) {
       IntegrationService.updateIntegration(editingItem.id, payload);
-      showToast(`Konektor "${formData.name}" berhasil diperbarui.`);
+      toast.success(`Konektor "${payload.name}" berhasil diperbarui.`, {
+        title: 'Konektor Diperbarui',
+      });
     } else {
       IntegrationService.addIntegration(payload);
-      showToast(`Konektor "${formData.name}" berhasil ditambahkan.`);
+      toast.success(`Konektor "${payload.name}" berhasil ditambahkan.`, {
+        title: 'Konektor Ditambahkan',
+      });
     }
 
     setIntegrations(IntegrationService.getIntegrations());
@@ -317,22 +340,6 @@ export default function ExportIntegrationsPage() {
 
   return (
     <div className="flex-1 flex flex-col relative w-full min-w-0">
-      {/* Toast Notification */}
-      {toast && (
-        <div
-          className={`fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-3 rounded-xl shadow-2xl text-xs border animate-in fade-in slide-in-from-bottom-3 duration-200 ${
-            toast.type === 'error'
-              ? 'bg-rose-950 text-white border-rose-800'
-              : 'bg-[#0F172A] text-white border-slate-700'
-          }`}
-        >
-          <CheckCircleIcon
-            className={`w-4 h-4 shrink-0 ${toast.type === 'error' ? 'text-rose-400' : 'text-emerald-400'}`}
-          />
-          <span className="font-medium">{toast.message}</span>
-        </div>
-      )}
-
       <Topbar
         title="Ekspor Data & Integrasi Enterprise ERP"
         subtitle="Unduh hasil verifikasi tervalidasi dalam format siap posting akuntansi dan rekonsiliasi pajak"
@@ -510,7 +517,7 @@ export default function ExportIntegrationsPage() {
               </button>
             </div>
 
-            <form onSubmit={handleFormSubmit} className="space-y-4">
+            <form onSubmit={handleFormSubmit} noValidate className="space-y-4">
               <div className="space-y-1">
                 <label className="text-xs font-bold text-slate-700">Nama Konektor</label>
                 <input

@@ -21,7 +21,6 @@ function VerificationWorkspaceInner() {
     activeDoc,
     activeDraft,
     selectedFieldId,
-    notification,
     isEditMode,
     selectDocument,
     setSelectedFieldId,
@@ -32,7 +31,6 @@ function VerificationWorkspaceInner() {
     updateNoteDraft,
     approveDocument,
     rejectDocument,
-    clearNotification,
   } = useVerification();
 
   const pendingList = documents.filter((d) => d.status === 'needs_review');
@@ -44,23 +42,6 @@ function VerificationWorkspaceInner() {
         title="Human-in-the-Loop Verification Workspace"
         subtitle="Verifikasi berdampingan: Pratinjau berkas asli dengan anotasi visual & formulir koreksi nilai AI"
       />
-
-      {/* Global Notification Banner */}
-      {notification && (
-        <div
-          className={`px-8 py-2.5 text-xs font-bold text-white flex items-center justify-between transition-all shrink-0 ${notification.type === 'success' ? 'bg-[#059669]' : 'bg-[#E11D48]'
-            }`}
-        >
-          <span>{notification.message}</span>
-          <button
-            type="button"
-            onClick={clearNotification}
-            className="p-1 hover:opacity-80 transition-opacity"
-          >
-            <XIcon className="w-4 h-4" />
-          </button>
-        </div>
-      )}
 
       <main className="flex-1 w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 py-6 sm:py-8 flex flex-col gap-6 min-w-0 min-h-0">
         <PageHeader

@@ -10,7 +10,6 @@ import {
   CopyIcon,
   CodeIcon,
   MoreHorizontalIcon,
-  CheckCircleIcon,
 } from '@/components/ui/icons';
 import {
   DataTableRow,
@@ -27,9 +26,11 @@ import {
 import { AuditLogDetailModal } from '@/components/dashboard/audit/AuditLogDetailModal';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { useAppScope } from '@/context/ScopeContext';
+import { useToast } from '@/context/ToastContext';
 
 export default function AuditTrailPage() {
   const { activeCompanyId, activeDepartment } = useAppScope();
+  const toast = useToast();
   const [logs, setLogs] = useState<AuditLogEntry[]>(() => AuditService.getLogs());
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [filterAction, setFilterAction] = useState<string>('all');
@@ -37,7 +38,6 @@ export default function AuditTrailPage() {
   const [filterRole, setFilterRole] = useState<string>('all');
   const [dateRange, setDateRange] = useState<DateRangeValue>({ preset: 'all' });
   const [selectedLog, setSelectedLog] = useState<AuditLogEntry | null>(null);
-  const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' } | null>(null);
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -55,25 +55,16 @@ export default function AuditTrailPage() {
   } = useDataTableInteractions<AuditLogEntry>();
 
   useEffect(() => {
-    // Listen to localStorage storage events or refresh
-    setLogs(AuditService.getLogs());
+    const timer = setTimeout(() => {
+      setLogs(AuditService.getLogs());
+    }, 0);
+    return () => clearTimeout(timer);
   }, []);
-
-  useEffect(() => {
-    if (toast) {
-      const timer = setTimeout(() => setToast(null), 3000);
-      return () => clearTimeout(timer);
-    }
-  }, [toast]);
-
-  const showToast = (message: string, type: 'success' | 'info' = 'success') => {
-    setToast({ message, type });
-  };
 
   const handleCopyText = (text: string, label: string) => {
     if (navigator.clipboard) {
       navigator.clipboard.writeText(text);
-      showToast(`${label} berhasil disalin ke clipboard!`);
+      toast.success(`${label} berhasil disalin ke clipboard!`, { title: 'Disalin' });
     }
   };
 
@@ -147,7 +138,7 @@ export default function AuditTrailPage() {
     setFilterRole('all');
     setDateRange({ preset: 'all' });
     setCurrentPage(1);
-    showToast('Filter jejak audit forensik berhasil direset', 'info');
+    toast.info('Filter jejak audit forensik berhasil direset.', { title: 'Filter Direset' });
   };
 
   const handleExportCSV = () => {
@@ -173,7 +164,9 @@ export default function AuditTrailPage() {
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
-    showToast(`Berhasil mengekspor ${filteredLogs.length} rekam log ke CSV!`, 'success');
+    toast.success(`Berhasil mengekspor ${filteredLogs.length} rekam log ke CSV!`, {
+      title: 'Ekspor CSV Selesai',
+    });
   };
 
   const filterConfigs: FilterConfig[] = [
@@ -258,14 +251,6 @@ export default function AuditTrailPage() {
 
   return (
     <div className="flex-1 flex flex-col relative">
-      {/* Toast Notification */}
-      {toast && (
-        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2 bg-[#0F172A] text-white px-4 py-3 rounded-xl shadow-2xl text-xs border border-slate-700 animate-in fade-in slide-in-from-bottom-3 duration-200">
-          <CheckCircleIcon className="w-4 h-4 text-emerald-400 shrink-0" />
-          <span className="font-medium">{toast.message}</span>
-        </div>
-      )}
-
       <Topbar
         title="Audit Trail Forensik & Rekam Jejak Kepatuhan"
         subtitle="Log aktivitas kepatuhan tidak dapat dimodifikasi untuk setiap tindakan persetujuan dan pengunggahan"

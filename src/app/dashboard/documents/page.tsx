@@ -36,11 +36,13 @@ import { DocumentQuickDetailModal } from '@/components/dashboard/documents/Docum
 import { PageHeader } from '@/components/shared/PageHeader';
 import { useAppRoutes } from '@/context/RouteContext';
 import { useAppScope } from '@/context/ScopeContext';
+import { useToast } from '@/context/ToastContext';
 
 function DocumentRepositoryContent() {
   const router = useRouter();
   const { getRoute } = useAppRoutes();
   const { activeCompanyId, activeDepartment } = useAppScope();
+  const toast = useToast();
   const searchParams = useSearchParams();
   const [documents, setDocuments] = useState<DocumentRecord[]>(() => DocumentService.getDocuments());
   const [statusFilter, setStatusFilter] = useState<string>(() => searchParams.get('status') || 'all');
@@ -75,7 +77,6 @@ function DocumentRepositoryContent() {
     currency: 'IDR',
     notes: '',
   });
-  const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' | 'error' } | null>(null);
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -93,23 +94,17 @@ function DocumentRepositoryContent() {
   } = useDataTableInteractions<DocumentRecord>();
 
   useEffect(() => {
-    setDocuments(DocumentService.getDocuments());
+    const timer = setTimeout(() => {
+      setDocuments(DocumentService.getDocuments());
+    }, 0);
+    return () => clearTimeout(timer);
   }, []);
-
-  useEffect(() => {
-    if (toast) {
-      const timer = setTimeout(() => setToast(null), 3000);
-      return () => clearTimeout(timer);
-    }
-  }, [toast]);
-
-  const showToast = (message: string, type: 'success' | 'info' | 'error' = 'success') => {
-    setToast({ message, type });
-  };
 
   const handleOpenEdit = (doc: DocumentRecord) => {
     if (doc.status === 'approved' || doc.status === 'rejected') {
-      showToast(`Dokumen berstatus '${doc.status}' terkunci dari modifikasi.`, 'error');
+      toast.error(`Dokumen berstatus '${doc.status}' terkunci dari modifikasi.`, {
+        title: 'Dokumen Terkunci',
+      });
       return;
     }
     setEditDoc(doc);
@@ -126,42 +121,67 @@ function DocumentRepositoryContent() {
   const handleEditSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!editDoc) return;
+
+    const trimmedNumber = editFormData.fileNumber.trim();
+    const trimmedVendor = editFormData.vendorName.trim();
+    if (!trimmedNumber) {
+      toast.error('Nomor Berkas / Faktur wajib diisi.', { title: 'Validasi Metadata Gagal' });
+      return;
+    }
+    if (!trimmedVendor || trimmedVendor.length < 2) {
+      toast.error('Nama Rekanan / Vendor wajib diisi minimal 2 karakter.', {
+        title: 'Validasi Metadata Gagal',
+      });
+      return;
+    }
+
     const parsed = parseCurrencyInput(editFormData.totalAmount, editFormData.currency);
+    if (!parsed.amount || parsed.amount <= 0) {
+      toast.error('Total Nilai Transaksi harus lebih besar dari 0.', {
+        title: 'Nominal Tidak Valid',
+      });
+      return;
+    }
+
     const res = DocumentService.updateMetadata(editDoc.id, {
-      fileNumber: editFormData.fileNumber.trim(),
-      vendorName: editFormData.vendorName.trim(),
+      fileNumber: trimmedNumber,
+      vendorName: trimmedVendor,
       vendorTaxId: editFormData.vendorTaxId.trim(),
       totalAmount: parsed.amount,
       notes: editFormData.notes.trim() || undefined,
     });
 
     if (!res.success) {
-      showToast(res.error || 'Gagal memperbarui metadata.', 'error');
+      toast.error(res.error || 'Gagal memperbarui metadata.', { title: 'Pembaruan Gagal' });
       return;
     }
 
     setDocuments(DocumentService.getDocuments());
     setEditDoc(null);
-    showToast(`Metadata dokumen ${editFormData.fileNumber} berhasil diperbarui!`, 'success');
+    toast.success(`Metadata dokumen ${trimmedNumber} berhasil diperbarui!`, {
+      title: 'Metadata Disimpan',
+    });
   };
 
   const handleDeleteConfirm = () => {
     if (!deleteDoc) return;
     const res = DocumentService.deleteDocument(deleteDoc.id);
     if (!res.success) {
-      showToast(res.error || 'Gagal menghapus dokumen.', 'error');
+      toast.error(res.error || 'Gagal menghapus dokumen.', { title: 'Penghapusan Gagal' });
       return;
     }
 
     setDocuments(DocumentService.getDocuments());
-    showToast(`Dokumen ${deleteDoc.fileNumber} berhasil dihapus dari repositori.`, 'success');
+    toast.success(`Dokumen ${deleteDoc.fileNumber} berhasil dihapus dari repositori.`, {
+      title: 'Dokumen Dihapus',
+    });
     setDeleteDoc(null);
   };
 
   const handleCopyText = (text: string, label: string) => {
     if (navigator.clipboard) {
       navigator.clipboard.writeText(text);
-      showToast(`${label} berhasil disalin ke clipboard!`);
+      toast.success(`${label} berhasil disalin ke clipboard!`, { title: 'Disalin' });
     }
   };
 
@@ -239,7 +259,7 @@ function DocumentRepositoryContent() {
     setConfidenceFilter('all');
     setDateRange({ preset: 'all' });
     setCurrentPage(1);
-    showToast('Filter repositori dokumen berhasil direset', 'info');
+    toast.info('Filter repositori dokumen berhasil direset.', { title: 'Filter Direset' });
   };
 
   // Export functions
@@ -267,7 +287,9 @@ function DocumentRepositoryContent() {
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
-    showToast(`Berhasil mengekspor ${filteredDocs.length} dokumen ke CSV!`, 'success');
+    toast.success(`Berhasil mengekspor ${filteredDocs.length} dokumen ke CSV!`, {
+      title: 'Ekspor CSV Selesai',
+    });
   };
 
   const handleExportExcel = () => {
@@ -323,7 +345,9 @@ function DocumentRepositoryContent() {
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
-    showToast(`Berhasil mengekspor ${filteredDocs.length} dokumen ke Excel (.xls)!`, 'success');
+    toast.success(`Berhasil mengekspor ${filteredDocs.length} dokumen ke Excel (.xls)!`, {
+      title: 'Ekspor Excel Selesai',
+    });
   };
 
   const filterConfigs: FilterConfig[] = [
@@ -427,11 +451,13 @@ function DocumentRepositoryContent() {
         onSelect: (doc) => {
           const res = DocumentService.updateStatus(doc.id, 'approved', 'Reviewer Tim');
           if (!res.success) {
-            showToast(res.error || 'Gagal menyetujui dokumen.', 'error');
+            toast.error(res.error || 'Gagal menyetujui dokumen.', { title: 'Persetujuan Gagal' });
             return;
           }
           setDocuments(DocumentService.getDocuments());
-          showToast(`Dokumen ${doc.fileNumber} berhasil disetujui!`, 'success');
+          toast.success(`Dokumen ${doc.fileNumber} berhasil disetujui!`, {
+            title: 'Dokumen Disetujui',
+          });
         },
       },
       {
@@ -448,31 +474,22 @@ function DocumentRepositoryContent() {
             'Ditolak cepat melalui repositori dokumen'
           );
           if (!res.success) {
-            showToast(res.error || 'Gagal menolak dokumen.', 'error');
+            toast.error(res.error || 'Gagal menolak dokumen.', { title: 'Penolakan Gagal' });
             return;
           }
           setDocuments(DocumentService.getDocuments());
-          showToast(`Dokumen ${doc.fileNumber} berhasil ditolak.`, 'error');
+          toast.error(`Dokumen ${doc.fileNumber} berhasil ditolak.`, {
+            title: 'Dokumen Ditolak',
+          });
         },
       },
     ],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [router]
   );
 
   return (
     <div className="flex-1 flex flex-col relative">
-      {/* Toast Notification */}
-      {toast && (
-        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2 bg-[#0F172A] text-white px-4 py-3 rounded-xl shadow-2xl text-xs border border-slate-700 animate-in fade-in slide-in-from-bottom-3 duration-200">
-          {toast.type === 'error' ? (
-            <XCircleIcon className="w-4 h-4 text-rose-400 shrink-0" />
-          ) : (
-            <CheckCircleIcon className="w-4 h-4 text-emerald-400 shrink-0" />
-          )}
-          <span className="font-medium">{toast.message}</span>
-        </div>
-      )}
-
       <Topbar
         title="Repositori Dokumen Enterprise"
         subtitle="Kelola, telusuri, dan saring seluruh arsip faktur, invoice, dan kontrak perusahaan"
@@ -667,7 +684,7 @@ function DocumentRepositoryContent() {
                 <XIcon className="w-4 h-4" />
               </button>
             </div>
-            <form onSubmit={handleEditSubmit} className="space-y-3.5">
+            <form onSubmit={handleEditSubmit} noValidate className="space-y-3.5">
               <div className="space-y-1">
                 <label className="text-xs font-bold text-slate-700">Nomor Berkas / Faktur</label>
                 <input

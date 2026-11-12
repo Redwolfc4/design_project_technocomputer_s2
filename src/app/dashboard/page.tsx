@@ -37,6 +37,7 @@ import { PageHeader } from '@/components/shared/PageHeader';
 import { SectionHeader } from '@/components/shared/SectionHeader';
 import { useAppMode } from '@/context/ModeContext';
 import { useAppRoutes } from '@/context/RouteContext';
+import { useToast } from '@/context/ToastContext';
 import { StatusDonutChart, StatusDonutItem } from '@/components/dashboard/analytics/charts/StatusDonutChart';
 import { DocumentTypeBarChart, DocumentTypeItem } from '@/components/dashboard/analytics/charts/DocumentTypeBarChart';
 import { DocumentTrendAreaChart } from '@/components/dashboard/analytics/charts/DocumentTrendAreaChart';
@@ -47,9 +48,9 @@ export default function DashboardOverviewPage() {
   const router = useRouter();
   const { isDemo, isProduction, tenantName } = useAppMode();
   const { getRoute } = useAppRoutes();
+  const toast = useToast();
   const [documents, setDocuments] = useState<DocumentRecord[]>(() => DocumentService.getDocuments());
   const [previewDoc, setPreviewDoc] = useState<DocumentRecord | null>(null);
-  const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' } | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeStatusFilter, setActiveStatusFilter] = useState<DocumentStatus | null>(null);
   const [activeTypeFilter, setActiveTypeFilter] = useState<string | null>(null);
@@ -69,24 +70,16 @@ export default function DashboardOverviewPage() {
   } = useDataTableInteractions<DocumentRecord>();
 
   useEffect(() => {
-    setDocuments(DocumentService.getDocuments());
+    const timer = setTimeout(() => {
+      setDocuments(DocumentService.getDocuments());
+    }, 0);
+    return () => clearTimeout(timer);
   }, []);
-
-  useEffect(() => {
-    if (toast) {
-      const timer = setTimeout(() => setToast(null), 3000);
-      return () => clearTimeout(timer);
-    }
-  }, [toast]);
-
-  const showToast = (message: string, type: 'success' | 'info' = 'success') => {
-    setToast({ message, type });
-  };
 
   const handleCopyText = (text: string, label: string) => {
     if (navigator.clipboard) {
       navigator.clipboard.writeText(text);
-      showToast(`${label} berhasil disalin ke clipboard!`);
+      toast.success(`${label} berhasil disalin ke clipboard!`, { title: 'Disalin' });
     }
   };
 
@@ -279,14 +272,6 @@ export default function DashboardOverviewPage() {
 
   return (
     <div className="flex-1 flex flex-col relative w-full min-w-0">
-      {/* Toast Notification */}
-      {toast && (
-        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2 bg-[#0F172A] text-white px-4 py-3 rounded-xl shadow-2xl text-xs border border-slate-700 animate-in fade-in slide-in-from-bottom-3 duration-200">
-          <CheckCircleIcon className="w-4 h-4 text-emerald-400 shrink-0" />
-          <span className="font-medium">{toast.message}</span>
-        </div>
-      )}
-
       {/* Topbar Navigation Header */}
       <Topbar
         title="Ringkasan Utama"

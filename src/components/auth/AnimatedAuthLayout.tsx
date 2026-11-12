@@ -35,15 +35,18 @@ export const AnimatedAuthLayout: React.FC<AnimatedAuthLayoutProps> = ({
   };
 
   useEffect(() => {
-    setMode(initialMode);
+    const timer = setTimeout(() => {
+      setMode(initialMode);
+    }, 0);
+    return () => clearTimeout(timer);
   }, [initialMode]);
 
   const isLogin = mode === 'login';
 
   return (
-    <div className="min-h-screen w-full bg-[#FAFAFF] flex items-center justify-center p-4 sm:p-6 lg:p-10 overflow-x-hidden font-sans">
+    <div className="min-h-screen w-full bg-[#FAFAFF] flex flex-col p-4 sm:p-6 lg:py-8 lg:px-10 overflow-x-hidden font-sans">
       {/* Outer Card Container */}
-      <div className="relative w-full max-w-5xl min-h-[640px] bg-white rounded-3xl border border-[#CBD5E1] shadow-2xl overflow-hidden flex flex-col lg:flex-row">
+      <div className="relative w-full max-w-5xl min-h-[640px] lg:min-h-[760px] mx-auto my-auto bg-white rounded-3xl border border-[#CBD5E1] shadow-2xl overflow-hidden flex flex-col lg:flex-row">
         {/* ======================================================== */}
         {/* DESKTOP SPLIT-SCREEN ANIMATED CONTAINERS (>= lg)         */}
         {/* ======================================================== */}
@@ -65,11 +68,11 @@ export const AnimatedAuthLayout: React.FC<AnimatedAuthLayoutProps> = ({
 
           {/* Animated Form Slide Track */}
           <div
-            className={`absolute top-0 bottom-0 w-1/2 transition-transform duration-500 ease-in-out pointer-events-auto z-20 flex items-center justify-center overflow-y-auto ${
+            className={`absolute top-0 bottom-0 w-1/2 transition-transform duration-500 ease-in-out pointer-events-auto z-20 flex flex-col overflow-y-auto ${
               isLogin ? 'left-1/2 translate-x-0' : 'left-0 translate-x-0'
             }`}
           >
-            <div className="w-full py-8">
+            <div className="w-full my-auto">
               {variant === 'demo' ? (
                 isLogin ? (
                   <DemoLoginForm onSwitchToRegister={() => handleSwitchMode('register')} />

@@ -21,6 +21,7 @@ import {
   PlayIcon,
   CodeIcon,
 } from '@/components/ui/icons';
+import { useToast } from '@/context/ToastContext';
 
 interface WebhookConfigSectionProps {
   initialUrl?: string;
@@ -48,6 +49,7 @@ const DEFAULT_PARAMS: WebhookParamItem[] = [
 ];
 
 export function WebhookConfigSection({ initialUrl, onChange }: WebhookConfigSectionProps) {
+  const toast = useToast();
   // Main Webhook Configuration State
   const [url, setUrl] = useState(initialUrl || 'https://api.nusantara-tech.co.id/webhooks/dokumenai');
   const [method, setMethod] = useState<WebhookHttpMethod>('POST');
@@ -223,8 +225,11 @@ export function WebhookConfigSection({ initialUrl, onChange }: WebhookConfigSect
       const parsed = JSON.parse(rawBody);
       setRawBody(JSON.stringify(parsed, null, 2));
       setJsonError(null);
-    } catch (err: any) {
-      setJsonError(err.message || 'JSON tidak valid untuk diformat');
+      toast.success('Payload JSON berhasil dirapikan.', { title: 'Prettify JSON' });
+    } catch (err: unknown) {
+      const errMsg = err instanceof Error ? err.message : 'JSON tidak valid untuk diformat';
+      setJsonError(errMsg);
+      toast.error(`Format JSON tidak valid: ${errMsg}`, { title: 'Prettify JSON Gagal' });
     }
   };
 
@@ -247,12 +252,21 @@ export function WebhookConfigSection({ initialUrl, onChange }: WebhookConfigSect
     };
     setRawBody(JSON.stringify(defaultData, null, 2));
     setJsonError(null);
+    toast.info('Payload JSON dikembalikan ke template default DokumenAI.', { title: 'Payload Direset' });
   };
 
   // Copy helper
   const handleCopy = (text: string, key: string) => {
-    navigator.clipboard.writeText(text);
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(text);
+    }
     setCopiedKey(key);
+    const labelMap: Record<string, string> = {
+      body_copy: 'Payload JSON',
+      raw_copy: 'Raw HTTP Request',
+      curl_copy: 'Perintah cURL',
+    };
+    toast.success(`${labelMap[key] || 'Konten webhook'} berhasil disalin ke clipboard.`);
     setTimeout(() => setCopiedKey(null), 2000);
   };
 
@@ -344,11 +358,15 @@ export function WebhookConfigSection({ initialUrl, onChange }: WebhookConfigSect
   // Run Simulated Webhook Test
   const handleTestWebhook = () => {
     if (!isUrlValid) {
-      alert('Harap masukkan URL endpoint webhook yang valid terlebih dahulu.');
+      toast.error('Harap masukkan URL endpoint webhook yang valid (awalan http:// atau https://).', {
+        title: 'URL Webhook Tidak Valid',
+      });
       return;
     }
     if (method === 'POST' && jsonError) {
-      alert(`Validasi JSON Gagal: ${jsonError}`);
+      toast.error(`Validasi JSON Gagal: ${jsonError}`, {
+        title: 'Payload JSON Tidak Valid',
+      });
       return;
     }
 
@@ -443,6 +461,18 @@ export function WebhookConfigSection({ initialUrl, onChange }: WebhookConfigSect
         },
         ...prev.slice(0, 9),
       ]);
+
+      if (isSuccess) {
+        toast.success(
+          `Simulasi ${method} webhook merespons ${simulatedStatusCode} ${result.statusText} (${duration}ms).`,
+          { title: 'Uji Webhook Berhasil' }
+        );
+      } else {
+        toast.error(
+          `Simulasi ${method} webhook mengembalikan ${simulatedStatusCode} ${result.statusText}. Periksa detail pada Test Response & Logs.`,
+          { title: 'Uji Webhook Gagal' }
+        );
+      }
     }, 400);
   };
 

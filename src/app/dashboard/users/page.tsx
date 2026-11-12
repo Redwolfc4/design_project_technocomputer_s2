@@ -4,6 +4,7 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Topbar } from '@/components/layout/Topbar';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { useAppScope } from '@/context/ScopeContext';
+import { useToast } from '@/context/ToastContext';
 import { RBACMember } from '@/types';
 import {
   INITIAL_RBAC_USERS,
@@ -38,6 +39,7 @@ import {
 
 export default function UsersManagementPage() {
   const { activeCompanyId, activeDepartment } = useAppScope();
+  const toast = useToast();
   // Master data state
   const [users, setUsers] = useState<RBACMember[]>(() => MemberService.getMembers());
 
@@ -99,17 +101,6 @@ export default function UsersManagementPage() {
 
   // Tooltip active ID for permission overflow
   const [hoveredPermId, setHoveredPermId] = useState<string | null>(null);
-
-  // Toast notification
-  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
-
-  // Auto-dismiss toast after 3 seconds
-  useEffect(() => {
-    if (toast) {
-      const timer = setTimeout(() => setToast(null), 3000);
-      return () => clearTimeout(timer);
-    }
-  }, [toast]);
 
   // Escape key handler for viewUser modal
   useEffect(() => {
@@ -258,7 +249,7 @@ export default function UsersManagementPage() {
     setSelectedStatus('Semua');
     setSelectedPermissions([]);
     setCurrentPage(1);
-    setToast({ message: 'Filter berhasil direset ke pengaturan awal', type: 'info' });
+    toast.info('Filter berhasil direset ke pengaturan awal.', { title: 'Filter Direset' });
   };
 
   const isFilterActive =
@@ -316,7 +307,12 @@ export default function UsersManagementPage() {
   // Submit Add
   const handleAddSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!validateForm()) return;
+    if (!validateForm()) {
+      toast.error('Harap lengkapi seluruh kolom wajib dengan format yang benar.', {
+        title: 'Validasi Anggota Gagal',
+      });
+      return;
+    }
 
     const res = MemberService.createMember({
       name: formData.name.trim(),
@@ -329,19 +325,27 @@ export default function UsersManagementPage() {
     });
 
     if (!res.success) {
-      setToast({ message: res.error || 'Gagal menambahkan anggota.', type: 'error' });
+      toast.error(res.error || 'Gagal menambahkan anggota.', { title: 'Gagal Menambahkan Anggota' });
       return;
     }
 
     setUsers(MemberService.getMembers());
     setIsAddOpen(false);
-    setToast({ message: `Anggota "${formData.name.trim()}" berhasil ditambahkan!`, type: 'success' });
+    toast.success(`Anggota "${formData.name.trim()}" berhasil ditambahkan ke tim RBAC!`, {
+      title: 'Anggota Ditambahkan',
+    });
   };
 
   // Submit Edit
   const handleEditSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editUser || !validateForm()) return;
+    if (!editUser) return;
+    if (!validateForm()) {
+      toast.error('Harap periksa kembali kolom wajib yang belum valid.', {
+        title: 'Validasi Perubahan Gagal',
+      });
+      return;
+    }
 
     const res = MemberService.updateMember(editUser.id, {
       name: formData.name.trim(),
@@ -353,13 +357,15 @@ export default function UsersManagementPage() {
     });
 
     if (!res.success) {
-      setToast({ message: res.error || 'Gagal memperbarui data.', type: 'error' });
+      toast.error(res.error || 'Gagal memperbarui data.', { title: 'Pembaruan Gagal' });
       return;
     }
 
     setUsers(MemberService.getMembers());
     setEditUser(null);
-    setToast({ message: `Data "${formData.name}" berhasil diperbarui!`, type: 'success' });
+    toast.success(`Data anggota "${formData.name.trim()}" berhasil diperbarui!`, {
+      title: 'Perubahan Disimpan',
+    });
   };
 
   // Delete User
@@ -367,11 +373,13 @@ export default function UsersManagementPage() {
     if (!deleteUser) return;
     const res = MemberService.deleteMember(deleteUser.id);
     if (!res.success) {
-      setToast({ message: res.error || 'Gagal menghapus anggota.', type: 'error' });
+      toast.error(res.error || 'Gagal menghapus anggota.', { title: 'Penghapusan Gagal' });
       return;
     }
     setUsers(MemberService.getMembers());
-    setToast({ message: `Anggota "${deleteUser.name}" berhasil dihapus dari sistem!`, type: 'success' });
+    toast.success(`Anggota "${deleteUser.name}" berhasil dihapus dari sistem!`, {
+      title: 'Anggota Dihapus',
+    });
     setDeleteUser(null);
   };
 
@@ -379,14 +387,13 @@ export default function UsersManagementPage() {
   const handleToggleStatus = (targetUser: RBACMember) => {
     const res = MemberService.toggleStatus(targetUser.id);
     if (!res.success) {
-      setToast({ message: res.error || 'Gagal mengubah status.', type: 'error' });
+      toast.error(res.error || 'Gagal mengubah status.', { title: 'Perubahan Status Gagal' });
       return;
     }
     setUsers(MemberService.getMembers());
     const nextStatus = targetUser.status === 'Aktif' ? 'Nonaktif' : 'Aktif';
-    setToast({
-      message: `Status "${targetUser.name}" berhasil diubah menjadi ${nextStatus}!`,
-      type: 'success',
+    toast.success(`Status "${targetUser.name}" berhasil diubah menjadi ${nextStatus}!`, {
+      title: 'Status Diperbarui',
     });
   };
 
@@ -416,7 +423,9 @@ export default function UsersManagementPage() {
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
-    setToast({ message: `Berhasil mengekspor ${dataToExport.length} data ke berkas CSV!`, type: 'success' });
+    toast.success(`Berhasil mengekspor ${dataToExport.length} data anggota ke berkas CSV!`, {
+      title: 'Ekspor CSV Selesai',
+    });
   };
 
   // Export Excel (.xls HTML table readable natively by Excel)
@@ -472,7 +481,9 @@ export default function UsersManagementPage() {
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
-    setToast({ message: `Berhasil mengekspor ${dataToExport.length} data ke berkas Excel (.xls)!`, type: 'success' });
+    toast.success(`Berhasil mengekspor ${dataToExport.length} data anggota ke berkas Excel (.xls)!`, {
+      title: 'Ekspor Excel Selesai',
+    });
   };
 
   // Filter configurations for DataTableToolbar
@@ -540,23 +551,6 @@ export default function UsersManagementPage() {
         subtitle="Kelola izin verifikasi dokumen, tingkat approval keuangan, dan akun auditor eksternal"
       />
 
-      {/* Floating Toast Notification */}
-      {toast && (
-        <div className="fixed top-6 right-6 z-50 flex items-center gap-3 px-4 py-3 rounded-xl shadow-xl border bg-white text-[#0F172A] border-slate-200 transition-all animate-bounce">
-          <div
-            className={`w-2.5 h-2.5 rounded-full ${toast.type === 'success' ? 'bg-emerald-500' : toast.type === 'error' ? 'bg-rose-500' : 'bg-indigo-500'
-              }`}
-          />
-          <span className="text-xs font-semibold">{toast.message}</span>
-          <button
-            onClick={() => setToast(null)}
-            className="text-slate-400 hover:text-slate-600 ml-2"
-          >
-            <XIcon className="w-3.5 h-3.5" />
-          </button>
-        </div>
-      )}
-
       <main className="flex-1 w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 py-6 sm:py-8 space-y-6 min-w-0">
         <PageHeader
           title="Pengguna, Peran & Hak Akses Tim"
@@ -571,7 +565,7 @@ export default function UsersManagementPage() {
                 }}
               />
               <button
-                onClick={() => setIsAddOpen(true)}
+                onClick={openAddModal}
                 className="inline-flex items-center gap-2 px-4 py-2 bg-[#4F46E5] hover:bg-[#4338CA] text-white text-xs font-semibold rounded-lg shadow-sm transition-colors cursor-pointer"
               >
                 <PlusIcon className="w-4 h-4" />
@@ -894,7 +888,7 @@ export default function UsersManagementPage() {
               </button>
             </div>
 
-            <form onSubmit={editUser ? handleEditSubmit : handleAddSubmit} className="space-y-4">
+            <form onSubmit={editUser ? handleEditSubmit : handleAddSubmit} noValidate className="space-y-4">
               {/* Field 1: Nama Lengkap */}
               <div className="space-y-1">
                 <label className="text-xs font-bold text-[#0F172A] block">

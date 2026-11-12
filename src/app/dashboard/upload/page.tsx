@@ -32,6 +32,11 @@ import {
 } from '@/components/shared/data-table';
 import { useAppRoutes } from '@/context/RouteContext';
 import { useAppScope } from '@/context/ScopeContext';
+import { useToast } from '@/context/ToastContext';
+
+function createUploadTimestamp(): number {
+  return Date.now();
+}
 
 const DEFAULT_FORM_VALUES: {
   selectedType: DocumentType;
@@ -141,8 +146,9 @@ function createDocumentFromBatchDraft(item: BatchItemDraft): DocumentRecord {
 
 export default function DocumentUploadPage() {
   const router = useRouter();
-  const { getRoute } = useAppRoutes();
+  const { getRoute, isDemo } = useAppRoutes();
   const { activeCompanyId, activeDepartment } = useAppScope();
+  const toast = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
@@ -165,7 +171,6 @@ export default function DocumentUploadPage() {
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [editingDraft, setEditingDraft] = useState<BatchItemDraft | null>(null);
-  const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' | 'error' } | null>(null);
 
   // 3-dot Floating Action Menu Interactions
   const {
@@ -220,7 +225,7 @@ export default function DocumentUploadPage() {
     setSearchQuery('');
     setStatusFilter('all');
     setTypeFilter('all');
-    showToast('Filter antrean batch berhasil direset', 'info');
+    toast.info('Filter antrean batch berhasil direset.', { title: 'Filter Direset' });
   };
 
   const batchFilterConfigs: FilterConfig[] = [
@@ -265,12 +270,6 @@ export default function DocumentUploadPage() {
   }, []);
 
   useEffect(() => {
-    if (!toast) return;
-    const timer = setTimeout(() => setToast(null), 3200);
-    return () => clearTimeout(timer);
-  }, [toast]);
-
-  useEffect(() => {
     if (!isUploadModalOpen) return;
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
@@ -298,8 +297,31 @@ export default function DocumentUploadPage() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [isSavePopoverOpen]);
 
-  const showToast = (message: string, type: 'success' | 'info' | 'error' = 'success') => {
-    setToast({ message, type });
+  const validateUploadForm = () => {
+    const badge = isDemo ? 'Demo Sandbox' : 'Unggah Dokumen';
+    if (!fileNumber.trim()) {
+      toast.error('Nomor Seri / Referensi dokumen wajib diisi.', {
+        title: 'Data Dokumen Belum Lengkap',
+        badge,
+      });
+      return false;
+    }
+    if (!vendorName.trim() || vendorName.trim().length < 2) {
+      toast.error('Nama Vendor Rekanan wajib diisi minimal 2 karakter.', {
+        title: 'Data Dokumen Belum Lengkap',
+        badge,
+      });
+      return false;
+    }
+    const parsedNominal = Number(nominal);
+    if (!nominal.trim() || Number.isNaN(parsedNominal) || parsedNominal <= 0) {
+      toast.error('Nominal DPP / Subtotal harus berupa angka lebih dari 0.', {
+        title: 'Nominal Tidak Valid',
+        badge,
+      });
+      return false;
+    }
+    return true;
   };
 
   const handleOpenUploadModal = () => {
@@ -335,11 +357,23 @@ export default function DocumentUploadPage() {
   };
 
   const handleFileSelect = (file: File) => {
+    const maxBytes = 25 * 1024 * 1024;
+    if (file.size > maxBytes) {
+      toast.error(`Ukuran berkas "${file.name}" melebihi batas maksimal 25MB.`, {
+        title: 'Berkas Terlalu Besar',
+        badge: isDemo ? 'Demo Sandbox' : 'Unggah Dokumen',
+      });
+      return;
+    }
     setUploadedFile(file);
     const cleanName = file.name.replace(/\.[^/.]+$/, '');
     if (!fileNumber || fileNumber === DEFAULT_FORM_VALUES.fileNumber) {
       setFileNumber(cleanName.slice(0, 30));
     }
+    toast.info(`Berkas "${file.name}" dipilih dan siap diproses.`, {
+      title: 'Berkas Terlampir',
+      badge: isDemo ? 'Demo Sandbox' : 'Unggah Dokumen',
+    });
   };
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -374,15 +408,20 @@ export default function DocumentUploadPage() {
   // Add or update current form in Batch Queue with chosen status ('ready' | 'draft')
   const handleSaveToBatchDraft = (targetStatus: 'ready' | 'draft') => {
     setIsSavePopoverOpen(false);
-    const num = parseFloat(nominal) || 10000000;
+    if (!validateUploadForm()) return;
+
+    const badge = isDemo ? 'Demo Sandbox' : 'Antrean Batch';
+    const num = Number(nominal);
+    const trimmedNumber = fileNumber.trim();
+    const trimmedVendor = vendorName.trim();
 
     if (editingDraft) {
       const res = BatchService.updateBatchDraft(editingDraft.id, {
         fileName: uploadedFile ? uploadedFile.name : editingDraft.fileName,
         fileSize: uploadedFile ? uploadedFile.size : editingDraft.fileSize,
         documentType: selectedType,
-        vendorName: vendorName || 'Vendor Rekanan',
-        fileNumber: fileNumber || editingDraft.fileNumber,
+        vendorName: trimmedVendor,
+        fileNumber: trimmedNumber,
         nominal: num,
         status: targetStatus,
       });
@@ -392,24 +431,28 @@ export default function DocumentUploadPage() {
         setUploadedFile(null);
         setIsUploadModalOpen(false);
         setEditingDraft(null);
-        showToast(
+        toast.success(
           targetStatus === 'draft'
-            ? `Berkas "${fileNumber}" disimpan sebagai Draft!`
-            : `Berkas "${fileNumber}" diperbarui dengan status Siap Proses!`
+            ? `Berkas "${trimmedNumber}" disimpan sebagai Draft!`
+            : `Berkas "${trimmedNumber}" diperbarui dengan status Siap Proses!`,
+          { title: 'Draf Diperbarui', badge }
         );
       } else {
-        showToast(res.error || 'Gagal memperbarui berkas antrean.', 'error');
+        toast.error(res.error || 'Gagal memperbarui berkas antrean.', {
+          title: 'Gagal Memperbarui Draf',
+          badge,
+        });
       }
       return;
     }
 
     const prefix = targetStatus === 'draft' ? 'Draf' : 'Berkas';
     const res = BatchService.addBatchDraft({
-      fileName: uploadedFile ? uploadedFile.name : `${prefix}_${fileNumber}.pdf`,
+      fileName: uploadedFile ? uploadedFile.name : `${prefix}_${trimmedNumber}.pdf`,
       fileSize: uploadedFile ? uploadedFile.size : 1500000,
       documentType: selectedType,
-      vendorName: vendorName || 'Vendor Rekanan',
-      fileNumber: fileNumber || `DRAFT-${Date.now().toString().slice(-4)}`,
+      vendorName: trimmedVendor,
+      fileNumber: trimmedNumber,
       nominal: num,
       status: targetStatus,
     });
@@ -418,23 +461,29 @@ export default function DocumentUploadPage() {
       setBatchDrafts(BatchService.getBatches());
       setUploadedFile(null);
       setIsUploadModalOpen(false);
-      showToast(
+      toast.success(
         targetStatus === 'draft'
-          ? 'Berkas disimpan sebagai Draft di Antrean Batch!'
-          : 'Berkas Siap Proses dimasukkan ke Antrean Batch!'
+          ? `Berkas "${trimmedNumber}" disimpan sebagai Draft di Antrean Batch!`
+          : `Berkas "${trimmedNumber}" (Siap Proses) dimasukkan ke Antrean Batch!`,
+        { title: 'Ditambahkan ke Antrean', badge }
       );
+    } else {
+      toast.error('Gagal menyimpan berkas ke antrean batch.', {
+        title: 'Gagal Menyimpan Draf',
+        badge,
+      });
     }
   };
 
   const handleDeleteBatchDraft = (id: string) => {
     BatchService.deleteBatchDraft(id);
     setBatchDrafts(BatchService.getBatches());
-    showToast('Berkas berhasil dihapus dari antrean.');
+    toast.success('Berkas berhasil dihapus dari antrean batch.', { title: 'Draf Dihapus' });
   };
 
   const handleExportBatchCSV = () => {
     if (filteredDrafts.length === 0) {
-      showToast('Antrean batch kosong untuk diekspor.', 'error');
+      toast.error('Antrean batch kosong untuk diekspor.', { title: 'Ekspor Gagal' });
       return;
     }
 
@@ -458,12 +507,14 @@ export default function DocumentUploadPage() {
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
-    showToast(`Berhasil mengekspor ${filteredDrafts.length} berkas antrean ke CSV!`, 'success');
+    toast.success(`Berhasil mengekspor ${filteredDrafts.length} berkas antrean ke CSV!`, {
+      title: 'Ekspor CSV Selesai',
+    });
   };
 
   const handleExportBatchExcel = () => {
     if (filteredDrafts.length === 0) {
-      showToast('Antrean batch kosong untuk diekspor.', 'error');
+      toast.error('Antrean batch kosong untuk diekspor.', { title: 'Ekspor Gagal' });
       return;
     }
 
@@ -511,7 +562,9 @@ export default function DocumentUploadPage() {
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
-    showToast(`Berhasil mengekspor ${filteredDrafts.length} berkas antrean ke Excel (.xls)!`, 'success');
+    toast.success(`Berhasil mengekspor ${filteredDrafts.length} berkas antrean ke Excel (.xls)!`, {
+      title: 'Ekspor Excel Selesai',
+    });
   };
 
   const handleProcessBatchItem = (item: BatchItemDraft) => {
@@ -520,7 +573,10 @@ export default function DocumentUploadPage() {
     DocumentService.createDocument(newDoc);
     BatchService.deleteBatchDraft(item.id);
     setBatchDrafts(BatchService.getBatches());
-    showToast(`Dokumen ${item.fileNumber} berhasil diproses dan masuk Antrean Verifikasi!`);
+    toast.success(`Dokumen ${item.fileNumber} berhasil diproses dan masuk Antrean Verifikasi!`, {
+      title: 'Ekstraksi AI Berhasil',
+      badge: isDemo ? 'Demo Sandbox' : 'Ekstraksi AI',
+    });
     setTimeout(() => {
       router.push(getRoute(`/verification?docId=${newDoc.id}`));
     }, 800);
@@ -555,6 +611,8 @@ export default function DocumentUploadPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!validateUploadForm()) return;
+
     setIsProcessing(true);
 
     const stages = [
@@ -571,9 +629,14 @@ export default function DocumentUploadPage() {
     });
 
     const draftBeingProcessed = editingDraft;
+    const trimmedNumber = fileNumber.trim();
+    const trimmedVendor = vendorName.trim();
+    const parsedNominal = Number(nominal);
 
     setTimeout(() => {
-      const subtotalVal = parseFloat(nominal) || 10000000;
+      const nowTs = createUploadTimestamp();
+      const nowIso = new Date(nowTs).toISOString();
+      const subtotalVal = parsedNominal;
       const taxVal = Math.round(subtotalVal * 0.11);
       const totalVal = subtotalVal + taxVal;
 
@@ -581,17 +644,17 @@ export default function DocumentUploadPage() {
         ? uploadedFile.name
         : draftBeingProcessed
           ? draftBeingProcessed.fileName
-          : `Scan_${fileNumber.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
+          : `Scan_${trimmedNumber.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
 
       const resolvedTitle = uploadedFile
         ? uploadedFile.name
         : draftBeingProcessed
           ? draftBeingProcessed.fileName
-          : `Unggahan Baru - ${fileNumber}`;
+          : `Unggahan Baru - ${trimmedNumber}`;
 
       const newDoc: DocumentRecord = {
-        id: `doc-${Date.now()}`,
-        fileNumber: fileNumber || `INV-${Date.now()}`,
+        id: `doc-${nowTs}`,
+        fileNumber: trimmedNumber,
         title: resolvedTitle,
         fileName: resolvedFileName,
         fileSize: uploadedFile ? uploadedFile.size : draftBeingProcessed ? draftBeingProcessed.fileSize : 450000,
@@ -600,9 +663,9 @@ export default function DocumentUploadPage() {
           : 'application/pdf') as 'application/pdf' | 'image/png' | 'image/jpeg',
         documentType: selectedType,
         status: 'needs_review',
-        uploadedAt: new Date().toISOString(),
-        processedAt: new Date().toISOString(),
-        vendorName: vendorName || 'Vendor Baru',
+        uploadedAt: nowIso,
+        processedAt: nowIso,
+        vendorName: trimmedVendor,
         vendorTaxId: '01.999.888.7-011.000',
         currency: 'IDR',
         subtotal: subtotalVal,
@@ -619,7 +682,7 @@ export default function DocumentUploadPage() {
         notes: [],
         lineItems: [
           {
-            id: `item-${Date.now()}-1`,
+            id: `item-${nowTs}-1`,
             itemNumber: 1,
             description: 'Item Jasa / Pengadaan Dokumen Baru',
             quantity: 1,
@@ -631,11 +694,11 @@ export default function DocumentUploadPage() {
         ],
         fields: [
           {
-            id: `f-${Date.now()}-1`,
+            id: `f-${nowTs}-1`,
             key: 'invoice_number',
             label: 'Nomor Dokumen',
-            value: fileNumber,
-            originalValue: fileNumber,
+            value: trimmedNumber,
+            originalValue: trimmedNumber,
             confidence: 0.95,
             isEdited: false,
             isRequired: true,
@@ -643,11 +706,11 @@ export default function DocumentUploadPage() {
             category: 'header',
           },
           {
-            id: `f-${Date.now()}-2`,
+            id: `f-${nowTs}-2`,
             key: 'vendor_name',
             label: 'Nama Vendor / PKP Penjual',
-            value: vendorName,
-            originalValue: vendorName,
+            value: trimmedVendor,
+            originalValue: trimmedVendor,
             confidence: 0.93,
             isEdited: false,
             isRequired: true,
@@ -655,7 +718,7 @@ export default function DocumentUploadPage() {
             category: 'vendor',
           },
           {
-            id: `f-${Date.now()}-3`,
+            id: `f-${nowTs}-3`,
             key: 'total_amount',
             label: 'Total Tagihan (Grand Total)',
             value: totalVal,
@@ -669,7 +732,7 @@ export default function DocumentUploadPage() {
         ],
         auditHistory: [
           {
-            timestamp: new Date().toISOString(),
+            timestamp: nowIso,
             actor: 'Staff Administrasi',
             action: 'UPLOAD_AND_EXTRACT',
             details: 'Dokumen diunggah melalui formulir web dan berhasil diekstraksi ke antrean verifikasi',
@@ -685,27 +748,21 @@ export default function DocumentUploadPage() {
       setIsProcessing(false);
       setIsUploadModalOpen(false);
       setEditingDraft(null);
+      toast.success(
+        isDemo
+          ? `Simulasi ekstraksi AI dokumen ${trimmedNumber} selesai dan dibuka di Workspace Verifikasi!`
+          : `Dokumen ${trimmedNumber} berhasil diekstraksi oleh AI dan masuk Antrean Verifikasi.`,
+        {
+          title: 'Ekstraksi AI Berhasil',
+          badge: isDemo ? 'Demo Sandbox' : 'Ekstraksi AI',
+        }
+      );
       router.push(getRoute(`/verification?docId=${newDoc.id}`));
     }, 1600);
   };
 
   return (
     <div className="flex-1 flex flex-col relative w-full min-w-0">
-      {/* Toast Notification */}
-      {toast && (
-        <div
-          className={`fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-3 rounded-xl shadow-2xl text-xs border animate-in fade-in slide-in-from-bottom-3 duration-200 ${toast.type === 'error'
-            ? 'bg-rose-950 text-white border-rose-800'
-            : 'bg-[#0F172A] text-white border-slate-700'
-            }`}
-        >
-          <CheckCircleIcon
-            className={`w-4 h-4 shrink-0 ${toast.type === 'error' ? 'text-rose-400' : 'text-emerald-400'}`}
-          />
-          <span className="font-medium">{toast.message}</span>
-        </div>
-      )}
-
       <Topbar
         title="Unggah Dokumen & Batch Processing"
         subtitle="Ekstraksi data faktur pajak, PO, dan invoice secara otomatis dengan AI model e-Faktur Indonesia"
@@ -879,7 +936,7 @@ export default function DocumentUploadPage() {
             </div>
 
             {/* Modal Form */}
-            <form onSubmit={handleSubmit} className="space-y-5">
+            <form onSubmit={handleSubmit} noValidate className="space-y-5">
               <input
                 ref={fileInputRef}
                 type="file"

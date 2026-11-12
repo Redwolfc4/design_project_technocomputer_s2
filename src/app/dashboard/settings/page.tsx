@@ -1,22 +1,111 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Topbar } from '@/components/layout/Topbar';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { SectionHeader } from '@/components/shared/SectionHeader';
 import { SettingService } from '@/lib/modules/settings/setting.service';
 import { WorkspaceSettings } from '@/types';
-import { SettingsIcon, CheckIcon } from '@/components/ui/icons';
+import { CheckIcon } from '@/components/ui/icons';
 import { WebhookConfigSection } from '@/components/dashboard/settings/WebhookConfigSection';
+import { useToast } from '@/context/ToastContext';
+import { useAppRoutes } from '@/context/RouteContext';
 
 export default function WorkspaceSettingsPage() {
+  const toast = useToast();
+  const { isDemo } = useAppRoutes();
   const [settings, setSettings] = useState<WorkspaceSettings>(() => SettingService.getSettings());
   const [savedSuccess, setSavedSuccess] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    SettingService.updateSettings(settings);
+    setSavedSuccess(false);
+
+    const badge = isDemo ? 'Demo Sandbox' : 'Konfigurasi Sistem';
+
+    if (!settings.workspaceName.trim() || settings.workspaceName.trim().length < 3) {
+      toast.error('Nama Workspace wajib diisi (minimal 3 karakter).', {
+        title: 'Validasi Pengaturan Gagal',
+        badge,
+      });
+      return;
+    }
+
+    if (!settings.companyName.trim() || settings.companyName.trim().length < 2) {
+      toast.error('Nama Perusahaan PKP wajib diisi.', {
+        title: 'Validasi Pengaturan Gagal',
+        badge,
+      });
+      return;
+    }
+
+    if (!settings.taxId.trim() || settings.taxId.trim().length < 10) {
+      toast.error('NPWP Perusahaan wajib diisi dengan format yang lengkap.', {
+        title: 'Validasi Pengaturan Gagal',
+        badge,
+      });
+      return;
+    }
+
+    if (
+      Number.isNaN(settings.autoApproveConfidenceThreshold) ||
+      settings.autoApproveConfidenceThreshold < 50 ||
+      settings.autoApproveConfidenceThreshold > 100
+    ) {
+      toast.error('Ambang batas Auto-Approval harus berada pada rentang 50% hingga 100%.', {
+        title: 'Validasi Pengaturan Gagal',
+        badge,
+      });
+      return;
+    }
+
+    if (
+      Number.isNaN(settings.defaultTaxRatePercent) ||
+      settings.defaultTaxRatePercent < 0 ||
+      settings.defaultTaxRatePercent > 100
+    ) {
+      toast.error('Tarif Default PPN harus berada pada rentang 0% hingga 100%.', {
+        title: 'Validasi Pengaturan Gagal',
+        badge,
+      });
+      return;
+    }
+
+    if (settings.webhookUrl?.trim()) {
+      try {
+        const parsedUrl = new URL(settings.webhookUrl.trim());
+        if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
+          toast.error('URL Endpoint Webhook harus menggunakan protokol http:// atau https://.', {
+            title: 'Validasi Webhook Gagal',
+            badge,
+          });
+          return;
+        }
+      } catch {
+        toast.error('Format URL Endpoint Webhook tidak valid.', {
+          title: 'Validasi Webhook Gagal',
+          badge,
+        });
+        return;
+      }
+    }
+
+    SettingService.updateSettings({
+      ...settings,
+      workspaceName: settings.workspaceName.trim(),
+      companyName: settings.companyName.trim(),
+      taxId: settings.taxId.trim(),
+    });
     setSavedSuccess(true);
+    toast.success(
+      isDemo
+        ? `Pengaturan simulasi "${settings.workspaceName.trim()}" berhasil disimpan ke sandbox.`
+        : `Pengaturan workspace "${settings.workspaceName.trim()}" dan aturan AI berhasil diperbarui.`,
+      {
+        title: 'Pengaturan Disimpan',
+        badge,
+      }
+    );
     setTimeout(() => setSavedSuccess(false), 3000);
   };
 
@@ -31,10 +120,10 @@ export default function WorkspaceSettingsPage() {
         <PageHeader
           title="Pengaturan Workspace & Aturan AI"
           subtitle="Konfigurasi parameter ambang batas auto-approval, tarif PPN default, dan URL Webhook integrasi."
-          badge={{ label: 'Konfigurasi Sistem', variant: 'neutral' }}
+          badge={{ label: isDemo ? 'Demo Sandbox' : 'Konfigurasi Sistem', variant: isDemo ? 'warning' : 'neutral' }}
         />
 
-        <form onSubmit={handleSubmit} className="p-6 sm:p-8 rounded-xl border border-[#CBD5E1] bg-white shadow-sm space-y-6">
+        <form onSubmit={handleSubmit} noValidate className="p-6 sm:p-8 rounded-xl border border-[#CBD5E1] bg-white shadow-sm space-y-6">
           <SectionHeader
             title="Parameter Workspace Enterprise"
             description="Perubahan pengaturan ini disimpan secara lokal ke peramban demo."
@@ -84,7 +173,10 @@ export default function WorkspaceSettingsPage() {
                   min="50"
                   max="100"
                   value={settings.autoApproveConfidenceThreshold}
-                  onChange={(e) => setSettings({ ...settings, autoApproveConfidenceThreshold: parseInt(e.target.value) || 95 })}
+                  onChange={(e) => {
+                    const parsed = parseInt(e.target.value, 10);
+                    setSettings({ ...settings, autoApproveConfidenceThreshold: Number.isNaN(parsed) ? 0 : parsed });
+                  }}
                   className="w-full text-xs font-semibold px-3 py-2 rounded-md border border-[#CBD5E1] bg-white text-[#0F172A]"
                 />
                 <span className="text-[11px] text-[#64748B]">Dokumen dengan skor keyakinan di atas nilai ini langsung disetujui.</span>
@@ -94,8 +186,13 @@ export default function WorkspaceSettingsPage() {
                 <label className="text-xs font-bold text-[#475569]">Tarif Default PPN (%)</label>
                 <input
                   type="number"
+                  min="0"
+                  max="100"
                   value={settings.defaultTaxRatePercent}
-                  onChange={(e) => setSettings({ ...settings, defaultTaxRatePercent: parseInt(e.target.value) || 11 })}
+                  onChange={(e) => {
+                    const parsed = parseInt(e.target.value, 10);
+                    setSettings({ ...settings, defaultTaxRatePercent: Number.isNaN(parsed) ? -1 : parsed });
+                  }}
                   className="w-full text-xs font-semibold px-3 py-2 rounded-md border border-[#CBD5E1] bg-white text-[#0F172A]"
                 />
                 <span className="text-[11px] text-[#64748B]">Dapat dikonfigurasi adaptif 11% atau 12% sesuai regulasi.</span>

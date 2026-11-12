@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { BrandLogo } from '@/components/shared/BrandLogo';
 import { ArrowRightIcon } from '@/components/ui/icons';
@@ -8,6 +9,7 @@ import { DEMO_PERSONAS } from '@/lib/constants/personas';
 import { formatRoleLabel } from '@/lib/utils/formatters';
 import { MockDocumentService } from '@/lib/mocks/storage';
 import { MockAuthService } from '@/lib/services/mockAuth';
+import { useToast } from '@/context/ToastContext';
 import { UserRole } from '@/types';
 
 interface DemoLoginFormProps {
@@ -16,24 +18,35 @@ interface DemoLoginFormProps {
 
 export const DemoLoginForm: React.FC<DemoLoginFormProps> = ({ onSwitchToRegister }) => {
   const router = useRouter();
+  const toast = useToast();
   const [selectedRole, setSelectedRole] = useState<UserRole>('finance_supervisor');
   const [isLoading, setIsLoading] = useState(false);
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     const persona = DEMO_PERSONAS[selectedRole];
-    if (persona) {
-      setIsLoading(true);
-      setTimeout(() => {
-        MockDocumentService.setCurrentUser(persona);
-        MockAuthService.loginDemo(persona);
-        router.push('/demo/dashboard');
-      }, 500);
+    if (!persona) {
+      toast.error('Peran demo tidak ditemukan. Silakan pilih peran lain.', {
+        title: 'Sesi Demo Gagal',
+        badge: 'Demo Sandbox',
+      });
+      return;
     }
+
+    setIsLoading(true);
+    setTimeout(() => {
+      MockDocumentService.setCurrentUser(persona);
+      MockAuthService.loginDemo(persona);
+      toast.success(`Masuk ke portal simulasi sebagai ${persona.name} (${persona.roleTitle}).`, {
+        title: 'Mode Demo Aktif',
+        badge: 'Demo Sandbox',
+      });
+      router.push('/demo/dashboard');
+    }, 500);
   };
 
   return (
-    <div className="w-full max-w-md mx-auto p-6 sm:p-8 flex flex-col justify-between h-full">
+    <div className="w-full max-w-md mx-auto p-6 sm:p-8 flex flex-col justify-between gap-6">
       <div className="space-y-6">
         {/* Brand Header */}
         <div className="space-y-2">
@@ -59,7 +72,7 @@ export const DemoLoginForm: React.FC<DemoLoginFormProps> = ({ onSwitchToRegister
                     onClick={() => setSelectedRole(persona.role)}
                     className={`p-3 rounded-xl border-2 cursor-pointer transition-all flex items-center justify-between ${
                       isChecked
-                        ? 'border-[#4F46E5] bg-[#EEF2FF]/60 shadow-xs ring-2 ring-[#4F46E5]/10'
+                        ? 'border-[#4F46E5] bg-[#EEF2FF]/60 shadow-sm ring-2 ring-[#4F46E5]/10'
                         : 'border-[#E2E8F0] hover:border-[#CBD5E1] bg-white'
                     }`}
                   >
@@ -67,7 +80,7 @@ export const DemoLoginForm: React.FC<DemoLoginFormProps> = ({ onSwitchToRegister
                       <div className="text-xs font-bold text-[#0F172A]">{persona.name}</div>
                       <div className="text-[11px] text-[#64748B]">{persona.roleTitle}</div>
                     </div>
-                    <span className="text-[10px] font-bold uppercase text-[#4F46E5] px-2 py-0.5 rounded bg-white border border-indigo-200 shadow-2xs">
+                    <span className="text-[10px] font-bold uppercase text-[#4F46E5] px-2 py-0.5 rounded bg-white border border-indigo-200 shadow-sm">
                       {formatRoleLabel(persona.role)}
                     </span>
                   </div>
@@ -110,9 +123,9 @@ export const DemoLoginForm: React.FC<DemoLoginFormProps> = ({ onSwitchToRegister
         </p>
 
         <div>
-          <a href="/" className="text-[11px] text-[#94A3B8] hover:text-[#475569] font-medium transition-colors">
+          <Link href="/" className="text-[11px] text-[#94A3B8] hover:text-[#475569] font-medium transition-colors">
             ← Kembali ke Beranda DokumenAI
-          </a>
+          </Link>
         </div>
       </div>
     </div>

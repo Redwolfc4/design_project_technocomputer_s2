@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { DocumentRecord, ExtractedField } from '@/types';
 import { MockDocumentService } from '@/lib/mocks/storage';
+import { useToast } from '@/context/ToastContext';
 
 export interface DocumentDraft {
   fields: ExtractedField[];
@@ -18,7 +19,6 @@ export interface VerificationContextType {
   activeDraft: DocumentDraft | null;
   drafts: Record<string, DocumentDraft>;
   selectedFieldId: string | null;
-  notification: { message: string; type: 'success' | 'error' } | null;
   isEditMode: boolean;
 
   // Actions
@@ -32,7 +32,6 @@ export interface VerificationContextType {
   updateNoteDraft: (documentId: string, note: string) => void;
   approveDocument: (documentId: string) => { success: boolean; message: string };
   rejectDocument: (documentId: string, reason?: string) => { success: boolean; message: string };
-  clearNotification: () => void;
 }
 
 const VerificationContext = createContext<VerificationContextType | undefined>(undefined);
@@ -44,11 +43,11 @@ export function VerificationProvider({
   children: React.ReactNode;
   initialDocId?: string | null;
 }) {
+  const toast = useToast();
   const [documents, setDocuments] = useState<DocumentRecord[]>([]);
   const [activeDocId, setActiveDocId] = useState<string | null>(null);
   const [drafts, setDrafts] = useState<Record<string, DocumentDraft>>({});
   const [selectedFieldId, setSelectedFieldId] = useState<string | null>(null);
-  const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [isEditMode, setIsEditMode] = useState<boolean>(false);
 
   // Snapshot of fields when entering edit mode, to restore on cancel
@@ -114,18 +113,6 @@ export function VerificationProvider({
     if (!activeDocId || !drafts[activeDocId]) return null;
     return drafts[activeDocId];
   }, [drafts, activeDocId]);
-
-  // Auto-dismiss notification after 4s
-  useEffect(() => {
-    if (notification) {
-      const timer = setTimeout(() => setNotification(null), 4000);
-      return () => clearTimeout(timer);
-    }
-  }, [notification]);
-
-  const clearNotification = useCallback(() => {
-    setNotification(null);
-  }, []);
 
   // Function to perform actual persist to storage & state
   const commitSave = useCallback((documentId: string, currentDraft: DocumentDraft) => {
@@ -326,10 +313,10 @@ export function VerificationProvider({
   const toggleEditMode = useCallback(() => {
     if (!activeDoc) return;
     if (activeDoc.status === 'approved' || activeDoc.status === 'rejected') {
-      setNotification({
-        message: 'Dokumen berstatus final (' + (activeDoc.status === 'approved' ? 'Terverifikasi' : 'Ditolak') + ') terkunci dan tidak dapat diedit.',
-        type: 'error',
-      });
+      toast.error(
+        `Dokumen berstatus final (${activeDoc.status === 'approved' ? 'Terverifikasi' : 'Ditolak'}) terkunci dan tidak dapat diedit.`,
+        { title: 'Dokumen Terkunci' }
+      );
       return;
     }
 
@@ -342,7 +329,7 @@ export function VerificationProvider({
     } else {
       setIsEditMode(false);
     }
-  }, [activeDoc, isEditMode, activeDraft]);
+  }, [activeDoc, isEditMode, activeDraft, toast]);
 
   // Cancel Edit Mode: Restore fields to snapshot and return to Read-Only
   const cancelEdit = useCallback(() => {
@@ -358,39 +345,50 @@ export function VerificationProvider({
       });
     }
     setIsEditMode(false);
-    setNotification({
-      message: 'Perubahan dibatalkan. Kembali ke Mode Read-Only.',
-      type: 'success',
+    toast.info('Perubahan dibatalkan. Kembali ke Mode Read-Only.', {
+      title: 'Edit Dibatalkan',
     });
-  }, [activeDoc, commitSave]);
+  }, [activeDoc, commitSave, toast]);
 
   // Save Edit Mode: Validate, commit save, and return to Read-Only
   const saveEdit = useCallback(() => {
     if (!activeDoc) return { success: false, message: 'Tidak ada dokumen aktif' };
     if (activeDoc.status === 'approved' || activeDoc.status === 'rejected') {
-      setNotification({
-        message: 'Dokumen berstatus final tidak dapat diubah.',
-        type: 'error',
-      });
+      toast.error('Dokumen berstatus final tidak dapat diubah.', { title: 'Dokumen Terkunci' });
       return { success: false, message: 'Status final terkunci' };
     }
 
     if (activeDraft) {
+      const missingRequiredField = activeDraft.fields.find(
+        (field) => field.isRequired && String(field.value ?? '').trim() === ''
+      );
+      if (missingRequiredField) {
+        toast.error(`Bidang wajib "${missingRequiredField.label}" tidak boleh kosong.`, {
+          title: 'Validasi Bidang Gagal',
+        });
+        return { success: false, message: `Bidang ${missingRequiredField.label} wajib diisi` };
+      }
+
       commitSave(activeDoc.id, activeDraft);
       // Update snapshot to current saved state
       editSnapshot.current[activeDoc.id] = JSON.parse(JSON.stringify(activeDraft.fields));
     }
 
     setIsEditMode(false);
-    setNotification({
-      message: 'Perubahan bidang dokumen berhasil disimpan.',
-      type: 'success',
+    toast.success(`Perubahan bidang dokumen ${activeDoc.fileNumber} berhasil disimpan.`, {
+      title: 'Bidang Dokumen Tersimpan',
     });
     return { success: true, message: 'Tersimpan' };
-  }, [activeDoc, activeDraft, commitSave]);
+  }, [activeDoc, activeDraft, commitSave, toast]);
 
   // Approve document
   const approveDocument = useCallback((documentId: string) => {
+    const targetDoc = documents.find((d) => d.id === documentId);
+    if (targetDoc && (targetDoc.status === 'approved' || targetDoc.status === 'rejected')) {
+      toast.error('Dokumen berstatus final tidak dapat diproses ulang.', { title: 'Aksi Ditolak' });
+      return { success: false, message: 'Status final terkunci' };
+    }
+
     // Flush any pending debounce for this document immediately
     if (debounceTimers.current[documentId]) {
       clearTimeout(debounceTimers.current[documentId]);
@@ -415,18 +413,25 @@ export function VerificationProvider({
       setDocuments((prev) => prev.map((d) => (d.id === documentId ? updated : d)));
       setIsEditMode(false);
       setSelectedFieldId(null);
-      setNotification({
-        message: `Dokumen ${updated.fileNumber} berhasil disetujui dan disinkronkan ke seluruh sistem!`,
-        type: 'success',
-      });
+      toast.success(
+        `Dokumen ${updated.fileNumber} berhasil disetujui dan disinkronkan ke seluruh sistem!`,
+        { title: 'Dokumen Disetujui' }
+      );
       return { success: true, message: 'Disetujui' };
     }
 
+    toast.error('Gagal memperbarui status dokumen.', { title: 'Proses Gagal' });
     return { success: false, message: 'Gagal memperbarui status dokumen.' };
-  }, [drafts, commitSave]);
+  }, [documents, drafts, commitSave, toast]);
 
   // Reject document
   const rejectDocument = useCallback((documentId: string, reason?: string) => {
+    const targetDoc = documents.find((d) => d.id === documentId);
+    if (targetDoc && (targetDoc.status === 'approved' || targetDoc.status === 'rejected')) {
+      toast.error('Dokumen berstatus final tidak dapat ditolak ulang.', { title: 'Aksi Ditolak' });
+      return { success: false, message: 'Status final terkunci' };
+    }
+
     // Flush any pending debounce for this document immediately
     if (debounceTimers.current[documentId]) {
       clearTimeout(debounceTimers.current[documentId]);
@@ -438,12 +443,11 @@ export function VerificationProvider({
       commitSave(documentId, draft);
     }
 
-    const finalReason = reason || draft?.reviewerNote;
+    const finalReason = (reason ?? draft?.reviewerNote ?? '').trim();
 
     if (!finalReason) {
-      setNotification({
-        message: 'Harap masukkan catatan/alasan penolakan terlebih dahulu pada editor!',
-        type: 'error',
+      toast.error('Harap masukkan catatan/alasan penolakan terlebih dahulu pada kolom Catatan Verifikator!', {
+        title: 'Alasan Penolakan Wajib Diisi',
       });
       return { success: false, message: 'Alasan penolakan wajib diisi.' };
     }
@@ -460,15 +464,15 @@ export function VerificationProvider({
       setDocuments((prev) => prev.map((d) => (d.id === documentId ? updated : d)));
       setIsEditMode(false);
       setSelectedFieldId(null);
-      setNotification({
-        message: `Dokumen ${updated.fileNumber} ditolak dan status tersinkronisasi.`,
-        type: 'error',
+      toast.error(`Dokumen ${updated.fileNumber} telah ditolak dan status tersinkronisasi.`, {
+        title: 'Dokumen Ditolak',
       });
       return { success: true, message: 'Ditolak' };
     }
 
+    toast.error('Gagal menolak dokumen.', { title: 'Proses Gagal' });
     return { success: false, message: 'Gagal menolak dokumen.' };
-  }, [drafts, commitSave]);
+  }, [documents, drafts, commitSave, toast]);
 
   const contextValue = useMemo(
     () => ({
@@ -478,7 +482,6 @@ export function VerificationProvider({
       activeDraft,
       drafts,
       selectedFieldId,
-      notification,
       isEditMode,
       selectDocument,
       setSelectedFieldId: handleSelectField,
@@ -490,7 +493,6 @@ export function VerificationProvider({
       updateNoteDraft,
       approveDocument,
       rejectDocument,
-      clearNotification,
     }),
     [
       documents,
@@ -499,7 +501,6 @@ export function VerificationProvider({
       activeDraft,
       drafts,
       selectedFieldId,
-      notification,
       isEditMode,
       selectDocument,
       handleSelectField,
@@ -510,7 +511,6 @@ export function VerificationProvider({
       updateNoteDraft,
       approveDocument,
       rejectDocument,
-      clearNotification,
     ]
   );
 
