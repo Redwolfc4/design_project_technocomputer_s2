@@ -1,12 +1,21 @@
 import { STORAGE_KEYS, isClientEnvironment, safeLocalStorageGet, safeLocalStorageSet } from '../storage.base';
 import { AuditService } from '../audit/audit.service';
 
+export interface IntegrationAuthConfig {
+  bearerToken?: string;
+  apiKeyHeaderName?: string;
+  apiKeyValue?: string;
+  basicUsername?: string;
+  basicPassword?: string;
+}
+
 export interface IntegrationEndpoint {
   id: string;
   name: string;
   systemType: 'sap' | 'oracle' | 'djp_tax' | 'accurate' | 'generic';
   endpointUrl: string;
   authMethod: 'bearer' | 'basic' | 'apiKey';
+  authConfig?: IntegrationAuthConfig;
   format: 'json' | 'csv' | 'xml';
   status: 'active' | 'inactive';
   lastSyncAt?: string;
@@ -20,6 +29,9 @@ export const INITIAL_INTEGRATION_ENDPOINTS: IntegrationEndpoint[] = [
     systemType: 'sap',
     endpointUrl: 'https://sap-gateway.nusantara-tech.co.id/api/v2/invoices',
     authMethod: 'bearer',
+    authConfig: {
+      bearerToken: 'sap_demo_tok_9f4b8c2a1d7e6034',
+    },
     format: 'json',
     status: 'active',
     lastSyncAt: '2026-03-04T08:30:00Z',
@@ -31,6 +43,10 @@ export const INITIAL_INTEGRATION_ENDPOINTS: IntegrationEndpoint[] = [
     systemType: 'djp_tax',
     endpointUrl: 'https://efaktur.pajak.go.id/api/v1/sync',
     authMethod: 'apiKey',
+    authConfig: {
+      apiKeyHeaderName: 'X-DJP-API-Key',
+      apiKeyValue: 'djp_demo_key_7729104a',
+    },
     format: 'csv',
     status: 'active',
     lastSyncAt: '2026-03-03T16:00:00Z',

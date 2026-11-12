@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { BrandLogo } from '@/components/shared/BrandLogo';
 import { EyeIcon, ArrowRightIcon } from '@/components/ui/icons';
@@ -186,7 +187,15 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({ onSwitchToLogin, isD
                 className="rounded border-[#CBD5E1] text-[#4F46E5] focus:ring-[#4F46E5] h-3.5 w-3.5 mt-0.5"
               />
               <span className="text-xs text-[#64748B] leading-tight">
-                Saya menyetujui Ketentuan Layanan & Kebijakan Privasi DokumenAI Enterprise
+                Saya menyetujui{' '}
+                <Link href="/terms" className="text-[#4F46E5] hover:underline" target="_blank">
+                  Ketentuan Layanan
+                </Link>{' '}
+                &{' '}
+                <Link href="/privacy" className="text-[#4F46E5] hover:underline" target="_blank">
+                  Kebijakan Privasi
+                </Link>{' '}
+                DokumenAI Enterprise
               </span>
             </label>
           </div>

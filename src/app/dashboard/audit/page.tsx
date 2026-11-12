@@ -4,9 +4,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Topbar } from '@/components/layout/Topbar';
 import { AuditService } from '@/lib/modules/audit/audit.service';
 import { AuditLogEntry } from '@/types';
-import { formatDateTime, formatActionLabel } from '@/lib/utils/formatters';
+import { formatDateTime, formatActionLabel, formatRoleLabel } from '@/lib/utils/formatters';
 import {
-  ShieldCheckIcon,
   EyeIcon,
   CopyIcon,
   CodeIcon,
@@ -115,8 +114,8 @@ export default function AuditTrailPage() {
     const rows = filteredLogs.map((l) => [
       `"${formatDateTime(l.timestamp)}"`,
       `"${l.actor}"`,
-      `"${l.actorRole}"`,
-      `"${l.action}"`,
+      `"${formatRoleLabel(l.actorRole)}"`,
+      `"${formatActionLabel(l.action)}"`,
       `"${l.resourceName}"`,
       `"${l.details.replace(/"/g, '""')}"`,
       `"${l.previousValue || ''}"`,
@@ -222,19 +221,6 @@ export default function AuditTrailPage() {
           }
         />
 
-        {/* Banner */}
-        <div className="p-4 rounded-xl border border-emerald-200 bg-emerald-50/60 flex items-center justify-between text-xs text-emerald-800 shadow-xs">
-          <div className="flex items-center gap-2.5">
-            <ShieldCheckIcon className="w-5 h-5 text-emerald-600 shrink-0" />
-            <span>
-              <strong>Jalur Forensik Aktif:</strong> Seluruh aktivitas human-in-the-loop direkam dengan stempel waktu ISO, peran pengguna, dan alamat IP.
-            </span>
-          </div>
-          <span className="font-bold text-[11px] bg-white px-2 py-1 rounded border border-emerald-200">
-            {logs.length} Rekam Log
-          </span>
-        </div>
-
         {/* Reusable Global DataTableToolbar */}
         <DataTableToolbar
           searchQuery={searchQuery}
@@ -288,7 +274,7 @@ export default function AuditTrailPage() {
                       </td>
                       <td className="py-3.5 px-5">
                         <div className="font-bold text-[#0F172A]">{log.actor}</div>
-                        <div className="text-[10px] text-[#64748B]">{log.actorRole}</div>
+                        <div className="text-[10px] text-[#64748B]">{formatRoleLabel(log.actorRole)}</div>
                       </td>
                       <td className="py-3.5 px-5 font-semibold text-[#4F46E5]">
                         {formatActionLabel(log.action)}
@@ -300,7 +286,8 @@ export default function AuditTrailPage() {
                         {log.details}
                         {log.previousValue && (
                           <div className="text-[10px] text-[#64748B] mt-0.5">
-                            {log.previousValue} → <strong className="text-[#059669]">{log.newValue}</strong>
+                            {log.previousValue.replace(/_/g, ' ')} →{' '}
+                            <strong className="text-[#059669]">{log.newValue?.replace(/_/g, ' ')}</strong>
                           </div>
                         )}
                       </td>

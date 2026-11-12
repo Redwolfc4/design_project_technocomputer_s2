@@ -11,7 +11,6 @@ import {
   FileTextIcon,
   CheckCircleIcon,
   AlertTriangleIcon,
-  UploadCloudIcon,
   ArrowRightIcon,
   LayersIcon,
   MoreHorizontalIcon,
@@ -22,6 +21,7 @@ import {
   FilterIcon,
   RotateCcwIcon,
   XIcon,
+  UploadCloudIcon,
 } from '@/components/ui/icons';
 import {
   DataTableRow,
@@ -199,12 +199,6 @@ export default function DashboardOverviewPage() {
     .filter((d) => d.status === 'approved')
     .reduce((acc, d) => acc + d.totalAmount, 0);
 
-  // Unfiltered count for reference
-  const pendingDocsUnfiltered = documents.filter((d) => d.status === 'needs_review').length;
-  const approvedValueUnfiltered = documents
-    .filter((d) => d.status === 'approved')
-    .reduce((acc, d) => acc + d.totalAmount, 0);
-
   // Operational Analytics breakdown
   const firstPassApprovalRate = Math.round((approvedDocs / totalDocs) * 100);
   const typeCounts: Record<string, number> = {};
@@ -301,24 +295,6 @@ export default function DashboardOverviewPage() {
       />
 
       <main className="flex-1 w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 py-6 sm:py-8 space-y-8 min-w-0">
-        {/* Banner Peringatan Lingkungan Demo */}
-        {isDemo && (
-          <div className="p-3.5 sm:p-4 rounded-xl border border-amber-300 bg-amber-50/80 text-amber-900 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
-            <div className="flex items-center gap-2.5">
-              <span className="text-base">⚠️</span>
-              <div>
-                <strong>Lingkungan Simulasi & Evaluasi Produk:</strong> Data dan integrasi di halaman ini adalah simulasi lokal (sandbox) dan tidak memengaruhi pembukuan produksi riil.
-              </div>
-            </div>
-            <Link
-              href="/login"
-              className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg shrink-0 text-center transition-colors shadow-2xs"
-            >
-              Masuk Akun Live
-            </Link>
-          </div>
-        )}
-
         {/* Page Identity Header */}
         <PageHeader
           title="Ringkasan Utama & Analisis Operasional"
@@ -334,40 +310,7 @@ export default function DashboardOverviewPage() {
           }
         />
 
-        {/* 1. Intelligent Processing Overview & Quick Actions Banner (Dipindah ke Atas Card Counter) */}
-        <div className="p-6 sm:p-7 rounded-2xl border border-indigo-100 bg-gradient-to-r from-indigo-50/70 via-white to-indigo-50/30 shadow-xs flex flex-col lg:flex-row items-start lg:items-center justify-between gap-5 min-w-0">
-          <div className="space-y-1.5 min-w-0 flex-1">
-            <div className="inline-flex items-center gap-2 text-[11px] uppercase font-extrabold tracking-wider text-[#4F46E5]">
-              <span className="w-2 h-2 rounded-full bg-[#4F46E5] animate-pulse" />
-              <span>{isProduction ? 'Antrean Verifikasi Dokumen Masuk' : 'Simulasi Intelligent Processing'}</span>
-            </div>
-            <h3 className="text-base sm:text-lg font-bold text-[#0F172A] leading-snug">
-              Ada {pendingDocsUnfiltered} dokumen menunggu review mata manusia sebelum ekspor ke SAP ERP
-            </h3>
-            <p className="text-xs sm:text-[13px] text-[#64748B]">
-              Total nominal transaksi yang telah tervalidasi dan siap dibayar:{' '}
-              <strong className="text-[#059669] font-bold">{formatIDR(approvedValueUnfiltered)}</strong>
-            </p>
-          </div>
-          <div className="flex flex-wrap sm:flex-nowrap items-center gap-3 shrink-0 w-full sm:w-auto">
-            <Link
-              href={getRoute('/upload')}
-              className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-[#CBD5E1] hover:bg-[#F8FAFC] text-xs font-bold text-[#0F172A] shadow-2xs hover:border-[#94A3B8] transition-all"
-            >
-              <UploadCloudIcon className="w-4 h-4 text-[#4F46E5]" />
-              <span className="whitespace-nowrap">Unggah Faktur Baru</span>
-            </Link>
-            <Link
-              href={getRoute('/verification')}
-              className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[#4F46E5] hover:bg-[#4338CA] text-xs font-bold text-white shadow-xs transition-all"
-            >
-              <CheckCircleIcon className="w-4 h-4" />
-              <span className="whitespace-nowrap">Buka Reviewer Workspace</span>
-            </Link>
-          </div>
-        </div>
-
-        {/* 2. Baris Filter Reaktif Standard Enterprise (DataTableFilters) */}
+        {/* Baris Filter Reaktif Standard Enterprise (DataTableFilters) */}
         <div className="rounded-xl border border-[#E2E8F0] bg-white p-5 shadow-xs space-y-4 min-w-0">
           {/* Dropdown Filters Row */}
           <DataTableFilters filters={dashboardFilterConfigs} />

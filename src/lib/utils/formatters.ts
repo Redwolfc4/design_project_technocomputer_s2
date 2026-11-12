@@ -267,4 +267,16 @@ export const formatActionLabel = (action: string): string => {
   return action.replace(/_/g, ' ');
 };
 
+export const formatRoleLabel = (role: string): string => {
+  if (!role) return '';
+  return role
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+};
+
+export const formatSystemTypeLabel = (systemType: string): string => {
+  if (!systemType) return '';
+  return systemType.replace(/_/g, ' ');
+};
+
 

@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { AuditLogEntry } from '@/types';
-import { formatDateTime, formatActionLabel } from '@/lib/utils/formatters';
+import { formatDateTime, formatActionLabel, formatRoleLabel } from '@/lib/utils/formatters';
 import { XIcon, ShieldCheckIcon, CopyIcon, CodeIcon } from '@/components/ui/icons';
 
 export interface AuditLogDetailModalProps {
@@ -71,7 +71,7 @@ export function AuditLogDetailModal({ log, onClose, onCopyText }: AuditLogDetail
             <div>
               <p className="text-[10px] font-bold text-[#64748B] uppercase tracking-wider">Aktor / Pengguna</p>
               <p className="font-bold text-[#0F172A] mt-0.5">{log.actor}</p>
-              <p className="text-[11px] text-[#4F46E5] font-semibold">{log.actorRole}</p>
+              <p className="text-[11px] text-[#4F46E5] font-semibold">{formatRoleLabel(log.actorRole)}</p>
             </div>
             <div>
               <p className="text-[10px] font-bold text-[#64748B] uppercase tracking-wider">Waktu Stempel ISO</p>
@@ -112,10 +112,12 @@ export function AuditLogDetailModal({ log, onClose, onCopyText }: AuditLogDetail
               {(log.previousValue || log.newValue) && (
                 <div className="pt-2 border-t border-[#F1F5F9] flex items-center gap-2 text-[11px]">
                   <span className="text-slate-400">Perubahan:</span>
-                  <span className="line-through text-rose-500 font-medium">{log.previousValue || '(Kosong)'}</span>
+                  <span className="line-through text-rose-500 font-medium">
+                    {log.previousValue ? log.previousValue.replace(/_/g, ' ') : '(Kosong)'}
+                  </span>
                   <span className="text-slate-400">→</span>
                   <span className="font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                    {log.newValue || '(Dihapus)'}
+                    {log.newValue ? log.newValue.replace(/_/g, ' ') : '(Dihapus)'}
                   </span>
                 </div>
               )}

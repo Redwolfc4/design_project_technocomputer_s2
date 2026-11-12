@@ -20,7 +20,6 @@ import {
   FilterConfig,
 } from '@/components/shared/data-table';
 import {
-  ShieldCheckIcon,
   SearchIcon,
   XIcon,
   PlusIcon,
@@ -568,16 +567,6 @@ export default function UsersManagementPage() {
             </div>
           }
         />
-
-        {/* Info Banner Existing */}
-        <div className="p-4 rounded-xl border border-indigo-200 bg-[#EEF2FF]/60 flex items-center justify-between text-xs text-[#4F46E5] shadow-xs">
-          <div className="flex items-center gap-2.5">
-            <ShieldCheckIcon className="w-5 h-5 text-[#4F46E5] shrink-0" />
-            <span>
-              <strong>Matriks Role-Based Access Control (RBAC):</strong> Hak akses verifikator, persetujuan keuangan, dan audit terisolasi sesuai prinsip pemisahan tugas (*Separation of Duties*).
-            </span>
-          </div>
-        </div>
 
         {/* Global Reusable DataTableToolbar */}
         <DataTableToolbar

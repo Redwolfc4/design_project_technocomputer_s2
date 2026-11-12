@@ -3,6 +3,7 @@
 import React, { Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Topbar } from '@/components/layout/Topbar';
+import { PageHeader } from '@/components/shared/PageHeader';
 import { VerificationProvider, useVerification } from '@/context/VerificationContext';
 import { formatIDR, getDocumentTypeLabel, getStatusBadgeInfo } from '@/lib/utils/formatters';
 import {
@@ -37,7 +38,7 @@ function VerificationWorkspaceInner() {
   const pendingList = documents.filter((d) => d.status === 'needs_review');
 
   return (
-    <div className="flex-1 flex flex-col min-h-screen lg:h-screen lg:overflow-hidden min-w-0">
+    <div className="flex-1 flex flex-col min-h-screen xl:h-screen xl:overflow-hidden min-w-0">
       <Topbar
         title="Human-in-the-Loop Verification Workspace"
         subtitle="Verifikasi berdampingan: Pratinjau berkas asli dengan anotasi visual & formulir koreksi nilai AI"
@@ -46,7 +47,7 @@ function VerificationWorkspaceInner() {
       {/* Global Notification Banner */}
       {notification && (
         <div
-          className={`px-8 py-2.5 text-xs font-bold text-white flex items-center justify-between transition-all ${notification.type === 'success' ? 'bg-[#059669]' : 'bg-[#E11D48]'
+          className={`px-8 py-2.5 text-xs font-bold text-white flex items-center justify-between transition-all shrink-0 ${notification.type === 'success' ? 'bg-[#059669]' : 'bg-[#E11D48]'
             }`}
         >
           <span>{notification.message}</span>
@@ -60,11 +61,22 @@ function VerificationWorkspaceInner() {
         </div>
       )}
 
-      <div className="flex-1 flex flex-col xl:flex-row overflow-y-auto lg:overflow-hidden min-w-0">
+      <main className="flex-1 w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 py-6 sm:py-8 flex flex-col gap-6 min-w-0 min-h-0">
+        <PageHeader
+          title="Antrean Verifikasi & Rekonsiliasi HITL"
+          subtitle="Verifikasi berdampingan: pratinjau berkas asli dengan anotasi visual & formulir koreksi nilai AI."
+          badge={{
+            label: pendingList.length > 0 ? `${pendingList.length} Antrean Verifikasi` : 'Workspace Verifikasi',
+            variant: 'info',
+          }}
+          className="shrink-0"
+        />
+
+        <div className="flex-1 flex flex-col xl:flex-row rounded-xl border border-[#CBD5E1] bg-white shadow-sm overflow-hidden min-w-0 min-h-0">
         {/* ======================================================== */}
         {/* Left Column 1: Verification Queue List                    */}
         {/* ======================================================== */}
-        <div className="w-full xl:w-72 2xl:w-80 border-b xl:border-b-0 xl:border-r border-[#E2E8F0] bg-white flex flex-col shrink-0 max-h-64 xl:max-h-full">
+        <div className="w-full xl:w-72 2xl:w-80 border-b xl:border-b-0 xl:border-r border-[#E2E8F0] bg-white flex flex-col shrink-0 max-h-64 xl:max-h-full xl:min-h-0">
           <div className="p-4 border-b border-[#E2E8F0] bg-[#FAFAFF] flex items-center justify-between">
             <span className="text-xs font-bold uppercase tracking-wider text-[#475569]">
               Antrean Verifikasi ({pendingList.length})
@@ -117,7 +129,7 @@ function VerificationWorkspaceInner() {
         {/* ======================================================== */}
         {/* Center Column: Visual Document Preview & Extraction Box  */}
         {/* ======================================================== */}
-        <div className="flex-1 bg-[#F1F5F9] p-4 sm:p-6 flex flex-col overflow-y-auto items-center justify-start min-w-0">
+        <div className="flex-1 bg-[#F1F5F9] p-4 sm:p-6 flex flex-col overflow-y-auto items-center justify-start min-w-0 xl:min-h-0">
           <div className="w-full max-w-2xl bg-white rounded-xl shadow-lg border border-[#CBD5E1] p-6 sm:p-8 relative min-h-[500px] flex flex-col justify-between select-none">
             <div className="absolute top-3 right-4 flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#EEF2FF] border border-[#CBD5E1] text-[#4F46E5] text-[10px] font-bold uppercase tracking-wider">
               <span>Preview Simulasi IDP</span>
@@ -192,23 +204,23 @@ function VerificationWorkspaceInner() {
                     <span className="text-[10px] font-bold uppercase tracking-wider text-[#64748B]">
                       Item Baris Transaksi ({activeDoc.lineItems.length})
                     </span>
-                    <div className="border border-[#E2E8F0] rounded-lg overflow-hidden text-xs">
-                      <table className="w-full text-left">
+                    <div className="border border-[#E2E8F0] rounded-lg overflow-x-auto text-xs bg-white">
+                      <table className="w-full min-w-[500px] text-left">
                         <thead className="bg-[#F8FAFC] text-[10px] font-bold text-[#64748B] border-b border-[#E2E8F0]">
                           <tr>
-                            <th className="p-2">Deskripsi</th>
-                            <th className="p-2 text-center">Qty</th>
-                            <th className="p-2 text-right">Harga Satuan</th>
-                            <th className="p-2 text-right">Total</th>
+                            <th className="p-2.5 min-w-[200px]">Deskripsi</th>
+                            <th className="p-2.5 text-center whitespace-nowrap">Qty</th>
+                            <th className="p-2.5 text-right whitespace-nowrap">Harga Satuan</th>
+                            <th className="p-2.5 text-right whitespace-nowrap">Total</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-[#E2E8F0]">
                           {activeDoc.lineItems.map((item) => (
-                            <tr key={item.id}>
-                              <td className="p-2 font-medium text-[#0F172A]">{item.description}</td>
-                              <td className="p-2 text-center text-[#64748B]">{item.quantity} {item.unit}</td>
-                              <td className="p-2 text-right text-[#64748B]">{formatIDR(item.unitPrice)}</td>
-                              <td className="p-2 text-right font-semibold text-[#0F172A]">{formatIDR(item.totalPrice)}</td>
+                            <tr key={item.id} className="hover:bg-slate-50/70 transition-colors">
+                              <td className="p-2.5 font-medium text-[#0F172A]">{item.description}</td>
+                              <td className="p-2.5 text-center text-[#64748B] whitespace-nowrap">{item.quantity} {item.unit}</td>
+                              <td className="p-2.5 text-right text-[#64748B] whitespace-nowrap">{formatIDR(item.unitPrice)}</td>
+                              <td className="p-2.5 text-right font-semibold text-[#0F172A] whitespace-nowrap">{formatIDR(item.totalPrice)}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -226,7 +238,7 @@ function VerificationWorkspaceInner() {
         {/* ======================================================== */}
         {/* Right Column: Debounced Auto-Sync Editor & Direct Actions */}
         {/* ======================================================== */}
-        <div className="w-full xl:w-96 border-t xl:border-t-0 xl:border-l border-[#E2E8F0] bg-white flex flex-col shrink-0 min-w-0">
+        <div className="w-full xl:w-96 border-t xl:border-t-0 xl:border-l border-[#E2E8F0] bg-white flex flex-col shrink-0 min-w-0 xl:min-h-0">
           <div className="p-3.5 border-b border-[#E2E8F0] bg-[#FAFAFF] flex items-center justify-between">
             <div className="flex flex-col">
               <span className="text-xs font-bold uppercase tracking-wider text-[#475569]">
@@ -467,7 +479,8 @@ function VerificationWorkspaceInner() {
             )}
           </div>
         </div>
-      </div>
+        </div>
+      </main>
     </div>
   );
 }

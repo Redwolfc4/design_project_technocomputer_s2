@@ -10,15 +10,15 @@ export function Footer() {
       <div className="max-w-screen-2xl mx-auto px-6 lg:px-12">
         {/* Main 4-Column Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-10 pb-12 border-b border-[#F1F5F9]">
-          
+
           {/* Column 1: Company Profile & Contacts (Span 2 cols on lg) */}
           <div className="lg:col-span-2 space-y-4">
             <Link href="/" className="inline-block hover:opacity-90 transition-opacity">
               <BrandLogo size={32} showText={true} subtitle="" textSize="base" />
             </Link>
-            
+
             <p className="text-xs text-[#64748B] leading-relaxed max-w-sm">
-              Platform otomasi pemrosesan dokumen cerdas (Intelligent Document Processing) enterprise terdepan di Indonesia. 
+              Platform otomasi pemrosesan dokumen cerdas (Intelligent Document Processing) enterprise terdepan di Indonesia.
               Mengintegrasikan OCR bertenaga deep learning, validasi kepatuhan pajak otomatis, dan audit trail forensik perbankan.
             </p>
 
@@ -108,25 +108,25 @@ export function Footer() {
                 </Link>
               </li>
               <li>
-                <a href="#company-overview" className="hover:text-[#4F46E5] transition-colors">
+                <Link href="/about" className="hover:text-[#4F46E5] transition-colors">
                   Tentang PT Nusantara Teknologi
-                </a>
+                </Link>
               </li>
               <li>
-                <a href="#leadership" className="hover:text-[#4F46E5] transition-colors">
+                <Link href="/leadership" className="hover:text-[#4F46E5] transition-colors">
                   Dewan Direksi & Manajemen
-                </a>
+                </Link>
               </li>
               <li>
-                <a href="#careers" className="hover:text-[#4F46E5] transition-colors inline-flex items-center gap-1.5">
+                <Link href="/careers" className="hover:text-[#4F46E5] transition-colors inline-flex items-center gap-1.5">
                   <span>Karir & Budaya Kerja</span>
                   <span className="px-1.5 py-0.5 bg-[#EEF2FF] text-[#4F46E5] text-[9px] rounded font-bold">Hiring</span>
-                </a>
+                </Link>
               </li>
               <li>
-                <a href="#press" className="hover:text-[#4F46E5] transition-colors">
+                <Link href="/investors" className="hover:text-[#4F46E5] transition-colors">
                   Hubungan Investor & Media
-                </a>
+                </Link>
               </li>
             </ul>
           </div>
@@ -184,17 +184,17 @@ export function Footer() {
           </div>
 
           <div className="flex items-center gap-5 text-[11px]">
-            <a href="#privacy" className="hover:text-[#0F172A] transition-colors">
+            <Link href="/privacy" className="hover:text-[#0F172A] transition-colors">
               Kebijakan Privasi
-            </a>
+            </Link>
             <span className="text-slate-300">•</span>
-            <a href="#terms" className="hover:text-[#0F172A] transition-colors">
+            <Link href="/terms" className="hover:text-[#0F172A] transition-colors">
               Syarat & Ketentuan Layanan
-            </a>
+            </Link>
             <span className="text-slate-300">•</span>
-            <a href="#sla" className="hover:text-[#0F172A] transition-colors">
+            <Link href="/sla" className="hover:text-[#0F172A] transition-colors">
               Jaminan SLA 99.9%
-            </a>
+            </Link>
           </div>
         </div>
 

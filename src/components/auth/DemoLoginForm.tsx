@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { BrandLogo } from '@/components/shared/BrandLogo';
 import { ArrowRightIcon } from '@/components/ui/icons';
 import { DEMO_PERSONAS } from '@/lib/constants/personas';
+import { formatRoleLabel } from '@/lib/utils/formatters';
 import { MockDocumentService } from '@/lib/mocks/storage';
 import { MockAuthService } from '@/lib/services/mockAuth';
 import { UserRole } from '@/types';
@@ -67,7 +68,7 @@ export const DemoLoginForm: React.FC<DemoLoginFormProps> = ({ onSwitchToRegister
                       <div className="text-[11px] text-[#64748B]">{persona.roleTitle}</div>
                     </div>
                     <span className="text-[10px] font-bold uppercase text-[#4F46E5] px-2 py-0.5 rounded bg-white border border-indigo-200 shadow-2xs">
-                      {persona.role}
+                      {formatRoleLabel(persona.role)}
                     </span>
                   </div>
                 );

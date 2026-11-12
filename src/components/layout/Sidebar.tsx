@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/icons';
 import { MockDocumentService } from '@/lib/mocks/storage';
 import { DEMO_PERSONAS } from '@/lib/constants/personas';
+import { TruncatedTextWithTooltip } from '@/components/ui/Tooltip';
 import { UserRole, UserPersona } from '@/types';
 import { useSidebar } from '@/context/SidebarContext';
 import { useAppMode } from '@/context/ModeContext';
@@ -110,17 +111,17 @@ export function Sidebar() {
 
         {/* Demo Mode: Role Switcher | Production Mode: Locked Tenant Profile */}
         {isDemo ? (
-          <div className="p-4 border-b border-amber-200 bg-amber-50/60 dark:bg-amber-950/20">
-            <div className="text-xs font-bold uppercase tracking-wider text-amber-900 dark:text-amber-400 mb-2 flex items-center justify-between">
+          <div className="p-4 border-b border-neutral-200 bg-neutral-50 dark:border-neutral-800 dark:bg-neutral-900">
+            <div className="text-xs font-bold uppercase tracking-wider text-neutral-900 dark:text-neutral-100 mb-2 flex items-center justify-between">
               <span>Peran Pengguna Demo</span>
-              <span className="text-[10px] bg-amber-100 text-amber-900 px-2 py-0.5 rounded font-extrabold border border-amber-300">
+              <span className="text-[10px] bg-[#4F46E5] text-white px-2 py-0.5 rounded font-extrabold shadow-2xs">
                 SANDBOX
               </span>
             </div>
             <select
               value={currentUser.role}
               onChange={handleRoleChange}
-              className="w-full text-sm bg-white dark:bg-[#1F2937] border border-amber-300 rounded-lg px-3 py-2 font-semibold text-[#0F172A] shadow-xs focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 cursor-pointer"
+              className="w-full text-sm bg-white dark:bg-neutral-950 border border-neutral-300 hover:border-black rounded-lg px-3 py-2 font-semibold text-black dark:text-white shadow-xs focus:outline-none focus:ring-2 focus:ring-black/10 focus:border-black cursor-pointer transition-colors"
             >
               <option value="finance_supervisor">Finance & Tax Supervisor (Dewi)</option>
               <option value="super_admin">Super Admin / CISO (Budi)</option>
@@ -187,13 +188,17 @@ export function Sidebar() {
                 .slice(0, 2)
                 .join('')}
             </div>
-            <div className="flex flex-col min-w-0">
-              <span className="text-sm font-semibold text-[#0F172A] dark:text-gray-200 truncate">
-                {isProduction && user?.name ? user.name : currentUser.name}
-              </span>
-              <span className="text-xs text-[#64748B] dark:text-[#94A3B8] truncate">
-                {isProduction && user?.roleTitle ? user.roleTitle : currentUser.roleTitle}
-              </span>
+            <div className="flex flex-col min-w-0 flex-1">
+              <TruncatedTextWithTooltip
+                text={isProduction && user?.name ? user.name : currentUser.name}
+                className="text-sm font-semibold text-[#0F172A] dark:text-gray-200"
+                position="top"
+              />
+              <TruncatedTextWithTooltip
+                text={isProduction && user?.roleTitle ? user.roleTitle : currentUser.roleTitle}
+                className="text-xs text-[#64748B] dark:text-[#94A3B8]"
+                position="top"
+              />
             </div>
           </div>
 

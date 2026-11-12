@@ -72,9 +72,9 @@ export function Topbar({ title, subtitle, onSearch }: TopbarProps) {
               onClick={handleResetData}
               disabled={isResetting}
               title="Reset Data Simulasi"
-              className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-md border border-amber-200 bg-amber-50/50 hover:bg-amber-100 text-xs font-semibold text-amber-800 transition-colors shrink-0 cursor-pointer"
+              className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-md border border-neutral-300 bg-white hover:bg-neutral-100 hover:border-black text-xs font-semibold text-black transition-colors shrink-0 cursor-pointer"
             >
-              <RefreshCwIcon className={`w-3.5 h-3.5 ${isResetting ? 'animate-spin text-amber-700' : ''}`} />
+              <RefreshCwIcon className={`w-3.5 h-3.5 text-black ${isResetting ? 'animate-spin' : ''}`} />
               <span className="hidden md:inline">Reset Demo Data</span>
             </button>
           )}
