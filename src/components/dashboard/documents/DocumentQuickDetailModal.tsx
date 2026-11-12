@@ -3,8 +3,9 @@
 import React from 'react';
 import Link from 'next/link';
 import { DocumentRecord } from '@/types';
-import { formatIDR, formatDate, getStatusBadgeInfo, getDocumentTypeLabel } from '@/lib/utils/formatters';
+import { formatCurrency, formatIDR, formatDate, getStatusBadgeInfo, getDocumentTypeLabel } from '@/lib/utils/formatters';
 import { XIcon, FileTextIcon, ArrowRightIcon, CopyIcon } from '@/components/ui/icons';
+import { useAppRoutes } from '@/context/RouteContext';
 
 export interface DocumentQuickDetailModalProps {
   document: DocumentRecord | null;
@@ -17,6 +18,7 @@ export function DocumentQuickDetailModal({
   onClose,
   onCopyText,
 }: DocumentQuickDetailModalProps) {
+  const { getRoute } = useAppRoutes();
   React.useEffect(() => {
     if (!document) return;
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -81,7 +83,14 @@ export function DocumentQuickDetailModal({
             </div>
             <div>
               <p className="text-[10px] font-bold text-[#64748B] uppercase tracking-wider">Total Nilai Tagihan</p>
-              <p className="font-bold text-sm text-[#0F172A] mt-0.5">{formatIDR(document.totalAmount)}</p>
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <span className="font-bold text-sm text-[#0F172A]">{formatCurrency(document.totalAmount, document.currency)}</span>
+                {document.currency && document.currency !== 'IDR' && (
+                  <span className="text-[9px] px-1.5 py-0.5 rounded font-black bg-indigo-50 text-indigo-700 border border-indigo-200">
+                    {document.currency}
+                  </span>
+                )}
+              </div>
             </div>
             <div>
               <p className="text-[10px] font-bold text-[#64748B] uppercase tracking-wider">Skor Akurasi AI</p>
@@ -132,7 +141,7 @@ export function DocumentQuickDetailModal({
           </button>
 
           <Link
-            href={`/dashboard/verification?docId=${document.id}`}
+            href={getRoute(`/verification?docId=${document.id}`)}
             className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[#4F46E5] hover:bg-[#4338CA] text-white text-xs font-bold transition-all shadow-xs"
           >
             <span>Buka Workspace Verifikasi</span>

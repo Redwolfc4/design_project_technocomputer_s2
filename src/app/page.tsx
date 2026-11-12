@@ -10,44 +10,14 @@ import {
   LayersIcon,
 } from '@/components/ui/icons';
 import { BrandLogo } from '@/components/shared/BrandLogo';
+import { Header } from '@/components/layout/Header';
+import { Footer } from '@/components/layout/Footer';
 
 export default function MarketingHomePage() {
   return (
     <div className="min-h-screen bg-[#FAFAFF] flex flex-col font-sans selection:bg-[#4F46E5]/10 selection:text-[#4F46E5]">
       {/* Navigation Bar */}
-      <header className="border-b border-[#E2E8F0] bg-white/95 backdrop-blur-md sticky top-0 z-50 py-3 sm:py-4">
-        <div className="max-w-screen-2xl mx-auto px-6 lg:px-12 flex items-center justify-between">
-          <div className="flex items-center gap-10">
-            <Link href="/" className="hover:opacity-90 transition-opacity">
-              <BrandLogo size={36} textSize="base" />
-            </Link>
-
-            <nav className="hidden md:flex items-center gap-7 text-xs font-semibold text-[#475569]">
-              <Link href="/product" className="hover:text-[#4F46E5] transition-colors">Produk</Link>
-              <Link href="/features" className="hover:text-[#4F46E5] transition-colors">Fitur Utama</Link>
-              <Link href="/solutions" className="hover:text-[#4F46E5] transition-colors">Solusi Pajak & AP</Link>
-              <Link href="/security" className="hover:text-[#4F46E5] transition-colors">Keamanan & Audit</Link>
-              <Link href="/pricing" className="hover:text-[#4F46E5] transition-colors">Paket Demo</Link>
-            </nav>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <Link
-              href="/login"
-              className="text-xs font-semibold text-[#475569] hover:text-[#0F172A] px-3 py-2 transition-colors"
-            >
-              Masuk Akun
-            </Link>
-            <Link
-              href="/dashboard"
-              className="flex items-center gap-1.5 bg-[#4F46E5] hover:bg-[#4338CA] text-white text-xs font-semibold px-4 py-2.5 rounded-lg shadow-sm transition-all shadow-[#4F46E5]/20 hover:shadow-md hover:shadow-[#4F46E5]/30"
-            >
-              <span>Eksplor Dashboard Demo</span>
-              <ArrowRightIcon className="w-3.5 h-3.5" />
-            </Link>
-          </div>
-        </div>
-      </header>
+      <Header />
 
       {/* Hero Section */}
       <section className="pt-16 pb-20 border-b border-[#E2E8F0] relative overflow-hidden bg-gradient-to-b from-white to-[#FAFAFF]">
@@ -69,14 +39,14 @@ export default function MarketingHomePage() {
 
               <div className="flex flex-wrap items-center gap-3 pt-2">
                 <Link
-                  href="/dashboard"
+                  href="/demo/dashboard"
                   className="flex items-center gap-2 bg-[#4F46E5] hover:bg-[#4338CA] text-white text-xs font-bold px-5 py-3 rounded-lg shadow-md transition-all shadow-[#4F46E5]/25"
                 >
                   <span>Buka Live Interactive Demo</span>
                   <ArrowRightIcon className="w-4 h-4" />
                 </Link>
                 <Link
-                  href="/dashboard/verification"
+                  href="/demo/dashboard/verification"
                   className="flex items-center gap-2 bg-white hover:bg-[#F8FAFC] text-[#0F172A] border border-[#CBD5E1] text-xs font-bold px-5 py-3 rounded-lg shadow-sm transition-all"
                 >
                   <span>Coba Workspace Verifikasi</span>
@@ -201,7 +171,7 @@ export default function MarketingHomePage() {
               </ul>
               <div className="pt-2">
                 <Link
-                  href="/dashboard/verification"
+                  href="/demo/dashboard/verification"
                   className="inline-flex items-center gap-2 text-xs font-bold text-[#4F46E5] hover:text-[#4338CA]"
                 >
                   <span>Buka Antrean Verifikasi Langsung</span>
@@ -283,7 +253,7 @@ export default function MarketingHomePage() {
                   <div>✓ Ekspor CSV Standar</div>
                 </div>
               </div>
-              <Link href="/dashboard" className="mt-8 block text-center py-2.5 px-4 rounded-lg border border-[#CBD5E1] text-xs font-bold text-[#0F172A] hover:bg-[#F8FAFC]">
+              <Link href="/demo/dashboard" className="mt-8 block text-center py-2.5 px-4 rounded-lg border border-[#CBD5E1] text-xs font-bold text-[#0F172A] hover:bg-[#F8FAFC]">
                 Mulai Uji Coba Demo
               </Link>
             </div>
@@ -305,7 +275,7 @@ export default function MarketingHomePage() {
                   <div>✓ Audit Trail 90 Hari</div>
                 </div>
               </div>
-              <Link href="/dashboard" className="mt-8 block text-center py-2.5 px-4 rounded-lg bg-[#4F46E5] text-white text-xs font-bold hover:bg-[#4338CA]">
+              <Link href="/demo/dashboard" className="mt-8 block text-center py-2.5 px-4 rounded-lg bg-[#4F46E5] text-white text-xs font-bold hover:bg-[#4338CA]">
                 Jelajahi Solusi Business
               </Link>
             </div>
@@ -323,7 +293,7 @@ export default function MarketingHomePage() {
                   <div>✓ Manajer Akun Khusus 24/7</div>
                 </div>
               </div>
-              <Link href="/dashboard" className="mt-8 block text-center py-2.5 px-4 rounded-lg border border-[#CBD5E1] text-xs font-bold text-[#0F172A] hover:bg-[#F8FAFC]">
+              <Link href="/login" className="mt-8 block text-center py-2.5 px-4 rounded-lg border border-[#CBD5E1] text-xs font-bold text-[#0F172A] hover:bg-[#F8FAFC]">
                 Hubungi Konsultan Kami
               </Link>
             </div>
@@ -332,17 +302,7 @@ export default function MarketingHomePage() {
       </section>
 
       {/* Footer */}
-      <footer className="bg-white border-t border-[#E2E8F0] py-12">
-        <div className="max-w-screen-2xl mx-auto px-6 lg:px-12 flex flex-col md:flex-row items-center justify-between gap-6">
-          <Link href="/" className="hover:opacity-90 transition-opacity">
-            <BrandLogo size={28} showText={true} subtitle="" textSize="sm" />
-          </Link>
-
-          <p className="text-xs text-[#64748B] text-center md:text-right">
-            © 2026 PT Nusantara Teknologi Cipta. Aplikasi Demonstrasi Intelligent Document Processing.
-          </p>
-        </div>
-      </footer>
+      <Footer />
     </div>
   );
 }

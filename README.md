@@ -245,7 +245,39 @@ bun run start -p 3005
 
 ---
 
-## 11. Batasan & Karakteristik Simulasi (Known Limitations)
+## 11. Panduan Deployment Vercel (CI/CD Production)
+
+DokumenAI Enterprise telah dikonfigurasi penuh dan teroptimasi untuk deployment instan di platform **Vercel** menggunakan runtime modern **Bun**:
+
+### Langkah Deployment ke Vercel:
+
+1. **Deploy via Vercel CLI:**
+   ```bash
+   # Login ke akun Vercel Anda
+   npx vercel login
+
+   # Deploy ke environment Preview
+   npx vercel
+
+   # Deploy langsung ke Production
+   npx vercel --prod
+   ```
+
+2. **Deploy Otomatis via GitHub Integration:**
+   - Hubungkan repository GitHub (`design_project_technocomputer_s2`) ke dashboard Vercel.
+   - Konfigurasi otomatis terdeteksi via [`vercel.json`](vercel.json):
+     - **Framework Preset**: `Next.js`
+     - **Install Command**: `bun install`
+     - **Build Command**: `bun run build`
+     - **Clean URLs**: `true`
+   - Setiap kali terjadi push ke branch `main`, Vercel akan otomatis melakukan proses linting, build optimasi static pages, dan deployment ke global edge network secara langsung.
+
+3. **Integritas Aset Statis di Vercel:**
+   - Seluruh aset visual (`/images/features/*.webp`), SVG icons, favicon (`/favicon.ico`), CSS statis (`/compiled.css`), dan demo documents (`/demo-documents/*.png`) tersimpan secara mandiri di direktori `public/` sehingga bebas dari broken link atau 404 pada lingkungan cloud serverless.
+
+---
+
+## 12. Batasan & Karakteristik Simulasi (Known Limitations)
 
 Demi menjaga transparansi profesional:
 - **Simulasi Deterministik**: Mesin ekstraksi AI disimulasikan secara deterministik untuk stabilitas pengujian otomatis offline tanpa ketergantungan API pihak ketiga.

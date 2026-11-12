@@ -1,121 +1,34 @@
 import { DocumentRecord, AuditLogEntry, UserPersona, WorkspaceSettings, DocumentStatus } from '@/types';
-import { INITIAL_MOCK_DOCUMENTS } from './documents';
+import { DocumentService } from '../modules/documents/document.service';
+import { AuditService } from '../modules/audit/audit.service';
+import { SettingService } from '../modules/settings/setting.service';
 import { DEMO_PERSONAS } from '../constants/personas';
-
-const STORAGE_KEYS = {
-  DOCUMENTS: 'dokumenai_documents_v1',
-  CURRENT_USER: 'dokumenai_current_user_v1',
-  AUDIT_LOGS: 'dokumenai_audit_logs_v1',
-  SETTINGS: 'dokumenai_settings_v1',
-};
-
-const INITIAL_SETTINGS: WorkspaceSettings = {
-  workspaceName: 'Nusantara Enterprise Cloud Workspace',
-  companyName: 'PT Nusantara Teknologi Cipta Tbk',
-  taxId: '01.234.567.8-051.000',
-  defaultCurrency: 'IDR',
-  locale: 'id-ID',
-  timezone: 'Asia/Jakarta',
-  autoApproveConfidenceThreshold: 95,
-  enableDuplicateDetection: true,
-  defaultTaxRatePercent: 11,
-  notificationEmail: 'finance-ops@nusantara-tech.co.id',
-  webhookUrl: 'https://api.nusantara-tech.co.id/webhooks/dokumenai',
-};
-
-const INITIAL_AUDIT_LOGS: AuditLogEntry[] = [
-  {
-    id: 'log-101',
-    timestamp: '2026-03-04T11:00:00Z',
-    actor: 'Budi Santoso, S.Kom., M.T.',
-    actorRole: 'super_admin',
-    action: 'UPLOAD_DOCUMENT',
-    resourceType: 'document',
-    resourceId: 'doc-004',
-    resourceName: 'Kontrak_SaaS_Mitra_Solusi_Digital.pdf',
-    details: 'Berhasil mengunggah dokumen kontrak multi-tahun untuk AI parsing',
-    status: 'success',
-    ipAddress: '182.253.112.44',
-  },
-  {
-    id: 'log-102',
-    timestamp: '2026-03-04T10:05:00Z',
-    actor: 'Rizky Pratama',
-    actorRole: 'document_reviewer',
-    action: 'UPLOAD_DOCUMENT',
-    resourceType: 'document',
-    resourceId: 'doc-003',
-    resourceName: 'Purchase_Order_Kharisma_Hardware.pdf',
-    details: 'Batch upload purchase order server rack IT',
-    status: 'success',
-    ipAddress: '182.253.112.89',
-  },
-  {
-    id: 'log-103',
-    timestamp: '2026-03-03T15:10:00Z',
-    actor: 'Dewi Lestari, S.E., Ak., CA',
-    actorRole: 'finance_supervisor',
-    action: 'APPROVE_DOCUMENT',
-    resourceType: 'document',
-    resourceId: 'doc-002',
-    resourceName: 'Invoice_Graha_Logistik_9014.pdf',
-    details: 'Verifikasi human-in-the-loop selesai. Nilai invoice Rp 20.535.000 disetujui.',
-    previousValue: 'Status: needs_review',
-    newValue: 'Status: approved',
-    status: 'success',
-    ipAddress: '182.253.112.55',
-  },
-  {
-    id: 'log-104',
-    timestamp: '2026-03-01T13:40:00Z',
-    actor: 'Rizky Pratama',
-    actorRole: 'document_reviewer',
-    action: 'REJECT_DOCUMENT',
-    resourceType: 'document',
-    resourceId: 'doc-006',
-    resourceName: 'Kuitansi_Sinar_Mandiri_ATK.pdf',
-    details: 'Dokumen ditolak karena resolusi fisik buram dan cap tidak terbaca',
-    previousValue: 'Status: needs_review',
-    newValue: 'Status: rejected',
-    status: 'warning',
-    ipAddress: '182.253.112.89',
-  },
-];
+import { STORAGE_KEYS, safeLocalStorageGet, safeLocalStorageSet, isClientEnvironment, safeLocalStorageRemove } from '../modules/storage.base';
+import { INITIAL_MOCK_DOCUMENTS } from './documents';
+import { INITIAL_RBAC_USERS } from './rbacUsers';
+import { INITIAL_BATCH_ITEMS } from '../modules/batches/batch.service';
+import { INITIAL_INTEGRATION_ENDPOINTS } from '../modules/integrations/integration.service';
+import { INITIAL_SETTINGS } from '../modules/settings/setting.service';
+import { INITIAL_AUDIT_LOGS } from '../modules/audit/audit.service';
 
 export class MockDocumentService {
-  private static isClient(): boolean {
-    return typeof window !== 'undefined';
-  }
-
   static getDocuments(): DocumentRecord[] {
-    if (!this.isClient()) return INITIAL_MOCK_DOCUMENTS;
-    const stored = localStorage.getItem(STORAGE_KEYS.DOCUMENTS);
-    if (!stored) {
-      localStorage.setItem(STORAGE_KEYS.DOCUMENTS, JSON.stringify(INITIAL_MOCK_DOCUMENTS));
-      return INITIAL_MOCK_DOCUMENTS;
-    }
-    try {
-      return JSON.parse(stored);
-    } catch {
-      return INITIAL_MOCK_DOCUMENTS;
-    }
+    return DocumentService.getDocuments();
   }
 
   static getDocumentById(id: string): DocumentRecord | undefined {
-    const docs = this.getDocuments();
-    return docs.find((d) => d.id === id);
+    return DocumentService.getDocumentById(id);
   }
 
   static saveDocument(doc: DocumentRecord): void {
-    if (!this.isClient()) return;
-    const docs = this.getDocuments();
+    const docs = DocumentService.getDocuments();
     const index = docs.findIndex((d) => d.id === doc.id);
     if (index >= 0) {
       docs[index] = doc;
+      safeLocalStorageSet(STORAGE_KEYS.DOCUMENTS, docs);
     } else {
-      docs.unshift(doc);
+      DocumentService.createDocument(doc);
     }
-    localStorage.setItem(STORAGE_KEYS.DOCUMENTS, JSON.stringify(docs));
   }
 
   static updateDocumentStatus(
@@ -124,131 +37,56 @@ export class MockDocumentService {
     actorName: string,
     note?: string
   ): DocumentRecord | undefined {
-    const doc = this.getDocumentById(id);
-    if (!doc) return undefined;
-
-    const prevStatus = doc.status;
-    doc.status = status;
-    if (status === 'approved' || status === 'rejected') {
-      doc.verifiedAt = new Date().toISOString();
-    }
-
-    doc.auditHistory.unshift({
-      timestamp: new Date().toISOString(),
-      actor: actorName,
-      action: `STATUS_CHANGE_TO_${status.toUpperCase()}`,
-      details: note || `Status diubah dari ${prevStatus} menjadi ${status}`,
-    });
-
-    if (note) {
-      doc.notes.push({
-        id: `note-${Date.now()}`,
-        author: actorName,
-        authorRole: 'Reviewer',
-        timestamp: new Date().toISOString(),
-        message: note,
-        type: status === 'rejected' ? 'correction_request' : 'note',
-      });
-    }
-
-    this.saveDocument(doc);
-
-    // Record to audit logs as well
-    this.addAuditLog({
-      timestamp: new Date().toISOString(),
-      actor: actorName,
-      actorRole: 'finance_supervisor',
-      action: `DOCUMENT_${status.toUpperCase()}`,
-      resourceType: 'document',
-      resourceId: doc.id,
-      resourceName: doc.fileName,
-      details: note || `Verifikasi dokumen selesai dengan status ${status}`,
-      previousValue: `Status: ${prevStatus}`,
-      newValue: `Status: ${status}`,
-      status: status === 'rejected' ? 'warning' : 'success',
-      ipAddress: '127.0.0.1 (Demo Local)',
-    });
-
-    return doc;
+    const res = DocumentService.updateStatus(id, status, actorName, note);
+    return res.document;
   }
 
   static getCurrentUser(): UserPersona {
-    if (!this.isClient()) return DEMO_PERSONAS.finance_supervisor;
+    if (!isClientEnvironment()) return DEMO_PERSONAS.finance_supervisor;
     const stored = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
-    if (!stored) {
-      localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(DEMO_PERSONAS.finance_supervisor));
+    if (stored === null) {
+      safeLocalStorageSet(STORAGE_KEYS.CURRENT_USER, DEMO_PERSONAS.finance_supervisor);
       return DEMO_PERSONAS.finance_supervisor;
     }
-    try {
-      return JSON.parse(stored);
-    } catch {
-      return DEMO_PERSONAS.finance_supervisor;
-    }
+    return safeLocalStorageGet<UserPersona>(STORAGE_KEYS.CURRENT_USER, DEMO_PERSONAS.finance_supervisor);
   }
 
   static setCurrentUser(persona: UserPersona): void {
-    if (!this.isClient()) return;
-    localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(persona));
+    safeLocalStorageSet(STORAGE_KEYS.CURRENT_USER, persona);
   }
 
   static getAuditLogs(): AuditLogEntry[] {
-    if (!this.isClient()) return INITIAL_AUDIT_LOGS;
-    const stored = localStorage.getItem(STORAGE_KEYS.AUDIT_LOGS);
-    if (!stored) {
-      localStorage.setItem(STORAGE_KEYS.AUDIT_LOGS, JSON.stringify(INITIAL_AUDIT_LOGS));
-      return INITIAL_AUDIT_LOGS;
-    }
-    try {
-      return JSON.parse(stored);
-    } catch {
-      return INITIAL_AUDIT_LOGS;
-    }
+    return AuditService.getLogs();
   }
 
   static addAuditLog(entry: Omit<AuditLogEntry, 'id'>): void {
-    if (!this.isClient()) return;
-    const logs = this.getAuditLogs();
-    const newEntry: AuditLogEntry = {
-      ...entry,
-      id: `log-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-    };
-    logs.unshift(newEntry);
-    localStorage.setItem(STORAGE_KEYS.AUDIT_LOGS, JSON.stringify(logs));
+    AuditService.recordEvent(entry);
   }
 
   static getSettings(): WorkspaceSettings {
-    if (!this.isClient()) return INITIAL_SETTINGS;
-    const stored = localStorage.getItem(STORAGE_KEYS.SETTINGS);
-    if (!stored) {
-      localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(INITIAL_SETTINGS));
-      return INITIAL_SETTINGS;
-    }
-    try {
-      return JSON.parse(stored);
-    } catch {
-      return INITIAL_SETTINGS;
-    }
+    return SettingService.getSettings();
   }
 
   static updateSettings(settings: Partial<WorkspaceSettings>): WorkspaceSettings {
-    const current = this.getSettings();
-    const updated = { ...current, ...settings };
-    if (this.isClient()) {
-      localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(updated));
-    }
-    return updated;
+    return SettingService.updateSettings(settings);
   }
 
   static resetDemoData(): void {
-    if (!this.isClient()) return;
-    localStorage.removeItem(STORAGE_KEYS.DOCUMENTS);
-    localStorage.removeItem(STORAGE_KEYS.AUDIT_LOGS);
-    localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
-    localStorage.removeItem(STORAGE_KEYS.SETTINGS);
-    localStorage.setItem(STORAGE_KEYS.DOCUMENTS, JSON.stringify(INITIAL_MOCK_DOCUMENTS));
-    localStorage.setItem(STORAGE_KEYS.AUDIT_LOGS, JSON.stringify(INITIAL_AUDIT_LOGS));
-    localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(DEMO_PERSONAS.finance_supervisor));
-    localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(INITIAL_SETTINGS));
+    if (!isClientEnvironment()) return;
+    safeLocalStorageRemove(STORAGE_KEYS.DOCUMENTS);
+    safeLocalStorageRemove(STORAGE_KEYS.AUDIT);
+    safeLocalStorageRemove(STORAGE_KEYS.CURRENT_USER);
+    safeLocalStorageRemove(STORAGE_KEYS.SETTINGS);
+    safeLocalStorageRemove(STORAGE_KEYS.MEMBERS);
+    safeLocalStorageRemove(STORAGE_KEYS.BATCHES);
+    safeLocalStorageRemove(STORAGE_KEYS.INTEGRATIONS);
+
+    safeLocalStorageSet(STORAGE_KEYS.DOCUMENTS, INITIAL_MOCK_DOCUMENTS);
+    safeLocalStorageSet(STORAGE_KEYS.AUDIT, INITIAL_AUDIT_LOGS);
+    safeLocalStorageSet(STORAGE_KEYS.CURRENT_USER, DEMO_PERSONAS.finance_supervisor);
+    safeLocalStorageSet(STORAGE_KEYS.SETTINGS, INITIAL_SETTINGS);
+    safeLocalStorageSet(STORAGE_KEYS.MEMBERS, INITIAL_RBAC_USERS);
+    safeLocalStorageSet(STORAGE_KEYS.BATCHES, INITIAL_BATCH_ITEMS);
+    safeLocalStorageSet(STORAGE_KEYS.INTEGRATIONS, INITIAL_INTEGRATION_ENDPOINTS);
   }
 }
-

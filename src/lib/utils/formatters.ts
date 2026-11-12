@@ -1,10 +1,163 @@
-export const formatIDR = (amount: number): string => {
-  return new Intl.NumberFormat('id-ID', {
-    style: 'currency',
-    currency: 'IDR',
-    maximumFractionDigits: 0,
-  }).format(amount);
+import { CurrencyCode, MonetaryValue } from '@/types';
+
+/**
+ * Universal Currency Formatter (Intl.NumberFormat)
+ * Supports IDR, USD, EUR, SGD, and fallback ISO codes.
+ */
+export const formatCurrency = (
+  amount: number | string,
+  currency: CurrencyCode = 'IDR',
+  options?: { showCurrencyCode?: boolean }
+): string => {
+  const num = typeof amount === 'string' ? parseFloat(amount) || 0 : amount;
+  const curr = (currency || 'IDR').toUpperCase().trim();
+
+  const localeMap: Record<string, string> = {
+    IDR: 'id-ID',
+    USD: 'en-US',
+    EUR: 'de-DE',
+    SGD: 'en-SG',
+    GBP: 'en-GB',
+    JPY: 'ja-JP',
+  };
+
+  const locale = localeMap[curr] || 'id-ID';
+  // Standard zero fraction digits for IDR & JPY, 2 for others
+  const fractionDigits = curr === 'IDR' || curr === 'JPY' ? 0 : 2;
+
+  try {
+    const formatted = new Intl.NumberFormat(locale, {
+      style: 'currency',
+      currency: curr,
+      minimumFractionDigits: fractionDigits,
+      maximumFractionDigits: fractionDigits,
+    }).format(num);
+
+    // Ensure non-breaking space after standard symbols like Rp
+    return formatted;
+  } catch {
+    return `${curr} ${num.toLocaleString('id-ID')}`;
+  }
 };
+
+/**
+ * Backward-compatible alias for formatCurrency with default IDR
+ */
+export const formatIDR = (amount: number): string => {
+  return formatCurrency(amount, 'IDR');
+};
+
+/**
+ * Parser for user-entered or CSV-imported currency strings.
+ * Detects currency code/symbol and resolves numeric amount safely.
+ */
+export interface ParsedMonetaryResult {
+  amount: number;
+  currency: CurrencyCode;
+  confidence: 'high' | 'ambiguous' | 'invalid';
+  rawString: string;
+}
+
+export const parseCurrencyInput = (input: string | number, defaultCurrency: CurrencyCode = 'IDR'): ParsedMonetaryResult => {
+  if (typeof input === 'number') {
+    return {
+      amount: input,
+      currency: defaultCurrency,
+      confidence: 'high',
+      rawString: String(input),
+    };
+  }
+
+  const raw = String(input).trim();
+  if (!raw) {
+    return {
+      amount: 0,
+      currency: defaultCurrency,
+      confidence: 'invalid',
+      rawString: '',
+    };
+  }
+
+  let detectedCurrency: CurrencyCode = defaultCurrency;
+  let confidence: 'high' | 'ambiguous' | 'invalid' = 'high';
+
+  // 1. Check explicit currency tokens
+  if (/\bIDR\b/i.test(raw) || /Rp/i.test(raw)) {
+    detectedCurrency = 'IDR';
+  } else if (/\bUSD\b/i.test(raw) || /US\$/i.test(raw)) {
+    detectedCurrency = 'USD';
+  } else if (/\bEUR\b/i.test(raw) || /€/.test(raw)) {
+    detectedCurrency = 'EUR';
+  } else if (/\bSGD\b/i.test(raw) || /S\$/i.test(raw)) {
+    detectedCurrency = 'SGD';
+  } else if (/\$/.test(raw)) {
+    detectedCurrency = 'USD';
+    confidence = 'ambiguous';
+  }
+
+  // 2. Clean currency symbols and currency tokens (keep digits, ., ,, -, +)
+  let cleaned = raw
+    .replace(/\b(IDR|USD|EUR|SGD|JPY|GBP)\b/gi, '')
+    .replace(/(Rp|US\$|S\$|[$€¥£])/g, '')
+    .replace(/[^\d.,\-+]/g, '')
+    .trim();
+
+  // Handle dot vs comma separator logic
+  const hasComma = cleaned.includes(',');
+  const hasDot = cleaned.includes('.');
+
+  if (hasComma && hasDot) {
+    // Determine which is decimal and which is thousand separator
+    if (cleaned.lastIndexOf(',') > cleaned.lastIndexOf('.')) {
+      // European/Indonesian format: 1.250,50 -> 1250.50
+      cleaned = cleaned.replace(/\./g, '').replace(',', '.');
+    } else {
+      // US format: 1,250.50 -> 1250.50
+      cleaned = cleaned.replace(/,/g, '');
+    }
+  } else if (hasComma && !hasDot) {
+    // Comma only: Could be decimal (1250,50) or thousand (1,250,000)
+    const parts = cleaned.split(',');
+    if (parts.length === 2 && parts[1].length <= 2) {
+      cleaned = cleaned.replace(',', '.');
+    } else {
+      cleaned = cleaned.replace(/,/g, '');
+    }
+  } else if (hasDot && !hasComma) {
+    // Dot only: Could be thousand (38.850.000) or decimal (1250.50)
+    const parts = cleaned.split('.');
+    if (parts.length > 2) {
+      // Multiple dots -> thousand separators: 38.850.000 -> 38850000
+      cleaned = cleaned.replace(/\./g, '');
+    } else if (parts.length === 2) {
+      if (parts[1].length === 3 && parts[0].length >= 1) {
+        // e.g. 50.000 -> 50000 (Indonesian thousand separator)
+        cleaned = cleaned.replace(/\./g, '');
+      } else if (parts[1].length > 3) {
+        cleaned = cleaned.replace(/\./g, '');
+      }
+      // If 1 or 2 digits after dot, standard decimal: 1250.50 -> keep as decimal
+    }
+  }
+
+  const parsedNum = parseFloat(cleaned);
+  if (isNaN(parsedNum)) {
+    return {
+      amount: 0,
+      currency: detectedCurrency,
+      confidence: 'invalid',
+      rawString: raw,
+    };
+  }
+
+  return {
+    amount: parsedNum,
+    currency: detectedCurrency,
+    confidence,
+    rawString: raw,
+  };
+};
+
 
 export const formatNumber = (num: number): string => {
   return new Intl.NumberFormat('id-ID').format(num);
@@ -108,4 +261,10 @@ export const getDocumentTypeLabel = (type: string): string => {
       return type;
   }
 };
+
+export const formatActionLabel = (action: string): string => {
+  if (!action) return '';
+  return action.replace(/_/g, ' ');
+};
+
 

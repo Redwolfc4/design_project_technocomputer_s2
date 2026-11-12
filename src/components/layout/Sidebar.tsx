@@ -3,45 +3,55 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { BrandLogo } from '@/components/shared/BrandLogo';
 import {
-  FileTextIcon,
   BarChart3Icon,
-  UploadCloudIcon,
-  CheckCircleIcon,
-  ShieldCheckIcon,
-  SettingsIcon,
-  UsersIcon,
+  FileTextIcon,
+  CheckSquareIcon,
   DownloadIcon,
-  LayersIcon,
+  ShieldCheckIcon,
+  UsersIcon,
+  SettingsIcon,
+  UploadCloudIcon,
+  XIcon,
+  LogOutIcon,
+  ChevronDownIcon,
 } from '@/components/ui/icons';
 import { MockDocumentService } from '@/lib/mocks/storage';
-import { UserPersona, UserRole } from '@/types';
 import { DEMO_PERSONAS } from '@/lib/constants/personas';
-import { BrandLogo } from '@/components/shared/BrandLogo';
+import { UserRole, UserPersona } from '@/types';
+import { useSidebar } from '@/context/SidebarContext';
+import { useAppMode } from '@/context/ModeContext';
+import { useAppRoutes } from '@/context/RouteContext';
+
+interface NavItem {
+  label: string;
+  href: string;
+  icon: React.ComponentType<{ className?: string }>;
+  badge?: number;
+}
 
 export function Sidebar() {
   const pathname = usePathname();
-  const [currentUser, setCurrentUser] = useState<UserPersona>(DEMO_PERSONAS.finance_supervisor);
-  const [pendingCount, setPendingCount] = useState(0);
+  const { isOpen, closeSidebar } = useSidebar();
+  const { isDemo, isProduction, tenantName, logout, user } = useAppMode();
+  const { getRoute } = useAppRoutes();
+
+  const [currentUser, setCurrentUser] = useState<UserPersona>(() => {
+    return MockDocumentService.getCurrentUser();
+  });
+
+  const [pendingCount, setPendingCount] = useState<number>(0);
 
   useEffect(() => {
-    const user = MockDocumentService.getCurrentUser();
-    setCurrentUser(user);
-
-    const updateCounts = () => {
-      const docs = MockDocumentService.getDocuments();
-      const needsReview = docs.filter((d) => d.status === 'needs_review').length;
-      setPendingCount(needsReview);
-    };
-
-    updateCounts();
-    const interval = setInterval(updateCounts, 3000);
-    return () => clearInterval(interval);
+    const docs = MockDocumentService.getDocuments();
+    setPendingCount(docs.filter((d) => d.status === 'needs_review').length);
+    setCurrentUser(MockDocumentService.getCurrentUser());
   }, []);
 
   const handleRoleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const roleKey = e.target.value as UserRole;
-    const persona = DEMO_PERSONAS[roleKey];
+    const newRole = e.target.value as UserRole;
+    const persona = DEMO_PERSONAS[newRole];
     if (persona) {
       MockDocumentService.setCurrentUser(persona);
       setCurrentUser(persona);
@@ -49,97 +59,154 @@ export function Sidebar() {
     }
   };
 
-  const navItems = [
-    { label: 'Ringkasan Utama', href: '/dashboard', icon: BarChart3Icon },
-    { label: 'Unggah Batch', href: '/dashboard/upload', icon: UploadCloudIcon },
+  const navItems: NavItem[] = [
+    { label: 'Ringkasan Utama', href: getRoute(''), icon: BarChart3Icon },
+    { label: 'Unggah Batch', href: getRoute('/upload'), icon: UploadCloudIcon },
     {
       label: 'Antrean Verifikasi',
-      href: '/dashboard/verification',
-      icon: CheckCircleIcon,
+      href: getRoute('/verification'),
+      icon: CheckSquareIcon,
       badge: pendingCount > 0 ? pendingCount : undefined,
     },
-    { label: 'Repositori Dokumen', href: '/dashboard/documents', icon: FileTextIcon },
-    { label: 'Ekspor & Integrasi', href: '/dashboard/export', icon: DownloadIcon },
-    { label: 'Analisis Operasional', href: '/dashboard/analytics', icon: LayersIcon },
-    { label: 'Audit Trail Forensik', href: '/dashboard/audit', icon: ShieldCheckIcon },
-    { label: 'Tim & Hak Akses', href: '/dashboard/users', icon: UsersIcon },
-    { label: 'Pengaturan Workspace', href: '/dashboard/settings', icon: SettingsIcon },
+    { label: 'Repositori Dokumen', href: getRoute('/documents'), icon: FileTextIcon },
+    { label: 'Ekspor & Integrasi', href: getRoute('/export'), icon: DownloadIcon },
+    { label: 'Audit Trail Forensik', href: getRoute('/audit'), icon: ShieldCheckIcon },
+    { label: 'Tim & Hak Akses', href: getRoute('/users'), icon: UsersIcon },
+    { label: 'Pengaturan Workspace', href: getRoute('/settings'), icon: SettingsIcon },
   ];
 
   return (
-    <aside className="w-64 border-r border-[#E2E8F0] dark:border-[#1F2937] bg-white dark:bg-[#111827] flex flex-col h-screen fixed left-0 top-0 z-30 transition-all select-none">
-      {/* Brand Header */}
-      <div className="h-16 flex items-center px-6 border-b border-[#E2E8F0] dark:border-[#1F2937]">
-        <Link href="/" className="hover:opacity-90 transition-opacity">
-          <BrandLogo size={32} />
-        </Link>
-      </div>
+    <>
+      {/* Mobile Backdrop Overlay */}
+      {isOpen && (
+        <div
+          onClick={closeSidebar}
+          className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-40 lg:hidden transition-opacity"
+          aria-hidden="true"
+        />
+      )}
 
-      {/* Workspace & Role Switcher */}
-      <div className="p-4 border-b border-[#E2E8F0] dark:border-[#1F2937] bg-[#FAFAFF] dark:bg-[#0D1322]/50">
-        <div className="text-[10px] font-bold uppercase tracking-wider text-[#64748B] dark:text-[#94A3B8] mb-1.5 flex items-center justify-between">
-          <span>Peran Pengguna Demo</span>
-          <span className="text-[9px] bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 px-1 rounded font-medium">
-            Simulasi Aktif
-          </span>
+      {/* Drawer Sidebar: Fixed on viewport, left 0, top 0, width w-72 (288px) */}
+      <aside
+        className={`w-72 border-r border-[#E2E8F0] dark:border-[#1F2937] bg-white dark:bg-[#111827] flex flex-col h-screen fixed left-0 top-0 z-50 transition-transform duration-200 ease-in-out select-none ${isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+          }`}
+      >
+        {/* Brand Header */}
+        <div className="h-16 flex items-center justify-between px-6 border-b border-[#E2E8F0] dark:border-[#1F2937]">
+          <Link href="/" className="hover:opacity-90 transition-opacity">
+            <BrandLogo size={36} textSize="base" />
+          </Link>
+
+          {/* Close button for mobile drawer */}
+          <button
+            type="button"
+            onClick={closeSidebar}
+            className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 lg:hidden cursor-pointer"
+            aria-label="Tutup sidebar"
+          >
+            <XIcon className="w-5 h-5" />
+          </button>
         </div>
-        <select
-          value={currentUser.role}
-          onChange={handleRoleChange}
-          className="w-full text-xs bg-white dark:bg-[#1F2937] border border-[#CBD5E1] dark:border-[#374151] rounded-md px-2.5 py-1.5 font-medium text-[#0F172A] dark:text-gray-100 shadow-sm focus:outline-none focus:ring-1 focus:ring-[#4F46E5] cursor-pointer"
-        >
-          <option value="finance_supervisor">Finance & Tax Supervisor (Dewi)</option>
-          <option value="super_admin">Super Admin / CISO (Budi)</option>
-          <option value="document_reviewer">Document Specialist (Rizky)</option>
-          <option value="auditor">Compliance Auditor (Siti)</option>
-        </select>
-      </div>
 
-      {/* Navigation Links */}
-      <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
-        {navItems.map((item) => {
-          const isActive = pathname === item.href;
-          const Icon = item.icon;
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`flex items-center justify-between px-3 py-2 rounded-md text-xs font-medium transition-colors ${isActive
-                ? 'bg-[#EEF2FF] dark:bg-[#1E1B4B]/80 text-[#4F46E5] dark:text-[#818CF8] font-semibold'
-                : 'text-[#475569] dark:text-[#94A3B8] hover:bg-[#F8FAFC] dark:hover:bg-[#1F2937] hover:text-[#0F172A] dark:hover:text-white'
-                }`}
+        {/* Demo Mode: Role Switcher | Production Mode: Locked Tenant Profile */}
+        {isDemo ? (
+          <div className="p-4 border-b border-amber-200 bg-amber-50/60 dark:bg-amber-950/20">
+            <div className="text-xs font-bold uppercase tracking-wider text-amber-900 dark:text-amber-400 mb-2 flex items-center justify-between">
+              <span>Peran Pengguna Demo</span>
+              <span className="text-[10px] bg-amber-100 text-amber-900 px-2 py-0.5 rounded font-extrabold border border-amber-300">
+                SANDBOX
+              </span>
+            </div>
+            <select
+              value={currentUser.role}
+              onChange={handleRoleChange}
+              className="w-full text-sm bg-white dark:bg-[#1F2937] border border-amber-300 rounded-lg px-3 py-2 font-semibold text-[#0F172A] shadow-xs focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 cursor-pointer"
             >
-              <div className="flex items-center gap-2.5">
-                <Icon className={`w-4 h-4 ${isActive ? 'text-[#4F46E5] dark:text-[#818CF8]' : 'text-[#64748B]'}`} />
-                <span>{item.label}</span>
-              </div>
-              {item.badge !== undefined && (
-                <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-[#E11D48] text-white">
-                  {item.badge}
-                </span>
-              )}
-            </Link>
-          );
-        })}
-      </nav>
+              <option value="finance_supervisor">Finance & Tax Supervisor (Dewi)</option>
+              <option value="super_admin">Super Admin / CISO (Budi)</option>
+              <option value="document_reviewer">Document Specialist (Rizky)</option>
+              <option value="auditor">Compliance Auditor (Siti)</option>
+            </select>
+          </div>
+        ) : (
+          <div className="p-4 border-b border-[#E2E8F0] bg-[#F8FAFC]">
+            <div className="text-xs font-bold uppercase tracking-wider text-[#64748B] mb-1.5 flex items-center justify-between">
+              <span>Tenant Korporat</span>
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" title="Koneksi Aktif" />
+            </div>
+            <div className="text-sm font-bold text-[#0F172A] truncate">
+              {tenantName}
+            </div>
+            <div className="text-xs text-[#64748B] mt-0.5">
+              Cabang: Menara Astra Lt. 28, Jakarta
+            </div>
+          </div>
+        )}
 
-      {/* User Profile Footer */}
-      <div className="p-3 border-t border-[#E2E8F0] dark:border-[#1F2937] bg-white dark:bg-[#111827]">
-        <div className="flex items-center gap-2.5 px-2 py-1.5 rounded-lg hover:bg-[#F8FAFC] dark:hover:bg-[#1F2937] transition-colors">
-          <div className="w-8 h-8 rounded-full bg-[#4F46E5]/10 text-[#4F46E5] font-bold text-xs flex items-center justify-center shrink-0 border border-[#CBD5E1] dark:border-[#374151]">
-            {currentUser.name.charAt(0)}
+        {/* Navigation Links */}
+        <nav className="flex-1 overflow-y-auto px-3.5 py-4 space-y-1.5">
+          {navItems.map((item) => {
+            const Icon = item.icon;
+            const isActive = pathname === item.href;
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={closeSidebar}
+                className={`flex items-center justify-between px-3.5 py-2.5 rounded-lg text-sm font-medium transition-colors ${isActive
+                  ? 'bg-[#EEF2FF] dark:bg-[#1E1B4B]/80 text-[#4F46E5] dark:text-[#818CF8] font-bold shadow-xs'
+                  : 'text-[#475569] dark:text-gray-400 hover:bg-[#F8FAFC] dark:hover:bg-[#1F2937] hover:text-[#0F172A] dark:hover:text-gray-200'
+                  }`}
+              >
+                <div className="flex items-center gap-3">
+                  <Icon
+                    className={`w-5 h-5 shrink-0 ${isActive
+                      ? 'text-[#4F46E5] dark:text-[#818CF8]'
+                      : 'text-[#64748B] dark:text-gray-400'
+                      }`}
+                  />
+                  <span className="tracking-tight">{item.label}</span>
+                </div>
+                {item.badge !== undefined && (
+                  <span className="bg-[#4F46E5] text-white text-xs font-bold px-2 py-0.5 rounded-full min-w-5 text-center shadow-xs">
+                    {item.badge}
+                  </span>
+                )}
+              </Link>
+            );
+          })}
+        </nav>
+
+        {/* User Card Footer */}
+        <div className="p-4 border-t border-[#E2E8F0] dark:border-[#1F2937] bg-[#FAFAFF] dark:bg-[#0D1322]/50 flex items-center justify-between">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-9 h-9 rounded-full bg-[#4F46E5] text-white flex items-center justify-center font-bold text-sm ring-2 ring-[#EEF2FF] shrink-0 shadow-xs">
+              {(isProduction && user?.name ? user.name : currentUser.name)
+                .split(' ')
+                .map((n) => n[0])
+                .slice(0, 2)
+                .join('')}
+            </div>
+            <div className="flex flex-col min-w-0">
+              <span className="text-sm font-semibold text-[#0F172A] dark:text-gray-200 truncate">
+                {isProduction && user?.name ? user.name : currentUser.name}
+              </span>
+              <span className="text-xs text-[#64748B] dark:text-[#94A3B8] truncate">
+                {isProduction && user?.roleTitle ? user.roleTitle : currentUser.roleTitle}
+              </span>
+            </div>
           </div>
-          <div className="flex flex-col min-w-0 flex-1">
-            <span className="text-xs font-semibold text-[#0F172A] dark:text-white truncate">
-              {currentUser.name}
-            </span>
-            <span className="text-[10px] text-[#64748B] dark:text-[#94A3B8] truncate">
-              {currentUser.roleTitle}
-            </span>
-          </div>
+
+          <button
+            type="button"
+            onClick={logout}
+            title="Keluar Sesi"
+            className="p-2 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition-colors cursor-pointer"
+          >
+            <LogOutIcon className="w-5 h-5" />
+          </button>
         </div>
-      </div>
-    </aside>
+      </aside>
+    </>
   );
 }
-

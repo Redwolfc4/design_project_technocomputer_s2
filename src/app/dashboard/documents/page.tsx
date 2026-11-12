@@ -1,12 +1,12 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, Suspense } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Topbar } from '@/components/layout/Topbar';
-import { MockDocumentService } from '@/lib/mocks/storage';
+import { DocumentService } from '@/lib/modules/documents/document.service';
 import { DocumentRecord } from '@/types';
-import { formatIDR, formatDate, getStatusBadgeInfo, getDocumentTypeLabel } from '@/lib/utils/formatters';
+import { formatCurrency, formatIDR, formatDate, getStatusBadgeInfo, getDocumentTypeLabel, parseCurrencyInput } from '@/lib/utils/formatters';
 import {
   ArrowRightIcon,
   FileTextIcon,
@@ -14,6 +14,10 @@ import {
   CopyIcon,
   CheckCircleIcon,
   DownloadIcon,
+  PencilIcon,
+  TrashIcon,
+  XIcon,
+  PlusIcon,
 } from '@/components/ui/icons';
 import {
   DataTableRow,
@@ -23,20 +27,49 @@ import {
   DataTableToolbar,
   DataTablePagination,
   DataTableEmptyState,
+  DataTableExport,
   FilterConfig,
 } from '@/components/shared/data-table';
 import { DocumentQuickDetailModal } from '@/components/dashboard/documents/DocumentQuickDetailModal';
+import { PageHeader } from '@/components/shared/PageHeader';
+import { useAppRoutes } from '@/context/RouteContext';
 
-export default function DocumentRepositoryPage() {
+function DocumentRepositoryContent() {
   const router = useRouter();
-  const [documents, setDocuments] = useState<DocumentRecord[]>([]);
-  const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [typeFilter, setTypeFilter] = useState<string>('all');
+  const { getRoute } = useAppRoutes();
+  const searchParams = useSearchParams();
+  const [documents, setDocuments] = useState<DocumentRecord[]>(() => DocumentService.getDocuments());
+  const [statusFilter, setStatusFilter] = useState<string>(() => searchParams.get('status') || 'all');
+  const [typeFilter, setTypeFilter] = useState<string>(() => searchParams.get('type') || 'all');
   const [searchQuery, setSearchQuery] = useState('');
+
+  useEffect(() => {
+    const s = searchParams.get('status');
+    const t = searchParams.get('type');
+    if (s) setStatusFilter(s);
+    if (t) setTypeFilter(t);
+  }, [searchParams]);
 
   // Modals & Interactivity
   const [previewDoc, setPreviewDoc] = useState<DocumentRecord | null>(null);
-  const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' } | null>(null);
+  const [editDoc, setEditDoc] = useState<DocumentRecord | null>(null);
+  const [deleteDoc, setDeleteDoc] = useState<DocumentRecord | null>(null);
+  const [editFormData, setEditFormData] = useState<{
+    fileNumber: string;
+    vendorName: string;
+    vendorTaxId: string;
+    totalAmount: string;
+    currency: string;
+    notes: string;
+  }>({
+    fileNumber: '',
+    vendorName: '',
+    vendorTaxId: '',
+    totalAmount: '0',
+    currency: 'IDR',
+    notes: '',
+  });
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' | 'error' } | null>(null);
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -54,7 +87,7 @@ export default function DocumentRepositoryPage() {
   } = useDataTableInteractions<DocumentRecord>();
 
   useEffect(() => {
-    setDocuments(MockDocumentService.getDocuments());
+    setDocuments(DocumentService.getDocuments());
   }, []);
 
   useEffect(() => {
@@ -64,8 +97,59 @@ export default function DocumentRepositoryPage() {
     }
   }, [toast]);
 
-  const showToast = (message: string, type: 'success' | 'info' = 'success') => {
+  const showToast = (message: string, type: 'success' | 'info' | 'error' = 'success') => {
     setToast({ message, type });
+  };
+
+  const handleOpenEdit = (doc: DocumentRecord) => {
+    if (doc.status === 'approved' || doc.status === 'rejected') {
+      showToast(`Dokumen berstatus '${doc.status}' terkunci dari modifikasi.`, 'error');
+      return;
+    }
+    setEditDoc(doc);
+    setEditFormData({
+      fileNumber: doc.fileNumber,
+      vendorName: doc.vendorName,
+      vendorTaxId: doc.vendorTaxId || '',
+      totalAmount: doc.totalAmount.toString(),
+      currency: doc.currency || 'IDR',
+      notes: '',
+    });
+  };
+
+  const handleEditSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editDoc) return;
+    const parsed = parseCurrencyInput(editFormData.totalAmount, editFormData.currency);
+    const res = DocumentService.updateMetadata(editDoc.id, {
+      fileNumber: editFormData.fileNumber.trim(),
+      vendorName: editFormData.vendorName.trim(),
+      vendorTaxId: editFormData.vendorTaxId.trim(),
+      totalAmount: parsed.amount,
+      notes: editFormData.notes.trim() || undefined,
+    });
+
+    if (!res.success) {
+      showToast(res.error || 'Gagal memperbarui metadata.', 'error');
+      return;
+    }
+
+    setDocuments(DocumentService.getDocuments());
+    setEditDoc(null);
+    showToast(`Metadata dokumen ${editFormData.fileNumber} berhasil diperbarui!`, 'success');
+  };
+
+  const handleDeleteConfirm = () => {
+    if (!deleteDoc) return;
+    const res = DocumentService.deleteDocument(deleteDoc.id);
+    if (!res.success) {
+      showToast(res.error || 'Gagal menghapus dokumen.', 'error');
+      return;
+    }
+
+    setDocuments(DocumentService.getDocuments());
+    showToast(`Dokumen ${deleteDoc.fileNumber} berhasil dihapus dari repositori.`, 'success');
+    setDeleteDoc(null);
   };
 
   const handleCopyText = (text: string, label: string) => {
@@ -114,7 +198,7 @@ export default function DocumentRepositoryPage() {
 
   // Export functions
   const handleExportCSV = () => {
-    const headers = ['Nomor Berkas', 'Nama Berkas', 'Kategori', 'Vendor', 'Tanggal Masuk', 'Total Nominal', 'Akurasi', 'Status'];
+    const headers = ['Nomor Berkas', 'Nama Berkas', 'Kategori', 'Vendor', 'Tanggal Masuk', 'Total Nominal', 'Currency', 'Total Nominal Formatted', 'Akurasi', 'Status'];
     const rows = filteredDocs.map((d) => [
       `"${d.fileNumber}"`,
       `"${d.fileName}"`,
@@ -122,6 +206,8 @@ export default function DocumentRepositoryPage() {
       `"${d.vendorName}"`,
       `"${d.uploadedAt}"`,
       d.totalAmount,
+      `"${d.currency || 'IDR'}"`,
+      `"${formatCurrency(d.totalAmount, d.currency || 'IDR')}"`,
       `${d.confidence}%`,
       `"${d.status}"`,
     ]);
@@ -151,28 +237,32 @@ export default function DocumentRepositoryPage() {
               <th>Kategori</th>
               <th>Vendor</th>
               <th>Tanggal Masuk</th>
+              <th>Mata Uang</th>
               <th>Total Nominal</th>
+              <th>Nominal Diformat</th>
               <th>Akurasi</th>
               <th>Status</th>
             </tr>
           </thead>
           <tbody>
             ${filteredDocs
-              .map(
-                (d) => `
+        .map(
+          (d) => `
               <tr>
                 <td>${d.fileNumber}</td>
                 <td>${d.fileName}</td>
                 <td>${getDocumentTypeLabel(d.documentType)}</td>
                 <td>${d.vendorName}</td>
                 <td>${d.uploadedAt}</td>
-                <td>${d.totalAmount}</td>
+                <td style="text-align: center;">${d.currency || 'IDR'}</td>
+                <td style="mso-number-format:'\\#\\,\\#\\#0\\.00'; text-align: right;">${d.totalAmount}</td>
+                <td style="text-align: right;">${formatCurrency(d.totalAmount, d.currency || 'IDR')}</td>
                 <td>${d.confidence}%</td>
                 <td>${d.status}</td>
               </tr>
             `
-              )
-              .join('')}
+        )
+        .join('')}
           </tbody>
         </table>
       </body>
@@ -232,7 +322,7 @@ export default function DocumentRepositoryPage() {
         id: 'open_workspace',
         label: 'Buka Workspace Verifikasi',
         icon: <ArrowRightIcon className="w-4 h-4 text-[#4F46E5]" />,
-        onSelect: (doc) => router.push(`/dashboard/verification?docId=${doc.id}`),
+        onSelect: (doc) => router.push(getRoute(`/verification?docId=${doc.id}`)),
       },
       {
         id: 'view_detail',
@@ -245,6 +335,20 @@ export default function DocumentRepositoryPage() {
         label: 'Salin Nomor Berkas',
         icon: <CopyIcon className="w-4 h-4 text-[#64748B]" />,
         onSelect: (doc) => handleCopyText(doc.fileNumber, 'Nomor Berkas'),
+      },
+      {
+        id: 'edit_metadata',
+        label: 'Ubah Metadata Dokumen',
+        icon: <PencilIcon className="w-4 h-4 text-amber-600" />,
+        disabled: (doc) => doc.status === 'approved' || doc.status === 'rejected',
+        onSelect: (doc) => handleOpenEdit(doc),
+      },
+      {
+        id: 'delete_doc',
+        label: 'Hapus dari Repositori',
+        icon: <TrashIcon className="w-4 h-4 text-rose-600" />,
+        disabled: (doc) => doc.status === 'approved',
+        onSelect: (doc) => setDeleteDoc(doc),
         dividerAfter: true,
       },
       {
@@ -253,8 +357,8 @@ export default function DocumentRepositoryPage() {
         icon: <CheckCircleIcon className="w-4 h-4 text-emerald-600" />,
         disabled: (doc) => doc.status === 'approved',
         onSelect: (doc) => {
-          MockDocumentService.updateDocumentStatus(doc.id, 'approved', 'Reviewer Tim');
-          setDocuments(MockDocumentService.getDocuments());
+          DocumentService.updateStatus(doc.id, 'approved', 'Reviewer Tim');
+          setDocuments(DocumentService.getDocuments());
           showToast(`Dokumen ${doc.fileNumber} berhasil disetujui!`, 'success');
         },
       },
@@ -278,7 +382,30 @@ export default function DocumentRepositoryPage() {
         onSearch={(q) => setSearchQuery(q)}
       />
 
-      <main className="flex-1 p-6 lg:p-8 space-y-6 max-w-7xl mx-auto w-full">
+      <main className="flex-1 w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 py-6 sm:py-8 space-y-6 min-w-0">
+        <PageHeader
+          title="Repositori Dokumen Enterprise"
+          subtitle="Kelola, telusuri, dan saring seluruh arsip faktur, invoice, dan kontrak perusahaan."
+          badge={{ label: 'Arsip Aktif', variant: 'info' }}
+          actions={
+            <div className="flex items-center gap-3">
+              <DataTableExport
+                options={{
+                  onExportCSV: handleExportCSV,
+                  onExportExcel: handleExportExcel,
+                }}
+              />
+              <button
+                onClick={() => router.push(getRoute('/upload'))}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-[#4F46E5] hover:bg-[#4338CA] text-white text-xs font-semibold rounded-lg shadow-sm transition-colors cursor-pointer"
+              >
+                <PlusIcon className="w-4 h-4" />
+                <span>Unggah Dokumen</span>
+              </button>
+            </div>
+          }
+        />
+
         {/* Reusable Global DataTableToolbar */}
         <DataTableToolbar
           searchQuery={searchQuery}
@@ -290,14 +417,6 @@ export default function DocumentRepositoryPage() {
           entityName="dokumen"
           isFilterActive={isFilterActive}
           onResetFilters={handleResetFilters}
-          exportOptions={{
-            onExportCSV: handleExportCSV,
-            onExportExcel: handleExportExcel,
-          }}
-          primaryAction={{
-            label: "+ Unggah Dokumen",
-            onClick: () => router.push('/dashboard/upload'),
-          }}
         />
 
         {/* Documents Table */}
@@ -310,7 +429,7 @@ export default function DocumentRepositoryPage() {
                   <th className="py-3 px-5">Kategori</th>
                   <th className="py-3 px-5">Vendor / Lawan Transaksi</th>
                   <th className="py-3 px-5">Tanggal Masuk</th>
-                  <th className="py-3 px-5">Total Nominal</th>
+                  <th className="py-3 px-5 text-right">Total Nominal</th>
                   <th className="py-3 px-5">Akurasi</th>
                   <th className="py-3 px-5">Status</th>
                   <th className="py-3 px-5 text-right">Aksi</th>
@@ -327,7 +446,7 @@ export default function DocumentRepositoryPage() {
                         onResetFilters={handleResetFilters}
                         action={{
                           label: "Unggah Dokumen Baru",
-                          onClick: () => router.push('/dashboard/upload'),
+                          onClick: () => router.push(getRoute('/upload')),
                         }}
                       />
                     </td>
@@ -339,7 +458,7 @@ export default function DocumentRepositoryPage() {
                       <DataTableRow
                         key={doc.id}
                         row={doc}
-                        onRowDoubleClick={(d) => router.push(`/dashboard/verification?docId=${d.id}`)}
+                        onRowDoubleClick={(d) => router.push(getRoute(`/verification?docId=${d.id}`))}
                         onRowContextMenu={(d, e) => openContextMenu(d, e, 'Aksi Dokumen')}
                       >
                         <td className="py-3.5 px-5">
@@ -355,18 +474,24 @@ export default function DocumentRepositoryPage() {
                         <td className="py-3.5 px-5 text-[#64748B]">
                           {formatDate(doc.uploadedAt)}
                         </td>
-                        <td className="py-3.5 px-5 font-bold text-[#0F172A]">
-                          {formatIDR(doc.totalAmount)}
+                        <td className="py-3.5 px-5 font-bold text-[#0F172A] text-right tabular-nums">
+                          <div className="flex items-center justify-end gap-1.5">
+                            <span>{formatCurrency(doc.totalAmount, doc.currency)}</span>
+                            {doc.currency && doc.currency !== 'IDR' && (
+                              <span className="text-[9px] px-1.5 py-0.5 rounded font-black bg-indigo-50 text-indigo-700 border border-indigo-200">
+                                {doc.currency}
+                              </span>
+                            )}
+                          </div>
                         </td>
                         <td className="py-3.5 px-5">
                           <span
-                            className={`font-bold ${
-                              doc.confidence >= 90
-                                ? 'text-[#059669]'
-                                : doc.confidence >= 75
+                            className={`font-bold ${doc.confidence >= 90
+                              ? 'text-[#059669]'
+                              : doc.confidence >= 75
                                 ? 'text-[#F59E0B]'
                                 : 'text-[#E11D48]'
-                            }`}
+                              }`}
                           >
                             {doc.confidence}%
                           </span>
@@ -434,6 +559,147 @@ export default function DocumentRepositoryPage() {
           onMouseLeave={() => scheduleCloseMenu(250)}
         />
       )}
+
+      {/* Modal Edit Metadata */}
+      {editDoc && (
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-xl border border-slate-200 max-w-md w-full p-6 space-y-4 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h3 className="text-sm font-bold text-slate-900">Ubah Metadata Dokumen</h3>
+              <button onClick={() => setEditDoc(null)} className="p-1 text-slate-400 hover:text-slate-600 rounded-md">
+                <XIcon className="w-4 h-4" />
+              </button>
+            </div>
+            <form onSubmit={handleEditSubmit} className="space-y-3.5">
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-700">Nomor Berkas / Faktur</label>
+                <input
+                  type="text"
+                  value={editFormData.fileNumber}
+                  onChange={(e) => setEditFormData({ ...editFormData, fileNumber: e.target.value })}
+                  className="w-full text-xs px-3 py-2 rounded-md border border-slate-300"
+                  required
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-700">Nama Rekanan / Vendor</label>
+                <input
+                  type="text"
+                  value={editFormData.vendorName}
+                  onChange={(e) => setEditFormData({ ...editFormData, vendorName: e.target.value })}
+                  className="w-full text-xs px-3 py-2 rounded-md border border-slate-300"
+                  required
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-700">NPWP Vendor</label>
+                <input
+                  type="text"
+                  value={editFormData.vendorTaxId}
+                  onChange={(e) => setEditFormData({ ...editFormData, vendorTaxId: e.target.value })}
+                  className="w-full text-xs px-3 py-2 rounded-md border border-slate-300"
+                />
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-700">Mata Uang</label>
+                  <select
+                    value={editFormData.currency}
+                    onChange={(e) => setEditFormData({ ...editFormData, currency: e.target.value })}
+                    className="w-full text-xs px-3 py-2 rounded-md border border-slate-300 bg-white font-semibold text-slate-800"
+                  >
+                    <option value="IDR">IDR — Rupiah Indonesia</option>
+                    <option value="USD">USD — US Dollar</option>
+                    <option value="EUR">EUR — Euro</option>
+                    <option value="SGD">SGD — Singapore Dollar</option>
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-700">Total Nilai Transaksi</label>
+                  <input
+                    type="text"
+                    value={editFormData.totalAmount}
+                    onChange={(e) => setEditFormData({ ...editFormData, totalAmount: e.target.value })}
+                    placeholder="Contoh: 38850000 atau 1,250.50"
+                    className="w-full text-xs px-3 py-2 rounded-md border border-slate-300 font-semibold"
+                    required
+                  />
+                </div>
+              </div>
+              <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200 text-xs flex items-center justify-between">
+                <span className="text-slate-500 font-medium">Pratinjau Format:</span>
+                <span className="font-bold text-[#059669]">
+                  {formatCurrency(parseCurrencyInput(editFormData.totalAmount, editFormData.currency).amount, editFormData.currency)}
+                </span>
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-700">Catatan Perubahan</label>
+                <textarea
+                  rows={2}
+                  value={editFormData.notes}
+                  onChange={(e) => setEditFormData({ ...editFormData, notes: e.target.value })}
+                  placeholder="Tambahkan alasan koreksi metadata..."
+                  className="w-full text-xs px-3 py-2 rounded-md border border-slate-300"
+                />
+              </div>
+              <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setEditDoc(null)}
+                  className="px-4 py-2 rounded-lg border border-slate-300 text-xs font-bold text-slate-700 hover:bg-slate-50 cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 rounded-lg bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700 shadow-sm cursor-pointer"
+                >
+                  Simpan Perubahan
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Hapus Dokumen */}
+      {deleteDoc && (
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-xl border border-slate-200 max-w-sm w-full p-6 space-y-4 animate-in fade-in zoom-in-95 duration-150">
+            <h3 className="text-sm font-bold text-rose-600 flex items-center gap-2">
+              <TrashIcon className="w-4 h-4" />
+              <span>Hapus Dokumen?</span>
+            </h3>
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Apakah Anda yakin ingin menghapus berkas <strong className="text-slate-900">{deleteDoc.fileNumber}</strong> ({deleteDoc.fileName}) dari repositori? Tindakan ini akan dicatat ke dalam audit trail.
+            </p>
+            <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setDeleteDoc(null)}
+                className="px-4 py-2 rounded-lg border border-slate-300 text-xs font-bold text-slate-700 hover:bg-slate-50 cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteConfirm}
+                className="px-4 py-2 rounded-lg bg-rose-600 text-white text-xs font-bold hover:bg-rose-700 shadow-sm cursor-pointer"
+              >
+                Hapus Dokumen
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
+  );
+}
+
+export default function DocumentRepositoryPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-center text-xs text-[#64748B]">Memuat Repositori Dokumen...</div>}>
+      <DocumentRepositoryContent />
+    </Suspense>
   );
 }

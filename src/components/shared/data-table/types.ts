@@ -83,15 +83,24 @@ export interface FilterOption {
 }
 
 /**
+ * Date range value interface.
+ */
+export interface DateRangeValue {
+  from?: string;
+  to?: string;
+  preset?: string;
+}
+
+/**
  * Configuration for a single filter dropdown.
  */
 export interface FilterConfig {
   id: string;
   label: string;
-  type?: 'select' | 'multi-select';
+  type?: 'select' | 'multi-select' | 'date-range';
   placeholder?: string;
-  options: FilterOption[];
-  selectedValue: string | string[];
+  options?: FilterOption[];
+  selectedValue: string | string[] | DateRangeValue;
   onChange: (value: any) => void;
   searchable?: boolean;
 }

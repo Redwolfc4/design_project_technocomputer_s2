@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { AuditLogEntry } from '@/types';
-import { formatDateTime } from '@/lib/utils/formatters';
+import { formatDateTime, formatActionLabel } from '@/lib/utils/formatters';
 import { XIcon, ShieldCheckIcon, CopyIcon, CodeIcon } from '@/components/ui/icons';
 
 export interface AuditLogDetailModalProps {
@@ -80,7 +80,7 @@ export function AuditLogDetailModal({ log, onClose, onCopyText }: AuditLogDetail
             </div>
             <div>
               <p className="text-[10px] font-bold text-[#64748B] uppercase tracking-wider">Tindakan / Aksi</p>
-              <p className="font-semibold text-[#4F46E5] mt-0.5">{log.action}</p>
+              <p className="font-semibold text-[#4F46E5] mt-0.5">{formatActionLabel(log.action)}</p>
             </div>
             <div>
               <p className="text-[10px] font-bold text-[#64748B] uppercase tracking-wider">Alamat IP & Jaringan</p>

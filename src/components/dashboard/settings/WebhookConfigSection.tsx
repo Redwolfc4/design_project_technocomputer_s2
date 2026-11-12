@@ -623,7 +623,7 @@ export function WebhookConfigSection({ initialUrl, onChange }: WebhookConfigSect
               </span>
             ) : (
               <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-indigo-50 text-[#4F46E5] font-bold">
-                {bodyFormat.toUpperCase()}
+                {bodyFormat.replace(/_/g, ' ').toUpperCase()}
               </span>
             )}
           </button>
@@ -640,7 +640,7 @@ export function WebhookConfigSection({ initialUrl, onChange }: WebhookConfigSect
           >
             <span>Autentikasi</span>
             <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-indigo-50 text-[#4F46E5] font-bold">
-              {authType.toUpperCase()}
+              {authType.replace(/_/g, ' ').toUpperCase()}
             </span>
           </button>
         </div>

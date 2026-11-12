@@ -3,6 +3,7 @@
 import React from 'react';
 import { FilterConfig } from './types';
 import { DataTableFilterSelect } from './DataTableFilterSelect';
+import { DataTableDateRangePicker } from './DataTableDateRangePicker';
 
 export interface DataTableFiltersProps {
   filters: FilterConfig[];
@@ -32,9 +33,13 @@ export const DataTableFilters: React.FC<DataTableFiltersProps> = ({
 
   return (
     <div className={`grid ${getGridColsClass(filters.length)} gap-3 ${className}`}>
-      {filters.map((filter) => (
-        <DataTableFilterSelect key={filter.id} filter={filter} />
-      ))}
+      {filters.map((filter) =>
+        filter.type === 'date-range' ? (
+          <DataTableDateRangePicker key={filter.id} filter={filter} />
+        ) : (
+          <DataTableFilterSelect key={filter.id} filter={filter} />
+        )
+      )}
     </div>
   );
 };
