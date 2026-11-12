@@ -6,6 +6,15 @@ import { usePathname } from 'next/navigation';
 import { ArrowRightIcon, MenuIcon, XIcon } from '@/components/ui/icons';
 import { BrandLogo } from '@/components/shared/BrandLogo';
 
+const NAV_LINKS = [
+  { href: '/', label: 'Beranda' },
+  { href: '/product', label: 'Produk' },
+  { href: '/features', label: 'Fitur Utama' },
+  { href: '/solutions', label: 'Solusi Pajak & AP' },
+  { href: '/security', label: 'Keamanan & Audit' },
+  { href: '/pricing', label: 'Paket Demo' },
+];
+
 export function Header() {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -65,45 +74,49 @@ export function Header() {
     <header className="border-b border-[#E2E8F0] bg-white/95 backdrop-blur-md sticky top-0 z-50 py-3 sm:py-4">
       <div className="max-w-screen-2xl mx-auto px-6 lg:px-12 flex items-center justify-between">
         {/* Logo and Desktop Links */}
-        <div className="flex items-center gap-10">
-          <Link href="/" className="hover:opacity-90 transition-opacity">
+        <div className="flex items-center gap-8 xl:gap-10">
+          <Link href="/" className="hover:opacity-90 transition-opacity shrink-0">
             <BrandLogo size={36} textSize="base" />
           </Link>
 
           {/* Desktop Navigation Links (>= lg) */}
           <nav
             aria-label="Navigasi Desktop"
-            className="hidden lg:flex items-center gap-7 text-xs font-semibold text-[#475569]"
+            className="hidden lg:flex items-center gap-5 xl:gap-7 text-xs font-semibold"
           >
-            <Link href="/product" className="hover:text-[#4F46E5] transition-colors">
-              Produk
-            </Link>
-            <Link href="/features" className="hover:text-[#4F46E5] transition-colors">
-              Fitur Utama
-            </Link>
-            <Link href="/solutions" className="hover:text-[#4F46E5] transition-colors">
-              Solusi Pajak & AP
-            </Link>
-            <Link href="/security" className="hover:text-[#4F46E5] transition-colors">
-              Keamanan & Audit
-            </Link>
-            <Link href="/pricing" className="hover:text-[#4F46E5] transition-colors">
-              Paket Demo
-            </Link>
+            {NAV_LINKS.map((item) => {
+              const isActive =
+                item.href === '/'
+                  ? pathname === '/'
+                  : pathname.startsWith(item.href);
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={`transition-colors whitespace-nowrap ${
+                    isActive
+                      ? 'text-[#4F46E5] font-bold'
+                      : 'text-[#475569] hover:text-[#4F46E5]'
+                  }`}
+                >
+                  {item.label}
+                </Link>
+              );
+            })}
           </nav>
         </div>
 
         {/* Desktop Action Buttons (>= lg) */}
-        <div className="hidden lg:flex items-center gap-3">
+        <div className="hidden lg:flex items-center gap-3 shrink-0">
           <Link
             href="/login"
-            className="text-xs font-semibold text-[#475569] hover:text-[#0F172A] px-3 py-2 transition-colors"
+            className="text-xs font-semibold text-[#475569] hover:text-[#0F172A] px-3 py-2 transition-colors whitespace-nowrap"
           >
             Masuk Akun
           </Link>
           <Link
             href="/demo/login"
-            className="flex items-center gap-1.5 bg-[#4F46E5] hover:bg-[#4338CA] text-white text-xs font-semibold px-4 py-2.5 rounded-lg shadow-sm transition-all shadow-[#4F46E5]/20 hover:shadow-md hover:shadow-[#4F46E5]/30"
+            className="flex items-center gap-1.5 bg-[#4F46E5] hover:bg-[#4338CA] text-white text-xs font-semibold px-4 py-2.5 rounded-lg shadow-sm transition-all shadow-[#4F46E5]/20 hover:shadow-md hover:shadow-[#4F46E5]/30 whitespace-nowrap"
           >
             <span>Eksplor Dashboard Demo</span>
             <ArrowRightIcon className="w-3.5 h-3.5" />
@@ -139,42 +152,27 @@ export function Header() {
           className="lg:hidden absolute top-full left-0 w-full bg-white border-b border-[#E2E8F0] shadow-lg animate-in fade-in slide-in-from-top-2 duration-200"
         >
           <div className="max-w-screen-2xl mx-auto px-6 py-5 flex flex-col space-y-4">
-            <nav className="flex flex-col space-y-2 text-sm font-semibold text-[#475569]">
-              <Link
-                href="/product"
-                onClick={() => setIsOpen(false)}
-                className="px-3 py-2.5 rounded-lg hover:bg-[#F8FAFC] hover:text-[#4F46E5] transition-colors"
-              >
-                Produk
-              </Link>
-              <Link
-                href="/features"
-                onClick={() => setIsOpen(false)}
-                className="px-3 py-2.5 rounded-lg hover:bg-[#F8FAFC] hover:text-[#4F46E5] transition-colors"
-              >
-                Fitur Utama
-              </Link>
-              <Link
-                href="/solutions"
-                onClick={() => setIsOpen(false)}
-                className="px-3 py-2.5 rounded-lg hover:bg-[#F8FAFC] hover:text-[#4F46E5] transition-colors"
-              >
-                Solusi Pajak & AP
-              </Link>
-              <Link
-                href="/security"
-                onClick={() => setIsOpen(false)}
-                className="px-3 py-2.5 rounded-lg hover:bg-[#F8FAFC] hover:text-[#4F46E5] transition-colors"
-              >
-                Keamanan & Audit
-              </Link>
-              <Link
-                href="/pricing"
-                onClick={() => setIsOpen(false)}
-                className="px-3 py-2.5 rounded-lg hover:bg-[#F8FAFC] hover:text-[#4F46E5] transition-colors"
-              >
-                Paket Demo
-              </Link>
+            <nav className="flex flex-col space-y-1.5 text-sm font-semibold text-[#475569]">
+              {NAV_LINKS.map((item) => {
+                const isActive =
+                  item.href === '/'
+                    ? pathname === '/'
+                    : pathname.startsWith(item.href);
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    onClick={() => setIsOpen(false)}
+                    className={`px-3 py-2.5 rounded-lg transition-colors ${
+                      isActive
+                        ? 'bg-[#EEF2FF] text-[#4F46E5] font-bold'
+                        : 'text-[#475569] hover:bg-[#F8FAFC] hover:text-[#4F46E5]'
+                    }`}
+                  >
+                    {item.label}
+                  </Link>
+                );
+              })}
             </nav>
 
             <div className="pt-3 border-t border-[#E2E8F0] flex flex-col space-y-2.5">
