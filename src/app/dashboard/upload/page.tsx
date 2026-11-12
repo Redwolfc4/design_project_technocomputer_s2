@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
+import React, { useState, useRef, useEffect, useMemo, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Topbar } from '@/components/layout/Topbar';
 import { DocumentService } from '@/lib/modules/documents/document.service';
 import { BatchService, BatchItemDraft, INITIAL_BATCH_ITEMS } from '@/lib/modules/batches/batch.service';
@@ -25,6 +25,9 @@ import { SectionHeader } from '@/components/shared/SectionHeader';
 import {
   DataTableExport,
   DataTableActionMenu,
+  DataTableRow,
+  DataTablePagination,
+  DataTableEmptyState,
   useDataTableInteractions,
   RowAction,
   DataTableToolbar,
@@ -33,6 +36,10 @@ import {
 import { useAppRoutes } from '@/context/RouteContext';
 import { useAppScope } from '@/context/ScopeContext';
 import { useToast } from '@/context/ToastContext';
+import { Modal } from '@/components/ui/Modal';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { Button } from '@/components/ui/Button';
+import { SearchableSelect } from '@/components/ui/Select';
 
 function createUploadTimestamp(): number {
   return Date.now();
@@ -144,8 +151,11 @@ function createDocumentFromBatchDraft(item: BatchItemDraft): DocumentRecord {
   };
 }
 
-export default function DocumentUploadPage() {
+function DocumentUploadContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const shouldAutoOpenUpload =
+    searchParams.get('action') === 'upload' || searchParams.get('openModal') === 'true';
   const { getRoute, isDemo } = useAppRoutes();
   const {
     activeCompanyId,
@@ -161,7 +171,7 @@ export default function DocumentUploadPage() {
   const toast = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState(shouldAutoOpenUpload);
   const [selectedType, setSelectedType] = useState<DocumentType>(DEFAULT_FORM_VALUES.selectedType);
   const [vendorName, setVendorName] = useState(DEFAULT_FORM_VALUES.vendorName);
   const [fileNumber, setFileNumber] = useState(DEFAULT_FORM_VALUES.fileNumber);
@@ -180,12 +190,16 @@ export default function DocumentUploadPage() {
   const [statusFilter, setStatusFilter] = useState<'all' | 'non_draft' | 'draft'>('all');
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [pageSize, setPageSize] = useState<number>(10);
   const [editingDraft, setEditingDraft] = useState<BatchItemDraft | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<BatchItemDraft | null>(null);
 
-  // 3-dot Floating Action Menu Interactions
+  // Floating Action Menu & Context Menu Interactions
   const {
     activeMenu,
     openDropdownMenu,
+    openContextMenu,
     closeMenu,
     scheduleCloseMenu,
     cancelScheduledClose,
@@ -205,11 +219,11 @@ export default function DocumentUploadPage() {
     return batchDrafts.filter((b) => {
       // 0. Scope Filter
       if (activeCompanyId !== 'all') {
-        const batchComp = (b as any).companyId || 'comp-01';
+        const batchComp = b.companyId || 'comp-01';
         if (batchComp !== activeCompanyId) return false;
       }
       if (activeDepartment && activeDepartment.id !== 'all') {
-        const batchDept = (b as any).department;
+        const batchDept = b.department;
         if (batchDept && batchDept.toLowerCase() !== activeDepartment.name.toLowerCase()) {
           return false;
         }
@@ -227,7 +241,17 @@ export default function DocumentUploadPage() {
       }
       return true;
     });
-  }, [batchDrafts, statusFilter, typeFilter, searchQuery]);
+  }, [batchDrafts, statusFilter, typeFilter, searchQuery, activeCompanyId, activeDepartment]);
+
+  const totalItems = filteredDrafts.length;
+  const paginatedDrafts = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredDrafts.slice(start, start + pageSize);
+  }, [filteredDrafts, currentPage, pageSize]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, statusFilter, typeFilter, activeCompanyId, activeDepartment, pageSize]);
 
   const isFilterActive = searchQuery.trim() !== '' || statusFilter !== 'all' || typeFilter !== 'all';
 
@@ -278,13 +302,14 @@ export default function DocumentUploadPage() {
       label: 'Status Kesiapan',
       type: 'select',
       placeholder: 'Semua Status',
+      searchable: true,
       options: [
         { label: 'Semua Status', value: 'all' },
         { label: 'Siap Proses', value: 'non_draft' },
         { label: 'Draft Disimpan', value: 'draft' },
       ],
       selectedValue: statusFilter,
-      onChange: (val) => setStatusFilter(val as any),
+      onChange: (val) => setStatusFilter((val || 'all') as 'all' | 'non_draft' | 'draft'),
     },
     {
       id: 'documentType',
@@ -314,6 +339,17 @@ export default function DocumentUploadPage() {
   }, []);
 
   useEffect(() => {
+    const action = searchParams.get('action');
+    const openModal = searchParams.get('openModal');
+    if (action === 'upload' || openModal === 'true') {
+      const timer = setTimeout(() => {
+        setIsUploadModalOpen(true);
+      }, 0);
+      return () => clearTimeout(timer);
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
     if (!isUploadModalOpen) return;
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
@@ -323,12 +359,15 @@ export default function DocumentUploadPage() {
         }
         if (!isProcessing) {
           setIsUploadModalOpen(false);
+          if (searchParams.get('action') || searchParams.get('openModal')) {
+            router.replace(getRoute('/upload'), { scroll: false });
+          }
         }
       }
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isUploadModalOpen, isSavePopoverOpen, isProcessing]);
+  }, [isUploadModalOpen, isSavePopoverOpen, isProcessing, searchParams, router, getRoute]);
 
   useEffect(() => {
     if (!isSavePopoverOpen) return;
@@ -398,15 +437,42 @@ export default function DocumentUploadPage() {
     if (isProcessing) return;
     setIsSavePopoverOpen(false);
     setIsUploadModalOpen(false);
+    if (searchParams.get('action') || searchParams.get('openModal')) {
+      router.replace(getRoute('/upload'), { scroll: false });
+    }
   };
 
   const handleFileSelect = (file: File) => {
+    // Validasi ekstensi & tipe file: Hanya PDF dan PNG
+    const allowedExtensions = ['.pdf', '.png'];
+    const allowedMimeTypes = ['application/pdf', 'image/png'];
+    const lowerName = file.name.toLowerCase();
+    const hasValidExtension = allowedExtensions.some((ext) => lowerName.endsWith(ext));
+    const hasValidMime = allowedMimeTypes.includes(file.type);
+
+    if (!hasValidExtension || (file.type && !hasValidMime)) {
+      toast.error(
+        `Format berkas "${file.name}" tidak didukung. Harap unggah berkas berekstensi PDF (.pdf) atau PNG (.png).`,
+        {
+          title: 'Format Berkas Tidak Sesuai',
+          badge: isDemo ? 'Demo Sandbox' : 'Unggah Dokumen',
+        }
+      );
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+      return;
+    }
+
     const maxBytes = 25 * 1024 * 1024;
     if (file.size > maxBytes) {
       toast.error(`Ukuran berkas "${file.name}" melebihi batas maksimal 25MB.`, {
         title: 'Berkas Terlalu Besar',
         badge: isDemo ? 'Demo Sandbox' : 'Unggah Dokumen',
       });
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
       return;
     }
     setUploadedFile(file);
@@ -646,7 +712,7 @@ export default function DocumentUploadPage() {
         icon: <TrashIcon className="w-4 h-4 text-[#E11D48]" />,
         destructive: true,
         dividerAfter: false,
-        onSelect: (item) => handleDeleteBatchDraft(item.id),
+        onSelect: (item) => setDeleteTarget(item),
       },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -862,56 +928,47 @@ export default function DocumentUploadPage() {
           />
 
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="border-b border-[#E2E8F0] text-[11px] font-bold text-[#64748B] uppercase tracking-wider bg-[#F8FAFC]">
-                  <th className="py-3 px-4">Nama Berkas</th>
-                  <th className="py-3 px-4">Jenis</th>
-                  <th className="py-3 px-4">Vendor</th>
-                  <th className="py-3 px-4">Nominal</th>
-                  <th className="py-3 px-4">Status</th>
-                  <th className="py-3 px-4 text-right">Aksi</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#E2E8F0] text-xs font-medium text-[#0F172A]">
-                {filteredDrafts.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="py-10 text-center space-y-3">
-                      {batchDrafts.length === 0 ? (
-                        <>
-                          <p className="text-slate-400">
-                            Antrean draf batch kosong. Klik tombol <strong className="text-slate-600">+ Unggah Dokumen</strong> di kanan atas untuk memilih berkas baru.
-                          </p>
-                          <button
-                            type="button"
-                            onClick={handleOpenUploadModal}
-                            className="inline-flex items-center gap-2 px-4 py-2 bg-[#4F46E5] hover:bg-[#4338CA] text-white text-xs font-semibold rounded-lg shadow-sm transition-colors cursor-pointer"
-                          >
-                            <PlusIcon className="w-4 h-4" />
-                            <span>Unggah Dokumen</span>
-                          </button>
-                        </>
-                      ) : (
-                        <>
-                          <p className="text-slate-400">
-                            Tidak ada berkas dengan status <strong className="text-slate-600">{statusFilter === 'draft' ? 'Draft' : 'Siap Proses (Bukan Draft)'}</strong> saat ini.
-                          </p>
-                          <button
-                            type="button"
-                            onClick={() => setStatusFilter('all')}
-                            className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-[#CBD5E1] text-xs font-semibold rounded-lg transition-colors cursor-pointer"
-                          >
-                            Tampilkan Semua ({batchDrafts.length})
-                          </button>
-                        </>
-                      )}
-                    </td>
+            {totalItems === 0 ? (
+              <DataTableEmptyState
+                isFilterActive={isFilterActive}
+                onResetFilters={handleResetFilters}
+                title={isFilterActive ? undefined : 'Antrean draf batch masih kosong'}
+                description={
+                  isFilterActive
+                    ? undefined
+                    : 'Klik tombol "+ Unggah Dokumen" untuk menambahkan berkas baru ke antrean pemrosesan AI.'
+                }
+                action={
+                  !isFilterActive
+                    ? {
+                        label: 'Unggah Dokumen',
+                        onClick: handleOpenUploadModal,
+                      }
+                    : undefined
+                }
+              />
+            ) : (
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-[#E2E8F0] text-[11px] font-bold text-[#64748B] uppercase tracking-wider bg-[#F8FAFC]">
+                    <th className="py-3 px-4">Nama Berkas</th>
+                    <th className="py-3 px-4">Jenis</th>
+                    <th className="py-3 px-4">Vendor</th>
+                    <th className="py-3 px-4">Nominal</th>
+                    <th className="py-3 px-4">Status</th>
+                    <th className="py-3 px-4 text-right">Aksi</th>
                   </tr>
-                ) : (
-                  filteredDrafts.map((b) => {
+                </thead>
+                <tbody className="divide-y divide-[#E2E8F0] text-xs font-medium text-[#0F172A]">
+                  {paginatedDrafts.map((b) => {
                     const badge = getStatusBadgeInfo(b.status);
                     return (
-                      <tr key={b.id} className="hover:bg-slate-50 transition-colors">
+                      <DataTableRow
+                        key={b.id}
+                        row={b}
+                        onRowDoubleClick={handleOpenEditDraft}
+                        onRowContextMenu={(r, e) => openContextMenu(r, e, 'Aksi Draf Berkas')}
+                      >
                         <td className="py-3.5 px-4 font-bold">
                           <div className="flex items-center gap-2">
                             <FileTextIcon className="w-4 h-4 text-indigo-600 shrink-0" />
@@ -939,52 +996,42 @@ export default function DocumentUploadPage() {
                             <MoreHorizontalIcon className="w-4 h-4" />
                           </button>
                         </td>
-                      </tr>
+                      </DataTableRow>
                     );
-                  })
-                )}
-              </tbody>
-            </table>
+                  })}
+                </tbody>
+              </table>
+            )}
           </div>
+
+          <DataTablePagination
+            currentPage={currentPage}
+            pageSize={pageSize}
+            totalItems={totalItems}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={setPageSize}
+          />
         </div>
       </main>
 
       {/* Modal Unggah Dokumen & Ekstraksi AI */}
       {isUploadModalOpen && (
-        <div
-          onClick={(e) => {
-            if (e.target === e.currentTarget) handleCloseUploadModal();
-          }}
-          className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4"
+        <Modal
+          isOpen={isUploadModalOpen}
+          onClose={handleCloseUploadModal}
+          title={editingDraft ? 'Edit Berkas Faktur / Tagihan' : 'Pilih Berkas Faktur / Tagihan'}
+          subtitle="Format yang didukung: PDF (.pdf) & PNG (.png) hingga ukuran maksimal 25MB per berkas."
+          maxWidth="2xl"
+          showCloseButton={!isProcessing}
+          closeOnOverlayClick={!isProcessing}
+          closeOnEsc={!isProcessing}
         >
-          <div className="bg-white rounded-xl shadow-2xl border border-[#CBD5E1] max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6 sm:p-7 space-y-5 animate-in fade-in zoom-in-95 duration-150">
-            {/* Modal Header */}
-            <div className="flex items-start justify-between gap-4 border-b border-slate-100 pb-4">
-              <div className="space-y-1">
-                <h3 className="text-sm sm:text-base font-bold text-[#0F172A]">
-                  {editingDraft ? 'Edit Berkas Faktur / Tagihan' : 'Pilih Berkas Faktur / Tagihan'}
-                </h3>
-                <p className="text-xs text-[#64748B]">
-                  Format yang didukung: PDF, PNG, JPG, TIFF hingga ukuran maksimal 25MB per berkas.
-                </p>
-              </div>
-              <button
-                type="button"
-                disabled={isProcessing}
-                onClick={handleCloseUploadModal}
-                aria-label="Tutup modal unggah"
-                className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors disabled:opacity-40 cursor-pointer shrink-0"
-              >
-                <XIcon className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Modal Form */}
-            <form onSubmit={handleSubmit} noValidate className="space-y-5">
+          {/* Modal Form */}
+          <form onSubmit={handleSubmit} noValidate className="space-y-5">
               <input
                 ref={fileInputRef}
                 type="file"
-                accept=".pdf,.png,.jpg,.jpeg"
+                accept=".pdf,.png,application/pdf,image/png"
                 onChange={handleInputChange}
                 className="hidden"
               />
@@ -1041,19 +1088,49 @@ export default function DocumentUploadPage() {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-[#475569]">Profil / Jenis Dokumen</label>
-                  <select
+                <div>
+                  <SearchableSelect<DocumentType>
+                    label="Profil / Jenis Dokumen"
+                    size="sm"
                     value={selectedType}
-                    onChange={(e) => setSelectedType(e.target.value as DocumentType)}
-                    className="w-full text-xs font-medium px-3 py-2 rounded-md border border-[#CBD5E1] bg-white text-[#0F172A] focus:outline-none focus:border-[#4F46E5]"
-                  >
-                    <option value="tax_invoice">Faktur Pajak (e-Faktur DJP)</option>
-                    <option value="commercial_invoice">Invoice Komersial AP</option>
-                    <option value="purchase_order">Surat Pesanan (PO)</option>
-                    <option value="contract">Perjanjian Kontrak</option>
-                    <option value="withholding_tax">Bukti Potong PPh 23/26</option>
-                  </select>
+                    onChange={(val) => setSelectedType(val)}
+                    searchPlaceholder="Cari profil dokumen..."
+                    options={[
+                      {
+                        value: 'tax_invoice',
+                        label: 'Faktur Pajak (e-Faktur DJP)',
+                        category: 'Perpajakan Indonesia',
+                        badge: 'PPN 11%',
+                      },
+                      {
+                        value: 'commercial_invoice',
+                        label: 'Invoice Komersial AP',
+                        category: 'Accounts Payable',
+                        badge: 'OCR v2.4',
+                      },
+                      {
+                        value: 'purchase_order',
+                        label: 'Surat Pesanan (PO)',
+                        category: 'Procurement',
+                      },
+                      {
+                        value: 'contract',
+                        label: 'Perjanjian Kontrak',
+                        category: 'Legal & Compliance',
+                      },
+                      {
+                        value: 'withholding_tax',
+                        label: 'Bukti Potong PPh 23/26',
+                        category: 'Perpajakan Indonesia',
+                        badge: 'e-Bupot',
+                      },
+                      {
+                        value: 'receipt',
+                        label: 'Kuitansi / Nota Transaksi',
+                        category: 'General Expense',
+                      },
+                    ]}
+                  />
                 </div>
 
                 <div className="space-y-1.5">
@@ -1105,28 +1182,31 @@ export default function DocumentUploadPage() {
 
               <div className="pt-3 flex flex-col-reverse sm:flex-row items-center justify-between gap-3 border-t border-slate-100">
                 <div className="relative w-full sm:w-auto" ref={savePopoverRef}>
-                  <button
+                  <Button
                     type="button"
+                    variant="secondary"
+                    size="md"
                     disabled={isProcessing}
                     onClick={() => setIsSavePopoverOpen((prev) => !prev)}
                     aria-expanded={isSavePopoverOpen}
                     aria-haspopup="menu"
-                    className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-[#CBD5E1] bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold transition-all disabled:opacity-50 cursor-pointer"
+                    leftIcon={!editingDraft ? <PlusIcon className="w-4 h-4 text-indigo-600" /> : undefined}
+                    rightIcon={
+                      <ChevronDownIcon
+                        className={`w-3.5 h-3.5 text-slate-500 transition-transform duration-150 ${
+                          isSavePopoverOpen ? 'rotate-180' : ''
+                        }`}
+                      />
+                    }
                   >
-                    {!editingDraft && <PlusIcon className="w-4 h-4 text-indigo-600" />}
-                    <span>{editingDraft ? 'Simpan Perubahan' : 'Simpan ke Antrean'}</span>
-                    <ChevronDownIcon
-                      className={`w-3.5 h-3.5 text-slate-500 transition-transform duration-150 ${
-                        isSavePopoverOpen ? 'rotate-180' : ''
-                      }`}
-                    />
-                  </button>
+                    {editingDraft ? 'Simpan Perubahan' : 'Simpan ke Antrean'}
+                  </Button>
 
                   {isSavePopoverOpen && (
                     <div
                       role="menu"
                       aria-label="Pilih status penyimpanan berkas"
-                      className="absolute bottom-full left-0 mb-2 w-full sm:w-72 bg-white border border-[#CBD5E1] rounded-xl shadow-xl z-30 p-2 space-y-1 animate-in fade-in zoom-in-95 duration-100"
+                      className="absolute bottom-full left-0 mb-2 w-full sm:w-72 bg-white border border-[#CBD5E1] rounded-xl shadow-xl z-30 p-2 space-y-1 animate-in"
                     >
                       <div className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-[#64748B] border-b border-slate-100 mb-1">
                         Pilih Status Berkas
@@ -1182,21 +1262,45 @@ export default function DocumentUploadPage() {
                     </div>
                   )}
                 </div>
-                <button
+                <Button
                   type="submit"
+                  variant="primary"
+                  size="md"
                   disabled={isProcessing}
-                  className="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg bg-[#4F46E5] hover:bg-[#4338CA] text-white text-xs font-bold shadow-md shadow-[#4F46E5]/25 transition-all disabled:opacity-50 cursor-pointer"
+                  isLoading={isProcessing}
+                  rightIcon={<ArrowRightIcon className="w-4 h-4" />}
                 >
-                  <span>{isProcessing ? 'Sedang Memproses...' : 'Mulai Ekstraksi AI & Buka Verifikasi'}</span>
-                  <ArrowRightIcon className="w-4 h-4" />
-                </button>
+                  {isProcessing ? 'Sedang Memproses...' : 'Mulai Ekstraksi AI & Buka Verifikasi'}
+                </Button>
               </div>
             </form>
-          </div>
-        </div>
+        </Modal>
       )}
 
-      {/* Floating Action Menu (3-dot popover) */}
+      {/* Confirm Delete Draft Dialog */}
+      <ConfirmDialog
+        isOpen={Boolean(deleteTarget)}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={() => {
+          if (deleteTarget) {
+            handleDeleteBatchDraft(deleteTarget.id);
+            setDeleteTarget(null);
+          }
+        }}
+        title="Hapus Berkas dari Antrean Batch?"
+        description={
+          deleteTarget ? (
+            <>
+              Draf berkas <strong>&ldquo;{deleteTarget.fileName}&rdquo;</strong> ({deleteTarget.fileNumber}) akan dihapus dari antrean pemrosesan batch.
+            </>
+          ) : null
+        }
+        confirmLabel="Ya, Hapus Draf"
+        cancelLabel="Batal"
+        variant="danger"
+      />
+
+      {/* Floating Action Menu (3-dot popover & context menu) */}
       {activeMenu && (
         <DataTableActionMenu
           isOpen={Boolean(activeMenu)}
@@ -1211,5 +1315,13 @@ export default function DocumentUploadPage() {
         />
       )}
     </div>
+  );
+}
+
+export default function DocumentUploadPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-center text-xs text-[#64748B]">Memuat Halaman Unggah Dokumen...</div>}>
+      <DocumentUploadContent />
+    </Suspense>
   );
 }

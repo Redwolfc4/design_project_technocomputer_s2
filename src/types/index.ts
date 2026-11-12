@@ -43,6 +43,7 @@ export interface RBACMember {
   roleTitle: string;
   avatar?: string;
   department: string;
+  companyId?: string;
   permissions: string[];
   status: 'Aktif' | 'Nonaktif';
   createdAt: string;
@@ -123,6 +124,8 @@ export interface DocumentRecord {
   confidence: number; // Overall confidence 0-100
   processingTimeMs: number;
   assignedReviewer?: string;
+  companyId?: string;
+  department?: string;
   isSimulatedAI: true; // Mandatory transparency flag
   extractionProfile: string;
   previewUrl: string;
@@ -152,6 +155,8 @@ export interface AuditLogEntry {
   newValue?: string;
   status: 'success' | 'warning' | 'failure';
   ipAddress: string;
+  companyId?: string;
+  department?: string;
 }
 
 export interface ExportMappingTemplate {

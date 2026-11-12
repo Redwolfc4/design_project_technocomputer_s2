@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Topbar } from '@/components/layout/Topbar';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { SectionHeader } from '@/components/shared/SectionHeader';
@@ -20,30 +20,51 @@ import {
   PlusIcon,
   PencilIcon,
   TrashIcon,
-  XIcon,
   EyeIcon,
   EyeOffIcon,
   MoreHorizontalIcon,
 } from '@/components/ui/icons';
 import {
+  DataTableToolbar,
+  DataTableRow,
+  DataTablePagination,
+  DataTableEmptyState,
   DataTableActionMenu,
   useDataTableInteractions,
   RowAction,
+  FilterConfig,
 } from '@/components/shared/data-table';
+import { Select, SearchableSelect } from '@/components/ui/Select';
+import { Modal } from '@/components/ui/Modal';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { useToast } from '@/context/ToastContext';
+
+type TargetSystem = 'sap' | 'oracle' | 'djp_tax' | 'generic';
 
 export default function ExportIntegrationsPage() {
   const toast = useToast();
   const [documents, setDocuments] = useState<DocumentRecord[]>([]);
-  const [integrations, setIntegrations] = useState<IntegrationEndpoint[]>(() => IntegrationService.getIntegrations());
-  const [targetSystem, setTargetSystem] = useState<'sap' | 'oracle' | 'djp_tax' | 'generic'>('sap');
+  const [integrations, setIntegrations] = useState<IntegrationEndpoint[]>(() =>
+    IntegrationService.getIntegrations()
+  );
+  const [targetSystem, setTargetSystem] = useState<TargetSystem>('sap');
   const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const exportDropdownRef = useRef<HTMLDivElement>(null);
 
+  // Filter, Search & Pagination for Integration Table
+  const [searchQuery, setSearchQuery] = useState('');
+  const [systemFilter, setSystemFilter] = useState<string>('all');
+  const [authFilter, setAuthFilter] = useState<string>('all');
+  const [formatFilter, setFormatFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
   // Modal CRUD State for Integration Endpoint
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<IntegrationEndpoint | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<IntegrationEndpoint | null>(null);
   const [showAuthSecret, setShowAuthSecret] = useState(false);
   const [formData, setFormData] = useState<{
     name: string;
@@ -69,10 +90,11 @@ export default function ExportIntegrationsPage() {
     status: 'active',
   });
 
-  // 3-dot Floating Action Menu Interactions
+  // Action Menu Interactions (Dropdown & Context Menu)
   const {
     activeMenu,
     openDropdownMenu,
+    openContextMenu,
     closeMenu,
     scheduleCloseMenu,
     cancelScheduledClose,
@@ -107,19 +129,155 @@ export default function ExportIntegrationsPage() {
     };
   }, [isExportMenuOpen]);
 
-  useEffect(() => {
-    if (!isModalOpen) return;
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setIsModalOpen(false);
-      }
-    };
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isModalOpen]);
-
   const approvedDocs = documents.filter((d) => d.status === 'approved');
   const totalApprovedAmount = approvedDocs.reduce((acc, d) => acc + d.totalAmount, 0);
+
+  // Filter Integrations
+  const filteredIntegrations = useMemo(() => {
+    return integrations.filter((item) => {
+      if (systemFilter !== 'all' && item.systemType !== systemFilter) return false;
+      if (authFilter !== 'all' && item.authMethod !== authFilter) return false;
+      if (formatFilter !== 'all' && item.format !== formatFilter) return false;
+      if (statusFilter !== 'all' && item.status !== statusFilter) return false;
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase().trim();
+        const matchName = item.name.toLowerCase().includes(q);
+        const matchUrl = item.endpointUrl.toLowerCase().includes(q);
+        const matchSystem = formatSystemTypeLabel(item.systemType).toLowerCase().includes(q);
+        if (!matchName && !matchUrl && !matchSystem) return false;
+      }
+      return true;
+    });
+  }, [integrations, systemFilter, authFilter, formatFilter, statusFilter, searchQuery]);
+
+  const totalItems = filteredIntegrations.length;
+  const paginatedIntegrations = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredIntegrations.slice(start, start + pageSize);
+  }, [filteredIntegrations, currentPage, pageSize]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, systemFilter, authFilter, formatFilter, statusFilter, pageSize]);
+
+  const isFilterActive =
+    searchQuery.trim() !== '' ||
+    systemFilter !== 'all' ||
+    authFilter !== 'all' ||
+    formatFilter !== 'all' ||
+    statusFilter !== 'all';
+
+  const handleResetFilters = () => {
+    setSearchQuery('');
+    setSystemFilter('all');
+    setAuthFilter('all');
+    setFormatFilter('all');
+    setStatusFilter('all');
+    setCurrentPage(1);
+    toast.info('Filter konektor integrasi berhasil direset.', { title: 'Filter Direset' });
+  };
+
+  const connectorFilters: FilterConfig[] = useMemo(
+    () => [
+      {
+        id: 'systemType',
+        label: 'Tipe Sistem ERP',
+        type: 'select',
+        placeholder: 'Semua Sistem',
+        searchable: true,
+        options: [
+          { label: 'Semua Sistem', value: 'all' },
+          { label: 'SAP S/4HANA', value: 'sap', badge: 'Enterprise' },
+          { label: 'Oracle Financials', value: 'oracle', badge: 'Cloud' },
+          { label: 'DJP e-Faktur Pajak', value: 'djp_tax', badge: 'Tax' },
+          { label: 'Accurate Online', value: 'accurate', badge: 'SMB' },
+          { label: 'Generic REST API', value: 'generic', badge: 'Custom' },
+        ],
+        selectedValue: systemFilter,
+        onChange: (val) => setSystemFilter(val || 'all'),
+      },
+      {
+        id: 'authMethod',
+        label: 'Autentikasi',
+        type: 'select',
+        placeholder: 'Semua Auth',
+        searchable: true,
+        options: [
+          { label: 'Semua Metode', value: 'all' },
+          { label: 'Bearer Token', value: 'bearer' },
+          { label: 'API Key Header', value: 'apiKey' },
+          { label: 'Basic Auth', value: 'basic' },
+        ],
+        selectedValue: authFilter,
+        onChange: (val) => setAuthFilter(val || 'all'),
+      },
+      {
+        id: 'format',
+        label: 'Format Payload',
+        type: 'select',
+        placeholder: 'Semua Format',
+        searchable: true,
+        options: [
+          { label: 'Semua Format', value: 'all' },
+          { label: 'JSON', value: 'json' },
+          { label: 'CSV', value: 'csv' },
+          { label: 'XML', value: 'xml' },
+        ],
+        selectedValue: formatFilter,
+        onChange: (val) => setFormatFilter(val || 'all'),
+      },
+      {
+        id: 'status',
+        label: 'Status Konektor',
+        type: 'select',
+        placeholder: 'Semua Status',
+        searchable: true,
+        options: [
+          { label: 'Semua Status', value: 'all' },
+          { label: 'Aktif', value: 'active' },
+          { label: 'Nonaktif', value: 'inactive' },
+        ],
+        selectedValue: statusFilter,
+        onChange: (val) => setStatusFilter(val || 'all'),
+      },
+    ],
+    [systemFilter, authFilter, formatFilter, statusFilter]
+  );
+
+  const handleExportConnectors = (format: 'csv' | 'xls') => {
+    if (filteredIntegrations.length === 0) {
+      toast.error('Tidak ada konfigurasi konektor untuk diekspor.', { title: 'Ekspor Gagal' });
+      return;
+    }
+    const headers = ['Nama Konektor', 'Tipe Sistem', 'Endpoint URL', 'Auth Method', 'Format Payload', 'Status'];
+    const rows = filteredIntegrations.map((i) => [
+      `"${i.name.replace(/"/g, '""')}"`,
+      `"${formatSystemTypeLabel(i.systemType)}"`,
+      `"${i.endpointUrl}"`,
+      `"${i.authMethod}"`,
+      `"${i.format.toUpperCase()}"`,
+      `"${i.status === 'active' ? 'Aktif' : 'Nonaktif'}"`,
+    ]);
+    const delimiter = format === 'xls' ? '\t' : ',';
+    const content = '\uFEFF' + [headers.join(delimiter), ...rows.map((r) => r.join(delimiter))].join('\r\n');
+    const mimeType =
+      format === 'xls' ? 'application/vnd.ms-excel;charset=utf-8;' : 'text/csv;charset=utf-8;';
+    const filename = `konektor_erp_dokumenai_${Date.now()}.${format}`;
+
+    const blob = new Blob([content], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    toast.success(`Daftar konektor berhasil diekspor ke ${filename}!`, {
+      title: `Ekspor ${format.toUpperCase()} Berhasil`,
+    });
+  };
 
   const handleDownload = (format: 'csv' | 'json' | 'xlsx') => {
     if (approvedDocs.length === 0) {
@@ -162,7 +320,7 @@ export default function ExportIntegrationsPage() {
           `"${d.uploadedAt}"`,
         ]);
         const delimiter = format === 'xlsx' ? '\t' : ',';
-        content = [headers.join(delimiter), ...rows.map((r) => r.join(delimiter))].join('\n');
+        content = '\uFEFF' + [headers.join(delimiter), ...rows.map((r) => r.join(delimiter))].join('\r\n');
         mimeType = format === 'xlsx' ? 'application/vnd.ms-excel;charset=utf-8' : 'text/csv;charset=utf-8';
         filename += format === 'xlsx' ? '.xls' : '.csv';
       }
@@ -241,12 +399,12 @@ export default function ExportIntegrationsPage() {
     setIsModalOpen(true);
   };
 
-  const handleDeleteIntegration = (item: IntegrationEndpoint) => {
-    if (confirm(`Yakin ingin menghapus konfigurasi konektor "${item.name}"?`)) {
-      IntegrationService.deleteIntegration(item.id);
-      setIntegrations(IntegrationService.getIntegrations());
-      toast.success(`Konektor ${item.name} berhasil dihapus.`, { title: 'Konektor Dihapus' });
-    }
+  const handleConfirmDeleteIntegration = () => {
+    if (!deleteTarget) return;
+    IntegrationService.deleteIntegration(deleteTarget.id);
+    setIntegrations(IntegrationService.getIntegrations());
+    toast.success(`Konektor "${deleteTarget.name}" berhasil dihapus.`, { title: 'Konektor Dihapus' });
+    setDeleteTarget(null);
   };
 
   const integrationActions: RowAction<IntegrationEndpoint>[] = [
@@ -261,7 +419,7 @@ export default function ExportIntegrationsPage() {
       label: 'Hapus Konektor',
       icon: <TrashIcon className="w-4 h-4 text-[#E11D48]" />,
       destructive: true,
-      onSelect: (item) => handleDeleteIntegration(item),
+      onSelect: (item) => setDeleteTarget(item),
     },
   ];
 
@@ -352,40 +510,46 @@ export default function ExportIntegrationsPage() {
           badge={{ label: `${approvedDocs.length} Siap Ekspor`, variant: 'success' }}
           actions={
             <div className="flex items-center gap-3">
-              {/* Simple Export Dropdown (Matches Enterprise DataTableExport Pattern) */}
+              {/* ERP Export Dropdown */}
               <div className="relative" ref={exportDropdownRef}>
                 <button
                   type="button"
                   disabled={isExporting}
                   onClick={() => setIsExportMenuOpen((prev) => !prev)}
-                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg border border-[#CBD5E1] bg-white text-xs font-semibold text-[#334155] hover:bg-[#FAFAFF] transition-colors shadow-xs disabled:opacity-50 cursor-pointer"
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg border border-[#CBD5E1] bg-white text-xs font-semibold text-[#334155] hover:bg-[#FAFAFF] transition-colors shadow-sm disabled:opacity-50 cursor-pointer"
                 >
                   <DownloadIcon className="w-3.5 h-3.5 text-[#64748B]" />
-                  <span>{isExporting ? 'Memproses...' : 'Export'}</span>
+                  <span>{isExporting ? 'Memproses...' : 'Export ERP'}</span>
                   <ChevronDownIcon className="w-3 h-3 text-[#64748B]" />
                 </button>
 
                 {isExportMenuOpen && (
-                  <div className="absolute right-0 mt-1.5 w-72 bg-white border border-[#CBD5E1] rounded-xl shadow-xl z-30 p-3 space-y-3 animate-in fade-in zoom-in-95 duration-100">
+                  <div className="absolute right-0 mt-1.5 w-72 bg-white border border-[#CBD5E1] rounded-xl shadow-xl z-30 p-3 space-y-3 animate-in">
                     <div className="px-2 py-1.5 rounded-lg bg-[#FAFAFF] border border-[#E2E8F0] flex items-center justify-between text-[11px]">
-                      <span className="text-[#64748B] font-medium">{approvedDocs.length} dokumen terverifikasi</span>
-                      <span className="font-bold text-[#059669]">{formatIDR(totalApprovedAmount)}</span>
+                      <span className="text-[#64748B] font-medium">
+                        {approvedDocs.length} dokumen terverifikasi
+                      </span>
+                      <span className="font-bold text-[#059669]">
+                        {formatIDR(totalApprovedAmount)}
+                      </span>
                     </div>
 
                     <div className="space-y-1">
                       <label className="text-[11px] font-bold text-[#475569] block px-0.5">
                         Profil Pemetaan Sistem Target
                       </label>
-                      <select
+                      <Select<TargetSystem>
+                        size="sm"
                         value={targetSystem}
-                        onChange={(e) => setTargetSystem(e.target.value as any)}
-                        className="w-full text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-[#CBD5E1] bg-white text-[#0F172A] focus:outline-hidden focus:border-[#4F46E5]"
-                      >
-                        <option value="sap">SAP S/4HANA (AP Schema)</option>
-                        <option value="oracle">Oracle Financials Cloud</option>
-                        <option value="djp_tax">DJP e-Faktur SPT PPN</option>
-                        <option value="generic">Generic General Ledger</option>
-                      </select>
+                        onChange={(val) => setTargetSystem(val)}
+                        aria-label="Profil Pemetaan Sistem Target"
+                        options={[
+                          { value: 'sap', label: 'SAP S/4HANA', description: 'AP Schema Mapping' },
+                          { value: 'oracle', label: 'Oracle Financials Cloud', description: 'ERP AP Ledger' },
+                          { value: 'djp_tax', label: 'DJP e-Faktur SPT PPN', description: 'CSV/XML Pajak' },
+                          { value: 'generic', label: 'Generic General Ledger', description: 'Standard Table' },
+                        ]}
+                      />
                     </div>
 
                     <div className="pt-1 border-t border-[#F1F5F9] space-y-0.5">
@@ -433,43 +597,92 @@ export default function ExportIntegrationsPage() {
           }
         />
 
+        {/* Enterprise Search & Filter Toolbar for Konektor */}
+        <DataTableToolbar
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          searchPlaceholder="Cari nama konektor, URL endpoint, atau tipe sistem ERP..."
+          filters={connectorFilters}
+          totalFiltered={totalItems}
+          totalUnfiltered={integrations.length}
+          entityName="konektor integrasi"
+          isFilterActive={isFilterActive}
+          onResetFilters={handleResetFilters}
+          exportOptions={{
+            onExportCSV: () => handleExportConnectors('csv'),
+            onExportExcel: () => handleExportConnectors('xls'),
+            disabled: filteredIntegrations.length === 0,
+          }}
+        />
+
         {/* Kelola Konektor Integrasi ERP & API (CRUD) */}
-        <div className="p-6 sm:p-8 rounded-xl border border-[#E2E8F0] bg-white shadow-xs space-y-6">
-          <SectionHeader
-            title="Konektor Integrasi ERP & Webhook"
-            description="Konfigurasi target API otomatis untuk sinkronisasi dokumen AI Enterprise."
-          />
+        <div className="rounded-xl border border-[#E2E8F0] bg-white shadow-sm overflow-hidden">
+          <div className="p-5 sm:p-6 border-b border-[#E2E8F0]">
+            <SectionHeader
+              title="Konektor Integrasi ERP & Webhook"
+              description="Klik dua kali atau klik kanan pada baris untuk mengubah atau mengelola endpoint sinkronisasi."
+            />
+          </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="border-b border-[#E2E8F0] text-[11px] font-bold text-[#64748B] uppercase tracking-wider bg-[#F8FAFC]">
-                  <th className="py-3 px-4">Nama Integrasi</th>
-                  <th className="py-3 px-4">Tipe Sistem</th>
-                  <th className="py-3 px-4">Endpoint URL</th>
-                  <th className="py-3 px-4">Format</th>
-                  <th className="py-3 px-4">Status</th>
-                  <th className="py-3 px-4 text-right">Aksi</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#E2E8F0] text-xs font-medium text-[#0F172A]">
-                {integrations.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="py-8 text-center text-slate-400">
-                      Belum ada konfigurasi integrasi tersimpan.
-                    </td>
+            {totalItems === 0 ? (
+              <DataTableEmptyState
+                isFilterActive={isFilterActive}
+                onResetFilters={handleResetFilters}
+                title={isFilterActive ? undefined : 'Belum ada konfigurasi konektor ERP'}
+                description={
+                  isFilterActive
+                    ? undefined
+                    : 'Tambahkan endpoint API ERP atau webhook baru untuk mengotomatisasi sinkronisasi data.'
+                }
+                action={
+                  !isFilterActive
+                    ? {
+                        label: 'Tambah Konektor',
+                        onClick: handleOpenAdd,
+                      }
+                    : undefined
+                }
+              />
+            ) : (
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-[#E2E8F0] text-[11px] font-bold text-[#64748B] uppercase tracking-wider bg-[#F8FAFC]">
+                    <th className="py-3 px-5">Nama Integrasi</th>
+                    <th className="py-3 px-4">Tipe Sistem</th>
+                    <th className="py-3 px-4">Endpoint URL</th>
+                    <th className="py-3 px-4">Autentikasi</th>
+                    <th className="py-3 px-4">Format</th>
+                    <th className="py-3 px-4">Status</th>
+                    <th className="py-3 px-5 text-right">Aksi</th>
                   </tr>
-                ) : (
-                  integrations.map((item) => (
-                    <tr key={item.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="py-3.5 px-4 font-bold">{item.name}</td>
+                </thead>
+                <tbody className="divide-y divide-[#E2E8F0] text-xs font-medium text-[#0F172A]">
+                  {paginatedIntegrations.map((item) => (
+                    <DataTableRow
+                      key={item.id}
+                      row={item}
+                      onRowDoubleClick={handleOpenEdit}
+                      onRowContextMenu={(r, e) => openContextMenu(r, e, 'Aksi Konektor ERP')}
+                    >
+                      <td className="py-3.5 px-5 font-bold">{item.name}</td>
                       <td className="py-3.5 px-4 uppercase text-[#4F46E5] font-semibold">
                         {formatSystemTypeLabel(item.systemType)}
                       </td>
-                      <td className="py-3.5 px-4 text-[#64748B] font-mono text-[11px] truncate max-w-[200px]">
+                      <td
+                        className="py-3.5 px-4 text-[#64748B] font-mono text-[11px] truncate max-w-[240px]"
+                        title={item.endpointUrl}
+                      >
                         {item.endpointUrl}
                       </td>
-                      <td className="py-3.5 px-4 uppercase text-[11px]">{item.format}</td>
+                      <td className="py-3.5 px-4 text-[11px] font-mono text-slate-600">
+                        {item.authMethod === 'bearer'
+                          ? 'Bearer Token'
+                          : item.authMethod === 'apiKey'
+                            ? 'API Key'
+                            : 'Basic Auth'}
+                      </td>
+                      <td className="py-3.5 px-4 uppercase text-[11px] font-bold">{item.format}</td>
                       <td className="py-3.5 px-4">
                         <span
                           className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold ${
@@ -481,7 +694,7 @@ export default function ExportIntegrationsPage() {
                           {item.status === 'active' ? 'Aktif' : 'Nonaktif'}
                         </span>
                       </td>
-                      <td className="py-3.5 px-4 text-right">
+                      <td className="py-3.5 px-5 text-right">
                         <button
                           type="button"
                           onClick={(e) => openDropdownMenu(item, e, 'Aksi Konektor ERP')}
@@ -491,294 +704,311 @@ export default function ExportIntegrationsPage() {
                           <MoreHorizontalIcon className="w-4 h-4" />
                         </button>
                       </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+                    </DataTableRow>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
+
+          <DataTablePagination
+            currentPage={currentPage}
+            pageSize={pageSize}
+            totalItems={totalItems}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={setPageSize}
+          />
         </div>
       </main>
 
-      {/* Modal Form Tambah / Edit Konektor */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-xl border border-slate-200 max-w-lg w-full max-h-[90vh] overflow-y-auto p-6 space-y-5 animate-in fade-in zoom-in-95 duration-150">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h3 className="text-sm font-bold text-slate-900">
-                {editingItem ? 'Edit Konektor Integrasi' : 'Tambah Konektor Integrasi Baru'}
-              </h3>
-              <button
-                type="button"
-                onClick={() => setIsModalOpen(false)}
-                className="p-1 text-slate-400 hover:text-slate-600 rounded-md cursor-pointer"
-              >
-                <XIcon className="w-4 h-4" />
-              </button>
+      {/* Shared Modal Form Tambah / Edit Konektor */}
+      <Modal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        maxWidth="lg"
+        title={editingItem ? 'Edit Konektor Integrasi' : 'Tambah Konektor Integrasi Baru'}
+        subtitle="Konfigurasi endpoint REST/Webhook, autentikasi, dan format payload."
+        footer={
+          <div className="flex justify-end gap-2 w-full">
+            <button
+              type="button"
+              onClick={() => setIsModalOpen(false)}
+              className="px-4 py-2 rounded-lg border border-slate-300 bg-white text-xs font-bold text-slate-700 hover:bg-slate-50 cursor-pointer"
+            >
+              Batal
+            </button>
+            <button
+              type="submit"
+              form="connector-form"
+              className="px-4 py-2 rounded-lg bg-[#4F46E5] text-white text-xs font-bold hover:bg-[#4338CA] shadow-sm cursor-pointer"
+            >
+              Simpan Konfigurasi
+            </button>
+          </div>
+        }
+      >
+        <form id="connector-form" onSubmit={handleFormSubmit} noValidate className="space-y-4">
+          <div className="space-y-1">
+            <label className="text-xs font-bold text-slate-700">
+              Nama Konektor <span className="text-rose-500">*</span>
+            </label>
+            <input
+              type="text"
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              placeholder="Contoh: Oracle Finance Cloud Prod"
+              className="w-full text-xs px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:border-[#4F46E5] focus:ring-2 focus:ring-[#4F46E5]/15"
+              required
+            />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <SearchableSelect<'sap' | 'oracle' | 'djp_tax' | 'accurate' | 'generic'>
+              label="Tipe Sistem"
+              size="sm"
+              value={formData.systemType}
+              onChange={(val) => setFormData({ ...formData, systemType: val })}
+              searchPlaceholder="Cari sistem ERP..."
+              options={[
+                { value: 'sap', label: 'SAP S/4HANA', badge: 'Enterprise' },
+                { value: 'oracle', label: 'Oracle Financials', badge: 'Cloud' },
+                { value: 'djp_tax', label: 'DJP e-Faktur Pajak', badge: 'Tax' },
+                { value: 'accurate', label: 'Accurate Online', badge: 'SMB' },
+                { value: 'generic', label: 'Generic REST API', badge: 'Custom' },
+              ]}
+            />
+            <Select<'json' | 'csv' | 'xml'>
+              label="Format Payload"
+              size="sm"
+              value={formData.format}
+              onChange={(val) => setFormData({ ...formData, format: val })}
+              options={[
+                { value: 'json', label: 'JSON', description: 'REST Application JSON' },
+                { value: 'csv', label: 'CSV', description: 'Tabular Delimited' },
+                { value: 'xml', label: 'XML', description: 'SOAP / DJP Schema' },
+              ]}
+            />
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-xs font-bold text-slate-700">
+              Endpoint URL <span className="text-rose-500">*</span>
+            </label>
+            <input
+              type="url"
+              value={formData.endpointUrl}
+              onChange={(e) => setFormData({ ...formData, endpointUrl: e.target.value })}
+              placeholder="https://api.erp.domain.com/v1/invoices"
+              className="w-full text-xs px-3 py-2 rounded-lg border border-slate-300 font-mono focus:outline-none focus:border-[#4F46E5] focus:ring-2 focus:ring-[#4F46E5]/15"
+              required
+            />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Select<'bearer' | 'apiKey' | 'basic'>
+              label="Metode Autentikasi"
+              size="sm"
+              value={formData.authMethod}
+              onChange={(nextMethod) => {
+                setShowAuthSecret(false);
+                setFormData({
+                  ...formData,
+                  authMethod: nextMethod,
+                  authConfig: {
+                    ...formData.authConfig,
+                    apiKeyHeaderName:
+                      nextMethod === 'apiKey' && !formData.authConfig.apiKeyHeaderName
+                        ? 'X-API-Key'
+                        : formData.authConfig.apiKeyHeaderName,
+                  },
+                });
+              }}
+              options={[
+                { value: 'bearer', label: 'Bearer Token', badge: 'OAuth/JWT' },
+                { value: 'apiKey', label: 'API Key Header', badge: 'Header' },
+                { value: 'basic', label: 'Basic Auth', badge: 'Credentials' },
+              ]}
+            />
+            <Select<'active' | 'inactive'>
+              label="Status"
+              size="sm"
+              value={formData.status}
+              onChange={(val) => setFormData({ ...formData, status: val })}
+              options={[
+                { value: 'active', label: 'Aktif', badge: 'Online' },
+                { value: 'inactive', label: 'Nonaktif', badge: 'Paused' },
+              ]}
+            />
+          </div>
+
+          {/* Dynamic Auth Configuration Fields */}
+          {formData.authMethod === 'bearer' && (
+            <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200 space-y-1.5">
+              <label className="text-xs font-bold text-slate-700 block">
+                Bearer Token <span className="text-rose-500">*</span>
+              </label>
+              <div className="relative">
+                <input
+                  type={showAuthSecret ? 'text' : 'password'}
+                  value={formData.authConfig.bearerToken || ''}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      authConfig: { ...formData.authConfig, bearerToken: e.target.value },
+                    })
+                  }
+                  placeholder="eyJhbGciOiJIUzI1NiIsIn..."
+                  className="w-full text-xs font-mono px-3 py-2 pr-9 rounded-md border border-slate-300 bg-white text-slate-900 focus:outline-none focus:border-indigo-500"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowAuthSecret((prev) => !prev)}
+                  aria-label={showAuthSecret ? 'Sembunyikan Bearer Token' : 'Tampilkan Bearer Token'}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                >
+                  {showAuthSecret ? <EyeOffIcon className="w-4 h-4" /> : <EyeIcon className="w-4 h-4" />}
+                </button>
+              </div>
+              <p className="text-[11px] text-slate-500">
+                Token dikirim otomatis melalui header <code className="font-mono text-slate-700">Authorization: Bearer &lt;token&gt;</code>.
+              </p>
             </div>
+          )}
 
-            <form onSubmit={handleFormSubmit} noValidate className="space-y-4">
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-700">Nama Konektor</label>
-                <input
-                  type="text"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="Contoh: Oracle Finance Cloud Prod"
-                  className="w-full text-xs px-3 py-2 rounded-md border border-slate-300 focus:outline-none focus:border-indigo-500"
-                  required
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
+          {formData.authMethod === 'apiKey' && (
+            <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200 space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-700">Tipe Sistem</label>
-                  <select
-                    value={formData.systemType}
-                    onChange={(e) => setFormData({ ...formData, systemType: e.target.value as any })}
-                    className="w-full text-xs px-3 py-2 rounded-md border border-slate-300 focus:outline-none focus:border-indigo-500"
-                  >
-                    <option value="sap">SAP S/4HANA</option>
-                    <option value="oracle">Oracle Financials</option>
-                    <option value="djp_tax">DJP e-Faktur Pajak</option>
-                    <option value="accurate">Accurate Online</option>
-                    <option value="generic">Generic REST API</option>
-                  </select>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-700">Format Payload</label>
-                  <select
-                    value={formData.format}
-                    onChange={(e) => setFormData({ ...formData, format: e.target.value as any })}
-                    className="w-full text-xs px-3 py-2 rounded-md border border-slate-300 focus:outline-none focus:border-indigo-500"
-                  >
-                    <option value="json">JSON</option>
-                    <option value="csv">CSV</option>
-                    <option value="xml">XML</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-700">Endpoint URL</label>
-                <input
-                  type="url"
-                  value={formData.endpointUrl}
-                  onChange={(e) => setFormData({ ...formData, endpointUrl: e.target.value })}
-                  placeholder="https://api.erp.domain.com/v1/invoices"
-                  className="w-full text-xs px-3 py-2 rounded-md border border-slate-300 font-mono focus:outline-none focus:border-indigo-500"
-                  required
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-700">Metode Autentikasi</label>
-                  <select
-                    value={formData.authMethod}
-                    onChange={(e) => {
-                      const nextMethod = e.target.value as 'bearer' | 'basic' | 'apiKey';
-                      setShowAuthSecret(false);
+                  <label className="text-xs font-bold text-slate-700 block">
+                    Nama Header <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.authConfig.apiKeyHeaderName || ''}
+                    onChange={(e) =>
                       setFormData({
                         ...formData,
-                        authMethod: nextMethod,
-                        authConfig: {
-                          ...formData.authConfig,
-                          apiKeyHeaderName:
-                            nextMethod === 'apiKey' && !formData.authConfig.apiKeyHeaderName
-                              ? 'X-API-Key'
-                              : formData.authConfig.apiKeyHeaderName,
-                        },
-                      });
-                    }}
-                    className="w-full text-xs px-3 py-2 rounded-md border border-slate-300 focus:outline-none focus:border-indigo-500"
-                  >
-                    <option value="bearer">Bearer Token</option>
-                    <option value="apiKey">API Key Header</option>
-                    <option value="basic">Basic Auth</option>
-                  </select>
+                        authConfig: { ...formData.authConfig, apiKeyHeaderName: e.target.value },
+                      })
+                    }
+                    placeholder="X-API-Key"
+                    className="w-full text-xs font-mono px-3 py-2 rounded-md border border-slate-300 bg-white text-slate-900 focus:outline-none focus:border-indigo-500"
+                    required
+                  />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-700">Status</label>
-                  <select
-                    value={formData.status}
-                    onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
-                    className="w-full text-xs px-3 py-2 rounded-md border border-slate-300 focus:outline-none focus:border-indigo-500"
-                  >
-                    <option value="active">Aktif</option>
-                    <option value="inactive">Nonaktif</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Dynamic Auth Configuration Fields */}
-              {formData.authMethod === 'bearer' && (
-                <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200 space-y-1.5">
                   <label className="text-xs font-bold text-slate-700 block">
-                    Bearer Token <span className="text-rose-500">*</span>
+                    Nilai API Key <span className="text-rose-500">*</span>
                   </label>
                   <div className="relative">
                     <input
                       type={showAuthSecret ? 'text' : 'password'}
-                      value={formData.authConfig.bearerToken || ''}
+                      value={formData.authConfig.apiKeyValue || ''}
                       onChange={(e) =>
                         setFormData({
                           ...formData,
-                          authConfig: { ...formData.authConfig, bearerToken: e.target.value },
+                          authConfig: { ...formData.authConfig, apiKeyValue: e.target.value },
                         })
                       }
-                      placeholder="eyJhbGciOiJIUzI1NiIsIn..."
+                      placeholder="api_key_secret..."
                       className="w-full text-xs font-mono px-3 py-2 pr-9 rounded-md border border-slate-300 bg-white text-slate-900 focus:outline-none focus:border-indigo-500"
                       required
                     />
                     <button
                       type="button"
                       onClick={() => setShowAuthSecret((prev) => !prev)}
-                      aria-label={showAuthSecret ? 'Sembunyikan Bearer Token' : 'Tampilkan Bearer Token'}
+                      aria-label={showAuthSecret ? 'Sembunyikan API Key' : 'Tampilkan API Key'}
                       className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
                     >
                       {showAuthSecret ? <EyeOffIcon className="w-4 h-4" /> : <EyeIcon className="w-4 h-4" />}
                     </button>
                   </div>
-                  <p className="text-[11px] text-slate-500">
-                    Token dikirim otomatis melalui header <code className="font-mono text-slate-700">Authorization: Bearer &lt;token&gt;</code>.
-                  </p>
                 </div>
-              )}
-
-              {formData.authMethod === 'apiKey' && (
-                <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200 space-y-3">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div className="space-y-1">
-                      <label className="text-xs font-bold text-slate-700 block">
-                        Nama Header <span className="text-rose-500">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        value={formData.authConfig.apiKeyHeaderName || ''}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            authConfig: { ...formData.authConfig, apiKeyHeaderName: e.target.value },
-                          })
-                        }
-                        placeholder="X-API-Key"
-                        className="w-full text-xs font-mono px-3 py-2 rounded-md border border-slate-300 bg-white text-slate-900 focus:outline-none focus:border-indigo-500"
-                        required
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-xs font-bold text-slate-700 block">
-                        Nilai API Key <span className="text-rose-500">*</span>
-                      </label>
-                      <div className="relative">
-                        <input
-                          type={showAuthSecret ? 'text' : 'password'}
-                          value={formData.authConfig.apiKeyValue || ''}
-                          onChange={(e) =>
-                            setFormData({
-                              ...formData,
-                              authConfig: { ...formData.authConfig, apiKeyValue: e.target.value },
-                            })
-                          }
-                          placeholder="api_key_secret..."
-                          className="w-full text-xs font-mono px-3 py-2 pr-9 rounded-md border border-slate-300 bg-white text-slate-900 focus:outline-none focus:border-indigo-500"
-                          required
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowAuthSecret((prev) => !prev)}
-                          aria-label={showAuthSecret ? 'Sembunyikan API Key' : 'Tampilkan API Key'}
-                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
-                        >
-                          {showAuthSecret ? <EyeOffIcon className="w-4 h-4" /> : <EyeIcon className="w-4 h-4" />}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                  <p className="text-[11px] text-slate-500">
-                    Pasangan header dan kunci API dikirimkan pada setiap request sinkronisasi endpoint.
-                  </p>
-                </div>
-              )}
-
-              {formData.authMethod === 'basic' && (
-                <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200 space-y-3">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div className="space-y-1">
-                      <label className="text-xs font-bold text-slate-700 block">
-                        Username <span className="text-rose-500">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        value={formData.authConfig.basicUsername || ''}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            authConfig: { ...formData.authConfig, basicUsername: e.target.value },
-                          })
-                        }
-                        placeholder="erp_service_user"
-                        className="w-full text-xs font-mono px-3 py-2 rounded-md border border-slate-300 bg-white text-slate-900 focus:outline-none focus:border-indigo-500"
-                        required
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-xs font-bold text-slate-700 block">
-                        Password <span className="text-rose-500">*</span>
-                      </label>
-                      <div className="relative">
-                        <input
-                          type={showAuthSecret ? 'text' : 'password'}
-                          value={formData.authConfig.basicPassword || ''}
-                          onChange={(e) =>
-                            setFormData({
-                              ...formData,
-                              authConfig: { ...formData.authConfig, basicPassword: e.target.value },
-                            })
-                          }
-                          placeholder="••••••••"
-                          className="w-full text-xs font-mono px-3 py-2 pr-9 rounded-md border border-slate-300 bg-white text-slate-900 focus:outline-none focus:border-indigo-500"
-                          required
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowAuthSecret((prev) => !prev)}
-                          aria-label={showAuthSecret ? 'Sembunyikan Password' : 'Tampilkan Password'}
-                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
-                        >
-                          {showAuthSecret ? <EyeOffIcon className="w-4 h-4" /> : <EyeIcon className="w-4 h-4" />}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                  <p className="text-[11px] text-slate-500">
-                    Kredensial akan di-encode Base64 melalui header <code className="font-mono text-slate-700">Authorization: Basic &lt;base64&gt;</code>.
-                  </p>
-                </div>
-              )}
-
-              <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 rounded-lg border border-slate-300 text-xs font-bold text-slate-700 hover:bg-slate-50 cursor-pointer"
-                >
-                  Batal
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 rounded-lg bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700 shadow-sm cursor-pointer"
-                >
-                  Simpan Konfigurasi
-                </button>
               </div>
-            </form>
-          </div>
-        </div>
-      )}
+              <p className="text-[11px] text-slate-500">
+                Pasangan header dan kunci API dikirimkan pada setiap request sinkronisasi endpoint.
+              </p>
+            </div>
+          )}
 
-      {/* Floating Action Menu (3-dot popover) */}
+          {formData.authMethod === 'basic' && (
+            <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200 space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-700 block">
+                    Username <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.authConfig.basicUsername || ''}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        authConfig: { ...formData.authConfig, basicUsername: e.target.value },
+                      })
+                    }
+                    placeholder="erp_service_user"
+                    className="w-full text-xs font-mono px-3 py-2 rounded-md border border-slate-300 bg-white text-slate-900 focus:outline-none focus:border-indigo-500"
+                    required
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-700 block">
+                    Password <span className="text-rose-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showAuthSecret ? 'text' : 'password'}
+                      value={formData.authConfig.basicPassword || ''}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          authConfig: { ...formData.authConfig, basicPassword: e.target.value },
+                        })
+                      }
+                      placeholder="••••••••"
+                      className="w-full text-xs font-mono px-3 py-2 pr-9 rounded-md border border-slate-300 bg-white text-slate-900 focus:outline-none focus:border-indigo-500"
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowAuthSecret((prev) => !prev)}
+                      aria-label={showAuthSecret ? 'Sembunyikan Password' : 'Tampilkan Password'}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                    >
+                      {showAuthSecret ? <EyeOffIcon className="w-4 h-4" /> : <EyeIcon className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <p className="text-[11px] text-slate-500">
+                Kredensial akan di-encode Base64 melalui header <code className="font-mono text-slate-700">Authorization: Basic &lt;base64&gt;</code>.
+              </p>
+            </div>
+          )}
+        </form>
+      </Modal>
+
+      {/* Confirm Delete Connector */}
+      <ConfirmDialog
+        isOpen={Boolean(deleteTarget)}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={handleConfirmDeleteIntegration}
+        title="Hapus Konfigurasi Konektor?"
+        description={
+          deleteTarget ? (
+            <>
+              Konfigurasi konektor <strong>&ldquo;{deleteTarget.name}&rdquo;</strong> akan dihapus permanen dan tidak lagi digunakan untuk sinkronisasi otomatis.
+            </>
+          ) : null
+        }
+        confirmLabel="Ya, Hapus Konektor"
+        cancelLabel="Batal"
+        variant="danger"
+      />
+
+      {/* Floating Action Menu (3-dot popover & right-click context menu) */}
       {activeMenu && (
         <DataTableActionMenu
           isOpen={Boolean(activeMenu)}

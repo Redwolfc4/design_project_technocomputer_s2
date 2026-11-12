@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Topbar } from '@/components/layout/Topbar';
 import { AuditService } from '@/lib/modules/audit/audit.service';
 import { AuditLogEntry } from '@/types';
@@ -27,6 +27,7 @@ import { AuditLogDetailModal } from '@/components/dashboard/audit/AuditLogDetail
 import { PageHeader } from '@/components/shared/PageHeader';
 import { useAppScope } from '@/context/ScopeContext';
 import { useToast } from '@/context/ToastContext';
+import { isTimestampInDateRange } from '@/components/shared/data-table/date-picker/dateUtils';
 
 export default function AuditTrailPage() {
   const {
@@ -71,22 +72,22 @@ export default function AuditTrailPage() {
     return () => clearTimeout(timer);
   }, []);
 
-  const handleCopyText = (text: string, label: string) => {
+  const handleCopyText = useCallback((text: string, label: string) => {
     if (navigator.clipboard) {
       navigator.clipboard.writeText(text);
       toast.success(`${label} berhasil disalin ke clipboard!`, { title: 'Disalin' });
     }
-  };
+  }, [toast]);
 
   const filteredLogs = useMemo(() => {
     return logs.filter((log) => {
       // 0. Scope Filtering
       if (activeCompanyId !== 'all') {
-        const logComp = (log as any).companyId || 'comp-01';
+        const logComp = log.companyId || 'comp-01';
         if (logComp !== activeCompanyId) return false;
       }
       if (activeDepartment && activeDepartment.id !== 'all') {
-        const logDept = (log as any).department;
+        const logDept = log.department;
         if (logDept && logDept.toLowerCase() !== activeDepartment.name.toLowerCase()) {
           return false;
         }
@@ -97,19 +98,7 @@ export default function AuditTrailPage() {
       if (filterRole !== 'all' && log.actorRole !== filterRole) return false;
 
       // Filter Rentang Waktu Kejadian
-      if (dateRange && dateRange.preset !== 'all' && log.timestamp) {
-        const logDate = new Date(log.timestamp);
-        if (dateRange.from) {
-          const fromDate = new Date(dateRange.from);
-          fromDate.setHours(0, 0, 0, 0);
-          if (logDate < fromDate) return false;
-        }
-        if (dateRange.to) {
-          const toDate = new Date(dateRange.to);
-          toDate.setHours(23, 59, 59, 999);
-          if (logDate > toDate) return false;
-        }
-      }
+      if (!isTimestampInDateRange(log.timestamp, dateRange)) return false;
 
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase().trim();
@@ -121,7 +110,7 @@ export default function AuditTrailPage() {
       }
       return true;
     });
-  }, [logs, filterAction, filterStatus, filterRole, dateRange, searchQuery]);
+  }, [logs, filterAction, filterStatus, filterRole, dateRange, searchQuery, activeCompanyId, activeDepartment]);
 
   // Pagination slice
   const totalItems = filteredLogs.length;
@@ -152,16 +141,21 @@ export default function AuditTrailPage() {
   };
 
   const handleExportCSV = () => {
+    if (filteredLogs.length === 0) {
+      toast.error('Tidak ada data log forensik untuk diekspor.', { title: 'Ekspor Gagal' });
+      return;
+    }
+
     const headers = ['Waktu', 'Aktor', 'Peran', 'Aksi Tindakan', 'Sumber Daya', 'Rincian', 'Nilai Sebelum', 'Nilai Sesudah', 'Status'];
     const rows = filteredLogs.map((l) => [
       `"${formatDateTime(l.timestamp)}"`,
-      `"${l.actor}"`,
+      `"${l.actor.replace(/"/g, '""')}"`,
       `"${formatRoleLabel(l.actorRole)}"`,
       `"${formatActionLabel(l.action)}"`,
-      `"${l.resourceName}"`,
+      `"${l.resourceName.replace(/"/g, '""')}"`,
       `"${l.details.replace(/"/g, '""')}"`,
-      `"${l.previousValue || ''}"`,
-      `"${l.newValue || ''}"`,
+      `"${(l.previousValue || '').replace(/"/g, '""')}"`,
+      `"${(l.newValue || '').replace(/"/g, '""')}"`,
       `"${l.status}"`,
     ]);
     const csvContent = '\uFEFF' + [headers.join(','), ...rows.map((r) => r.join(','))].join('\r\n');
@@ -176,6 +170,75 @@ export default function AuditTrailPage() {
     URL.revokeObjectURL(url);
     toast.success(`Berhasil mengekspor ${filteredLogs.length} rekam log ke CSV!`, {
       title: 'Ekspor CSV Selesai',
+    });
+  };
+
+  const handleExportExcel = () => {
+    if (filteredLogs.length === 0) {
+      toast.error('Tidak ada data log forensik untuk diekspor.', { title: 'Ekspor Gagal' });
+      return;
+    }
+
+    const escapeHtml = (val: string) =>
+      val
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+
+    const tableHtml = `
+      <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+      <head><meta charset="utf-8"/></head>
+      <body>
+        <table border="1">
+          <thead>
+            <tr style="background-color: #4F46E5; color: #FFFFFF; font-weight: bold;">
+              <th>Waktu</th>
+              <th>Aktor</th>
+              <th>Peran</th>
+              <th>Aksi Tindakan</th>
+              <th>Sumber Daya</th>
+              <th>Rincian</th>
+              <th>Nilai Sebelum</th>
+              <th>Nilai Sesudah</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${filteredLogs
+              .map(
+                (l) => `
+              <tr>
+                <td>${escapeHtml(formatDateTime(l.timestamp))}</td>
+                <td>${escapeHtml(l.actor)}</td>
+                <td>${escapeHtml(formatRoleLabel(l.actorRole))}</td>
+                <td>${escapeHtml(formatActionLabel(l.action))}</td>
+                <td>${escapeHtml(l.resourceName)}</td>
+                <td>${escapeHtml(l.details)}</td>
+                <td>${escapeHtml(l.previousValue || '')}</td>
+                <td>${escapeHtml(l.newValue || '')}</td>
+                <td>${escapeHtml(l.status.toUpperCase())}</td>
+              </tr>
+            `
+              )
+              .join('')}
+          </tbody>
+        </table>
+      </body>
+      </html>
+    `;
+
+    const blob = new Blob([tableHtml], { type: 'application/vnd.ms-excel;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `dokumenai_audit_trail_${new Date().toISOString().slice(0, 10)}.xls`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    toast.success(`Berhasil mengekspor ${filteredLogs.length} rekam log ke Excel (.xls)!`, {
+      title: 'Ekspor Excel Selesai',
     });
   };
 
@@ -219,12 +282,17 @@ export default function AuditTrailPage() {
       label: 'Tipe Tindakan',
       type: 'select',
       placeholder: 'Semua Tindakan',
+      searchable: true,
       options: [
         { label: 'Semua Tindakan', value: 'all' },
-        { label: 'Persetujuan / Approval', value: 'approved' },
-        { label: 'Verifikasi / Koreksi', value: 'verify' },
         { label: 'Unggah / Upload', value: 'upload' },
+        { label: 'Persetujuan / Approval', value: 'approve' },
+        { label: 'Penolakan / Reject', value: 'reject' },
+        { label: 'Verifikasi / Koreksi', value: 'verify' },
+        { label: 'Pembaruan / Update', value: 'update' },
+        { label: 'Hapus / Delete', value: 'delete' },
         { label: 'Ekspor / Export', value: 'export' },
+        { label: 'Antrean Batch', value: 'batch' },
       ],
       selectedValue: filterAction,
       onChange: (val) => setFilterAction(val),
@@ -234,9 +302,11 @@ export default function AuditTrailPage() {
       label: 'Status Kepatuhan',
       type: 'select',
       placeholder: 'Semua Status',
+      searchable: true,
       options: [
         { label: 'Semua Status', value: 'all' },
         { label: 'Success / Berhasil', value: 'success' },
+        { label: 'Warning / Peringatan', value: 'warning' },
         { label: 'Failure / Gagal', value: 'failure' },
       ],
       selectedValue: filterStatus,
@@ -290,7 +360,7 @@ export default function AuditTrailPage() {
         onSelect: (log) => handleCopyText(log.id, 'Log ID'),
       },
     ],
-    []
+    [handleCopyText]
   );
 
   return (
@@ -310,6 +380,8 @@ export default function AuditTrailPage() {
               <DataTableExport
                 options={{
                   onExportCSV: handleExportCSV,
+                  onExportExcel: handleExportExcel,
+                  disabled: filteredLogs.length === 0,
                 }}
               />
             </div>

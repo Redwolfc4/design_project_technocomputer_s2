@@ -72,10 +72,10 @@ export const Tooltip: React.FC<TooltipProps> = ({
       {isVisible && (
         <div
           role="tooltip"
-          className={`absolute z-50 pointer-events-none whitespace-normal transition-all duration-150 animate-in fade-in zoom-in-95 ${positionClasses[position]}`}
+          className={`absolute z-50 pointer-events-none whitespace-normal transition-all duration-150 animate-in ${positionClasses[position]}`}
           style={{ maxWidth: '280px', width: 'max-content' }}
         >
-          <div className="relative px-2.5 py-1.5 text-xs font-medium text-white bg-slate-900/95 dark:bg-slate-800/95 backdrop-blur-xs rounded-md shadow-lg border border-slate-700/50 leading-relaxed text-left break-words">
+          <div className="relative px-2.5 py-1.5 text-xs font-medium text-white bg-slate-900/95 dark:bg-slate-800/95 backdrop-blur-sm rounded-md shadow-lg border border-slate-700/50 leading-relaxed text-left break-words">
             {content}
             <div className={`absolute w-0 h-0 pointer-events-none ${arrowClasses[position]}`} />
           </div>

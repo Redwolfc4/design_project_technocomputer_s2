@@ -1,8 +1,8 @@
 'use client';
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useAppScope } from '@/context/ScopeContext';
-import { ChevronDownIcon } from '@/components/ui/icons';
+import { SearchableSelect, SelectOption } from '@/components/ui/Select';
 
 interface ScopeSelectorBarProps {
   className?: string;
@@ -27,6 +27,29 @@ export const ScopeSelectorBar: React.FC<ScopeSelectorBarProps> = ({
     setActiveDepartmentId,
   } = useAppScope();
 
+  const companyOptions: SelectOption[] = useMemo(
+    () => [
+      { value: 'all', label: 'Semua Perusahaan (Global)', badge: 'Global' },
+      ...allowedCompanies.map((c) => ({
+        value: c.id,
+        label: compact ? c.code : c.name,
+        badge: compact ? undefined : c.code,
+      })),
+    ],
+    [allowedCompanies, compact]
+  );
+
+  const departmentOptions: SelectOption[] = useMemo(
+    () => [
+      { value: 'all', label: 'Semua Departemen' },
+      ...allowedDepartments.map((d) => ({
+        value: d.id,
+        label: d.name,
+      })),
+    ],
+    [allowedDepartments]
+  );
+
   return (
     <div
       className={`inline-flex flex-wrap items-center gap-2 text-xs ${className}`}
@@ -39,21 +62,17 @@ export const ScopeSelectorBar: React.FC<ScopeSelectorBarProps> = ({
           Perusahaan:
         </span>
         {canChangeCompany ? (
-          <div className="relative inline-block">
-            <select
-              aria-label="Pilih Scope Perusahaan"
+          <div className="min-w-[180px] sm:min-w-[215px]">
+            <SearchableSelect
+              size="xs"
               value={activeCompanyId}
-              onChange={(e) => setActiveCompanyId(e.target.value)}
-              className="appearance-none pl-2.5 pr-7 py-1 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 font-bold text-xs shadow-2xs hover:border-[#4F46E5] focus:outline-none focus:ring-2 focus:ring-[#4F46E5]/20 focus:border-[#4F46E5] cursor-pointer"
-            >
-              <option value="all">Semua Perusahaan (Global)</option>
-              {allowedCompanies.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {compact ? c.code : c.name}
-                </option>
-              ))}
-            </select>
-            <ChevronDownIcon className="w-3.5 h-3.5 text-slate-400 pointer-events-none absolute right-2 top-1/2 -translate-y-1/2" />
+              options={companyOptions}
+              onChange={(val) => setActiveCompanyId(val)}
+              searchPlaceholder="Cari perusahaan..."
+              aria-label="Pilih Scope Perusahaan"
+              minDropdownWidth={260}
+              triggerClassName="font-bold bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700"
+            />
           </div>
         ) : (
           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-bold border border-slate-200 dark:border-slate-700">
@@ -75,21 +94,17 @@ export const ScopeSelectorBar: React.FC<ScopeSelectorBarProps> = ({
           Departemen:
         </span>
         {canChangeDepartment ? (
-          <div className="relative inline-block">
-            <select
-              aria-label="Pilih Scope Departemen"
+          <div className="min-w-[165px] sm:min-w-[190px]">
+            <SearchableSelect
+              size="xs"
               value={activeDepartmentId}
-              onChange={(e) => setActiveDepartmentId(e.target.value)}
-              className="appearance-none pl-2.5 pr-7 py-1 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 font-bold text-xs shadow-2xs hover:border-[#4F46E5] focus:outline-none focus:ring-2 focus:ring-[#4F46E5]/20 focus:border-[#4F46E5] cursor-pointer"
-            >
-              <option value="all">Semua Departemen</option>
-              {allowedDepartments.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.name}
-                </option>
-              ))}
-            </select>
-            <ChevronDownIcon className="w-3.5 h-3.5 text-slate-400 pointer-events-none absolute right-2 top-1/2 -translate-y-1/2" />
+              options={departmentOptions}
+              onChange={(val) => setActiveDepartmentId(val)}
+              searchPlaceholder="Cari departemen..."
+              aria-label="Pilih Scope Departemen"
+              minDropdownWidth={230}
+              triggerClassName="font-bold bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700"
+            />
           </div>
         ) : (
           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-[#4F46E5] dark:text-indigo-300 font-bold border border-indigo-200 dark:border-indigo-800">
@@ -118,4 +133,3 @@ export const ScopeSelectorBar: React.FC<ScopeSelectorBarProps> = ({
     </div>
   );
 };
-

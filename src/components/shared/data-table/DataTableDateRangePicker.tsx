@@ -1,12 +1,15 @@
 'use client';
 
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { FilterConfig, DateRangeValue } from './types';
-import { CalendarIcon } from '@/components/ui/icons';
+import { CalendarIcon, XIcon } from '@/components/ui/icons';
 import { DualCalendarView } from './date-picker/DualCalendarView';
+import { CustomDateInputs } from './date-picker/CustomDateInputs';
 import {
   formatToDisplayDate,
   compareDates,
+  getPresetDateRange,
+  parseLocalISODate,
 } from './date-picker/dateUtils';
 
 export interface DataTableDateRangePickerProps {
@@ -15,7 +18,9 @@ export interface DataTableDateRangePickerProps {
 
 export const DataTableDateRangePicker: React.FC<DataTableDateRangePickerProps> = ({ filter }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [alignRight, setAlignRight] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
 
   // Parse currentValue
   const currentValue: DateRangeValue = useMemo(() => {
@@ -25,15 +30,26 @@ export const DataTableDateRangePicker: React.FC<DataTableDateRangePickerProps> =
     return { preset: (filter.selectedValue as string) || 'all' };
   }, [filter.selectedValue]);
 
+  const now = useMemo(() => new Date(), []);
+
   // Draft state while popover is open
   const [draftPreset, setDraftPreset] = useState<string>(currentValue.preset || 'all');
   const [draftStart, setDraftStart] = useState<string | undefined>(currentValue.from);
   const [draftEnd, setDraftEnd] = useState<string | undefined>(currentValue.to);
   const [hoverDate, setHoverDate] = useState<string | null>(null);
 
-  // Left calendar view year & month (Default to November 2026 matching user preference)
-  const [viewYear, setViewYear] = useState<number>(2026);
-  const [viewMonth, setViewMonth] = useState<number>(10); // 10 = November
+  // Left calendar view year & month (default to current month)
+  const [viewYear, setViewYear] = useState<number>(() => now.getFullYear());
+  const [viewMonth, setViewMonth] = useState<number>(() => now.getMonth());
+
+  const updateHorizontalAlignment = useCallback(() => {
+    if (!triggerRef.current || typeof window === 'undefined') return;
+    const rect = triggerRef.current.getBoundingClientRect();
+    const popoverWidth = window.innerWidth >= 768 ? 650 : window.innerWidth >= 640 ? 620 : 330;
+    const overflowsRight = rect.left + popoverWidth > window.innerWidth - 16;
+    const fitsFromRight = rect.right - popoverWidth >= 16;
+    setAlignRight(overflowsRight && fitsFromRight);
+  }, []);
 
   // Close when clicking outside
   useEffect(() => {
@@ -48,14 +64,17 @@ export const DataTableDateRangePicker: React.FC<DataTableDateRangePickerProps> =
       }
     };
     if (isOpen) {
+      updateHorizontalAlignment();
       document.addEventListener('mousedown', handleClickOutside);
       window.addEventListener('keydown', handleKeyDown);
+      window.addEventListener('resize', updateHorizontalAlignment);
     }
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
       window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('resize', updateHorizontalAlignment);
     };
-  }, [isOpen]);
+  }, [isOpen, updateHorizontalAlignment]);
 
   // Sync draft state on open
   useEffect(() => {
@@ -65,15 +84,16 @@ export const DataTableDateRangePicker: React.FC<DataTableDateRangePickerProps> =
       setDraftEnd(currentValue.to);
 
       if (currentValue.from) {
-        const d = new Date(currentValue.from);
-        if (!isNaN(d.getTime())) {
+        const d = parseLocalISODate(currentValue.from);
+        if (d) {
           setViewYear(d.getFullYear());
           setViewMonth(d.getMonth());
+          return;
         }
-      } else {
-        setViewYear(2026);
-        setViewMonth(10);
       }
+      const today = new Date();
+      setViewYear(today.getFullYear());
+      setViewMonth(today.getMonth());
     }
   }, [isOpen, currentValue]);
 
@@ -115,7 +135,6 @@ export const DataTableDateRangePicker: React.FC<DataTableDateRangePickerProps> =
       }
       setDraftStart(finalStart);
       setDraftEnd(finalEnd);
-      // Auto apply immediately without closing popover
       filter.onChange({
         preset: 'custom',
         from: finalStart,
@@ -124,68 +143,101 @@ export const DataTableDateRangePicker: React.FC<DataTableDateRangePickerProps> =
     }
   };
 
-  // Preset shortcuts: applies without auto-closing popover
-  const handleSelectPreset = (presetKey: string) => {
-    setDraftPreset(presetKey);
-
-    let start: string | undefined;
-    let end: string | undefined;
-
-    if (presetKey === 'today') {
-      start = '2026-11-11';
-      end = '2026-11-11';
-      setViewYear(2026);
-      setViewMonth(10);
-    } else if (presetKey === 'this_week') {
-      start = '2026-11-09';
-      end = '2026-11-15';
-      setViewYear(2026);
-      setViewMonth(10);
-    } else if (presetKey === 'last_week') {
-      start = '2026-11-02';
-      end = '2026-11-08';
-      setViewYear(2026);
-      setViewMonth(10);
-    } else if (presetKey === 'last_7_days') {
-      start = '2026-11-05';
-      end = '2026-11-11';
-      setViewYear(2026);
-      setViewMonth(10);
-    } else if (presetKey === 'current_month') {
-      start = '2026-11-01';
-      end = '2026-11-30';
-      setViewYear(2026);
-      setViewMonth(10);
-    } else if (presetKey === 'reset') {
-      start = undefined;
-      end = undefined;
-      setViewYear(2026);
-      setViewMonth(10);
+  // Manual DD/MM/YYYY custom input change
+  const handleCustomInputsChange = (from?: string, to?: string) => {
+    let finalFrom = from;
+    let finalTo = to;
+    if (finalFrom && finalTo && compareDates(finalTo, finalFrom) < 0) {
+      finalFrom = to;
+      finalTo = from;
     }
 
-    setDraftStart(start);
-    setDraftEnd(end);
+    setDraftStart(finalFrom);
+    setDraftEnd(finalTo);
 
-    // Apply immediately without auto-closing
+    if (finalFrom) {
+      const parsed = parseLocalISODate(finalFrom);
+      if (parsed) {
+        setViewYear(parsed.getFullYear());
+        setViewMonth(parsed.getMonth());
+      }
+    }
+
+    if (!finalFrom && !finalTo) {
+      setDraftPreset('all');
+      filter.onChange({ preset: 'all', from: undefined, to: undefined });
+      return;
+    }
+
+    setDraftPreset('custom');
     filter.onChange({
-      preset: presetKey === 'reset' ? 'all' : presetKey,
-      from: start,
-      to: end,
+      preset: 'custom',
+      from: finalFrom,
+      to: finalTo,
     });
   };
 
+  // Preset shortcuts: computes dynamic range based on current date
+  const handleSelectPreset = (presetKey: string) => {
+    setDraftPreset(presetKey);
+
+    if (presetKey === 'reset') {
+      const today = new Date();
+      setDraftStart(undefined);
+      setDraftEnd(undefined);
+      setViewYear(today.getFullYear());
+      setViewMonth(today.getMonth());
+      filter.onChange({
+        preset: 'all',
+        from: undefined,
+        to: undefined,
+      });
+      return;
+    }
+
+    const { from, to } = getPresetDateRange(presetKey, new Date());
+    setDraftStart(from);
+    setDraftEnd(to);
+
+    if (from) {
+      const d = parseLocalISODate(from);
+      if (d) {
+        setViewYear(d.getFullYear());
+        setViewMonth(d.getMonth());
+      }
+    }
+
+    filter.onChange({
+      preset: presetKey,
+      from,
+      to,
+    });
+  };
+
+  const handleQuickReset = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    handleSelectPreset('reset');
+  };
+
   // Trigger text: format dd/mm/yyyy - dd/mm/yyyy or placeholder
+  const hasActiveRange = Boolean(
+    currentValue.from || currentValue.to || (currentValue.preset && currentValue.preset !== 'all')
+  );
   const isSelected = Boolean(currentValue.from && currentValue.to);
   const triggerDisplay = isSelected
     ? `${formatToDisplayDate(currentValue.from)} - ${formatToDisplayDate(currentValue.to)}`
-    : 'dd/mm/yyyy - dd/mm/yyyy';
+    : currentValue.from
+      ? `Dari ${formatToDisplayDate(currentValue.from)}`
+      : currentValue.to
+        ? `Sampai ${formatToDisplayDate(currentValue.to)}`
+        : filter.placeholder || 'dd/mm/yyyy - dd/mm/yyyy';
 
   const quickNavItems = [
-    { key: 'today', label: 'Today' },
-    { key: 'this_week', label: 'This Week' },
-    { key: 'last_week', label: 'Last Week' },
-    { key: 'last_7_days', label: 'Last 7 Days' },
-    { key: 'current_month', label: 'Current Month' },
+    { key: 'today', label: 'Hari Ini' },
+    { key: 'this_week', label: 'Minggu Ini' },
+    { key: 'last_week', label: 'Minggu Lalu' },
+    { key: 'last_7_days', label: '7 Hari Terakhir' },
+    { key: 'current_month', label: 'Bulan Ini' },
   ];
 
   return (
@@ -194,34 +246,55 @@ export const DataTableDateRangePicker: React.FC<DataTableDateRangePickerProps> =
         {filter.label}
       </label>
 
-      {/* Trigger Button: Placeholder dd/mm/yyyy - dd/mm/yyyy + Calendar Icon */}
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => setIsOpen((prev) => !prev)}
-        className={`w-full flex items-center justify-between px-3 py-2 bg-[#FAFAFF] border rounded-lg text-xs transition-all duration-150 focus:outline-none shadow-xs group cursor-pointer ${isOpen
-          ? 'border-[#4F46E5] ring-2 ring-[#4F46E5]/15 bg-white text-[#0F172A]'
-          : 'border-[#CBD5E1] hover:bg-white hover:border-[#94A3B8]'
-          }`}
+        className={`w-full flex items-center justify-between px-3 py-2 bg-[#FAFAFF] border rounded-lg text-xs transition-all duration-150 focus:outline-none shadow-sm group cursor-pointer ${
+          isOpen
+            ? 'border-[#4F46E5] ring-2 ring-[#4F46E5]/15 bg-white text-[#0F172A]'
+            : hasActiveRange
+              ? 'border-[#4F46E5]/40 bg-indigo-50/30 text-[#0F172A] hover:bg-white hover:border-[#4F46E5]'
+              : 'border-[#CBD5E1] hover:bg-white hover:border-[#94A3B8]'
+        }`}
         aria-label={`Filter ${filter.label}`}
         aria-haspopup="dialog"
         aria-expanded={isOpen}
       >
         <span
-          className={`truncate font-medium tracking-wide ${isSelected ? 'text-[#0F172A]' : 'text-[#94A3B8]'
-            }`}
+          className={`truncate font-medium tracking-wide ${
+            hasActiveRange ? 'text-[#0F172A]' : 'text-[#94A3B8]'
+          }`}
         >
           {triggerDisplay}
         </span>
-        <CalendarIcon className="w-3.5 h-3.5 text-[#64748B] group-hover:text-[#4F46E5] shrink-0 ml-2 transition-colors" />
+        <span className="flex items-center gap-1 shrink-0 ml-2">
+          {hasActiveRange && (
+            <span
+              role="button"
+              tabIndex={-1}
+              onClick={handleQuickReset}
+              title={`Reset filter ${filter.label}`}
+              aria-label={`Reset filter ${filter.label}`}
+              className="p-0.5 rounded hover:bg-slate-200/80 text-slate-400 hover:text-rose-600 transition-colors cursor-pointer"
+            >
+              <XIcon className="w-3 h-3" />
+            </span>
+          )}
+          <CalendarIcon className="w-3.5 h-3.5 text-[#64748B] group-hover:text-[#4F46E5] transition-colors" />
+        </span>
       </button>
 
-      {/* Popover: Clean Dual Calendar (Left) + Sidebar Quick Selection List (Right), No Footer */}
+      {/* Popover: Dual Calendar + Custom Inputs (Left) + Sidebar Quick Range List (Right) */}
       {isOpen && (
-        <div className="absolute left-0 mt-1.5 w-[330px] sm:w-[620px] md:w-[650px] max-w-[calc(100vw-32px)] bg-white text-[#0F172A] border border-[#CBD5E1] rounded-2xl shadow-xl z-50 p-4 sm:p-5 flex flex-col animate-in fade-in-50 zoom-in-95 duration-100">
-          {/* Main Layout: Left = Dual Calendar, Right = Sidebar List */}
-          <div className="flex flex-col sm:flex-row gap-4 sm:gap-4 items-stretch">
-            {/* Left Column: Dual Calendar View (No Header) */}
-            <div className="flex-1 w-full min-w-0">
+        <div
+          className={`absolute ${
+            alignRight ? 'right-0' : 'left-0'
+          } mt-1.5 w-[330px] sm:w-[620px] md:w-[650px] max-w-[calc(100vw-32px)] bg-white text-[#0F172A] border border-[#CBD5E1] rounded-2xl shadow-xl z-50 p-4 sm:p-5 flex flex-col gap-3 animate-in`}
+        >
+          <div className="flex flex-col sm:flex-row gap-4 items-stretch">
+            {/* Left Column: Dual Calendar + Manual DD/MM/YYYY Inputs */}
+            <div className="flex-1 w-full min-w-0 space-y-3">
               <DualCalendarView
                 currentLeftYear={viewYear}
                 currentLeftMonth={viewMonth}
@@ -233,11 +306,16 @@ export const DataTableDateRangePicker: React.FC<DataTableDateRangePickerProps> =
                 onSelectDate={handleSelectDate}
                 onHoverDate={setHoverDate}
               />
+
+              <CustomDateInputs
+                startDate={draftStart}
+                endDate={draftEnd}
+                onChangeRange={handleCustomInputsChange}
+              />
             </div>
 
-            {/* Right Column: Sidebar Quick Selection List (Desktop Right Sidebar) */}
-            <div className="w-full sm:w-[130px] md:w-[140px] shrink-0 border-t sm:border-t-0 sm:border-l border-slate-100 sm:pl-3 pt-3 sm:pt-0 flex flex-col justify-between">
-              {/* Top/Main Items List */}
+            {/* Right Column: Sidebar Quick Selection List */}
+            <div className="w-full sm:w-[140px] shrink-0 border-t sm:border-t-0 sm:border-l border-slate-100 sm:pl-3 pt-3 sm:pt-0 flex flex-col justify-between">
               <div className="flex flex-col gap-0.5">
                 <div className="text-[10px] font-bold uppercase tracking-wider text-[#94A3B8] px-2.5 py-1 hidden sm:block">
                   Quick Range
@@ -249,10 +327,11 @@ export const DataTableDateRangePicker: React.FC<DataTableDateRangePickerProps> =
                       key={item.key}
                       type="button"
                       onClick={() => handleSelectPreset(item.key)}
-                      className={`w-full text-left px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors cursor-pointer ${isActive
-                        ? 'bg-[#EEF2FF] text-[#4F46E5] font-semibold'
-                        : 'text-[#475569] hover:bg-slate-50 hover:text-[#0F172A]'
-                        }`}
+                      className={`w-full text-left px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors cursor-pointer ${
+                        isActive
+                          ? 'bg-[#EEF2FF] text-[#4F46E5] font-semibold'
+                          : 'text-[#475569] hover:bg-slate-50 hover:text-[#0F172A]'
+                      }`}
                     >
                       {item.label}
                     </button>
@@ -260,22 +339,22 @@ export const DataTableDateRangePicker: React.FC<DataTableDateRangePickerProps> =
                 })}
               </div>
 
-              {/* Bottom Divider & Reset / Selesai Actions */}
               <div className="pt-2 mt-2 border-t border-slate-100 flex flex-col gap-1.5">
                 <button
                   type="button"
                   onClick={() => handleSelectPreset('reset')}
-                  className={`w-full text-left px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors cursor-pointer ${draftPreset === 'reset' || (!draftStart && !draftEnd && draftPreset === 'all')
-                    ? 'bg-rose-50 text-rose-600 font-semibold'
-                    : 'text-[#64748B] hover:bg-rose-50/60 hover:text-rose-600'
-                    }`}
+                  className={`w-full text-left px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors cursor-pointer ${
+                    draftPreset === 'reset' || (!draftStart && !draftEnd && draftPreset === 'all')
+                      ? 'bg-rose-50 text-rose-600 font-semibold'
+                      : 'text-[#64748B] hover:bg-rose-50/60 hover:text-rose-600'
+                  }`}
                 >
                   Reset
                 </button>
                 <button
                   type="button"
                   onClick={() => setIsOpen(false)}
-                  className="w-full px-2.5 py-1.5 bg-[#4F46E5] hover:bg-[#4338CA] text-white rounded-md text-xs font-semibold text-center transition-colors cursor-pointer shadow-2xs"
+                  className="w-full px-2.5 py-1.5 bg-[#4F46E5] hover:bg-[#4338CA] text-white rounded-md text-xs font-semibold text-center transition-colors cursor-pointer shadow-sm"
                 >
                   Selesai
                 </button>

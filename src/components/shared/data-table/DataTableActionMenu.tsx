@@ -101,7 +101,7 @@ export function DataTableActionMenu<T>({
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
       onContextMenu={(e) => e.preventDefault()}
-      className="fixed z-50 w-64 bg-white rounded-xl border border-[#CBD5E1] shadow-2xl p-1.5 text-xs text-[#0F172A] animate-in fade-in zoom-in-95 duration-100 select-none"
+      className="fixed z-50 w-64 bg-white rounded-xl border border-[#CBD5E1] shadow-2xl p-1.5 text-xs text-[#0F172A] animate-in select-none"
     >
       {/* Header Info */}
       {(title || resolvedSubtitle) && (

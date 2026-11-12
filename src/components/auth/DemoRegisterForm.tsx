@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { BrandLogo } from '@/components/shared/BrandLogo';
 import { ArrowRightIcon } from '@/components/ui/icons';
+import { Select } from '@/components/ui/Select';
 import { MockDocumentService } from '@/lib/mocks/storage';
 import { MockAuthService } from '@/lib/services/mockAuth';
 import { useToast } from '@/context/ToastContext';
@@ -120,16 +121,37 @@ export const DemoRegisterForm: React.FC<DemoRegisterFormProps> = ({ onSwitchToLo
 
           <div className="space-y-1.5">
             <label className="text-xs font-bold text-[#475569]">Pilih Level Hak Akses Simulasi</label>
-            <select
+            <Select<UserRole>
               value={role}
-              onChange={(e) => setRole(e.target.value as UserRole)}
-              className="w-full text-xs font-semibold px-3.5 py-2.5 rounded-xl border border-[#CBD5E1] bg-white text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#4F46E5]/20 focus:border-[#4F46E5] transition-all cursor-pointer"
-            >
-              <option value="document_reviewer">Document Specialist (Reviewer Verifikasi)</option>
-              <option value="finance_supervisor">Finance & Tax Supervisor (Persetujuan Keuangan)</option>
-              <option value="auditor">Compliance Auditor (Inspeksi Forensik)</option>
-              <option value="super_admin">Super Admin / CISO (Akses Penuh)</option>
-            </select>
+              onChange={(val) => setRole(val)}
+              options={[
+                {
+                  value: 'document_reviewer',
+                  label: 'Document Specialist',
+                  description: 'Reviewer Verifikasi HITL',
+                  badge: 'HITL',
+                },
+                {
+                  value: 'finance_supervisor',
+                  label: 'Finance & Tax Supervisor',
+                  description: 'Persetujuan Keuangan & Pajak',
+                  badge: 'Approval',
+                },
+                {
+                  value: 'auditor',
+                  label: 'Compliance Auditor',
+                  description: 'Inspeksi Forensik & Audit Trail',
+                  badge: 'Read/Audit',
+                },
+                {
+                  value: 'super_admin',
+                  label: 'Super Admin / CISO',
+                  description: 'Akses Penuh Tenant & Konfigurasi',
+                  badge: 'Full',
+                },
+              ]}
+              aria-label="Pilih Level Hak Akses Simulasi"
+            />
           </div>
 
           <div className="space-y-1.5">

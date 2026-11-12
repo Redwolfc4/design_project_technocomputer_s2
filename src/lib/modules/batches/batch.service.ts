@@ -13,6 +13,8 @@ export interface BatchItemDraft {
   currency?: string;
   status: 'draft' | 'ready' | 'processing' | 'completed' | 'failed';
   createdAt: string;
+  companyId?: string;
+  department?: string;
 }
 
 export const INITIAL_BATCH_ITEMS: BatchItemDraft[] = [

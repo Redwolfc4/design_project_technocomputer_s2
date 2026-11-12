@@ -1,7 +1,8 @@
 'use client';
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { DataTablePaginationProps } from './types';
+import { Select } from '@/components/ui/Select';
 
 export const DataTablePagination: React.FC<DataTablePaginationProps> = ({
   currentPage,
@@ -16,6 +17,15 @@ export const DataTablePagination: React.FC<DataTablePaginationProps> = ({
   const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
   const startItem = totalItems === 0 ? 0 : (currentPage - 1) * pageSize + 1;
   const endItem = Math.min(currentPage * pageSize, totalItems);
+
+  const selectOptions = useMemo(
+    () =>
+      pageSizeOptions.map((size) => ({
+        value: String(size),
+        label: String(size),
+      })),
+    [pageSizeOptions]
+  );
 
   if (totalItems === 0) return null;
 
@@ -45,22 +55,19 @@ export const DataTablePagination: React.FC<DataTablePaginationProps> = ({
       {/* Left: Page Size Selector & Range Indicator */}
       <div className="flex items-center gap-2 flex-wrap">
         <span>Tampilkan</span>
-        <select
-          value={pageSize}
-          onChange={(e) => {
-            onPageSizeChange(Number(e.target.value));
-            onPageChange(1); // Reset to page 1 on page size change
-          }}
-          disabled={isLoading}
-          aria-label="Pilih jumlah baris per halaman"
-          className="bg-white border border-[#CBD5E1] rounded px-2 py-1 text-xs text-[#0F172A] focus:outline-none focus:border-[#4F46E5] disabled:opacity-50"
-        >
-          {pageSizeOptions.map((size) => (
-            <option key={size} value={size}>
-              {size}
-            </option>
-          ))}
-        </select>
+        <div className="w-20">
+          <Select
+            size="xs"
+            value={String(pageSize)}
+            options={selectOptions}
+            disabled={isLoading}
+            aria-label="Pilih jumlah baris per halaman"
+            onChange={(val) => {
+              onPageSizeChange(Number(val));
+              onPageChange(1);
+            }}
+          />
+        </div>
         <span>
           baris per halaman (Menampilkan {startItem}–{endItem} dari {totalItems} data)
         </span>
@@ -98,7 +105,7 @@ export const DataTablePagination: React.FC<DataTablePaginationProps> = ({
               disabled={isLoading}
               className={`w-7 h-7 rounded text-xs font-bold transition-colors ${
                 isActive
-                  ? 'bg-[#4F46E5] text-white shadow-xs'
+                  ? 'bg-[#4F46E5] text-white shadow-sm'
                   : 'bg-white border border-[#CBD5E1] text-[#0F172A] hover:bg-slate-50'
               }`}
               aria-current={isActive ? 'page' : undefined}

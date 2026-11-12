@@ -15,11 +15,11 @@ import {
   UploadCloudIcon,
   XIcon,
   LogOutIcon,
-  ChevronDownIcon,
 } from '@/components/ui/icons';
 import { MockDocumentService } from '@/lib/mocks/storage';
 import { DEMO_PERSONAS } from '@/lib/constants/personas';
 import { TruncatedTextWithTooltip } from '@/components/ui/Tooltip';
+import { Select, SelectOption } from '@/components/ui/Select';
 import { UserRole, UserPersona } from '@/types';
 import { useSidebar } from '@/context/SidebarContext';
 import { useAppMode } from '@/context/ModeContext';
@@ -50,8 +50,7 @@ export function Sidebar() {
     setCurrentUser(MockDocumentService.getCurrentUser());
   }, []);
 
-  const handleRoleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const newRole = e.target.value as UserRole;
+  const handleRoleChange = (newRole: UserRole) => {
     const persona = DEMO_PERSONAS[newRole];
     if (persona) {
       MockDocumentService.setCurrentUser(persona);
@@ -59,6 +58,33 @@ export function Sidebar() {
       window.location.reload();
     }
   };
+
+  const demoRoleOptions: SelectOption<UserRole>[] = [
+    {
+      value: 'finance_supervisor',
+      label: 'Finance & Tax Supervisor',
+      description: 'Persona: Dewi Lestari',
+      badge: 'Approval',
+    },
+    {
+      value: 'super_admin',
+      label: 'Super Admin / CISO',
+      description: 'Persona: Budi Santoso',
+      badge: 'Full',
+    },
+    {
+      value: 'document_reviewer',
+      label: 'Document Specialist',
+      description: 'Persona: Rizky Pratama',
+      badge: 'HITL',
+    },
+    {
+      value: 'auditor',
+      label: 'Compliance Auditor',
+      description: 'Persona: Siti Aminah',
+      badge: 'Read/Audit',
+    },
+  ];
 
   const navItems: NavItem[] = [
     { label: 'Ringkasan Utama', href: getRoute(''), icon: BarChart3Icon },
@@ -114,20 +140,18 @@ export function Sidebar() {
           <div className="p-4 border-b border-neutral-200 bg-neutral-50 dark:border-neutral-800 dark:bg-neutral-900">
             <div className="text-xs font-bold uppercase tracking-wider text-neutral-900 dark:text-neutral-100 mb-2 flex items-center justify-between">
               <span>Peran Pengguna Demo</span>
-              <span className="text-[10px] bg-[#4F46E5] text-white px-2 py-0.5 rounded font-extrabold shadow-2xs">
+              <span className="text-[10px] bg-[#4F46E5] text-white px-2 py-0.5 rounded font-extrabold shadow-sm">
                 SANDBOX
               </span>
             </div>
-            <select
+            <Select<UserRole>
+              size="sm"
               value={currentUser.role}
+              options={demoRoleOptions}
               onChange={handleRoleChange}
-              className="w-full text-sm bg-white dark:bg-neutral-950 border border-neutral-300 hover:border-black rounded-lg px-3 py-2 font-semibold text-black dark:text-white shadow-xs focus:outline-none focus:ring-2 focus:ring-black/10 focus:border-black cursor-pointer transition-colors"
-            >
-              <option value="finance_supervisor">Finance & Tax Supervisor (Dewi)</option>
-              <option value="super_admin">Super Admin / CISO (Budi)</option>
-              <option value="document_reviewer">Document Specialist (Rizky)</option>
-              <option value="auditor">Compliance Auditor (Siti)</option>
-            </select>
+              aria-label="Peran Pengguna Demo"
+              minDropdownWidth={256}
+            />
           </div>
         ) : (
           <div className="p-4 border-b border-[#E2E8F0] bg-[#F8FAFC]">
@@ -155,7 +179,7 @@ export function Sidebar() {
                 href={item.href}
                 onClick={closeSidebar}
                 className={`flex items-center justify-between px-3.5 py-2.5 rounded-lg text-sm font-medium transition-colors ${isActive
-                  ? 'bg-[#EEF2FF] dark:bg-[#1E1B4B]/80 text-[#4F46E5] dark:text-[#818CF8] font-bold shadow-xs'
+                  ? 'bg-[#EEF2FF] dark:bg-[#1E1B4B]/80 text-[#4F46E5] dark:text-[#818CF8] font-bold shadow-sm'
                   : 'text-[#475569] dark:text-gray-400 hover:bg-[#F8FAFC] dark:hover:bg-[#1F2937] hover:text-[#0F172A] dark:hover:text-gray-200'
                   }`}
               >
@@ -169,7 +193,7 @@ export function Sidebar() {
                   <span className="tracking-tight">{item.label}</span>
                 </div>
                 {item.badge !== undefined && (
-                  <span className="bg-[#4F46E5] text-white text-xs font-bold px-2 py-0.5 rounded-full min-w-5 text-center shadow-xs">
+                  <span className="bg-[#4F46E5] text-white text-xs font-bold px-2 py-0.5 rounded-full min-w-5 text-center shadow-sm">
                     {item.badge}
                   </span>
                 )}
@@ -181,7 +205,7 @@ export function Sidebar() {
         {/* User Card Footer */}
         <div className="p-4 border-t border-[#E2E8F0] dark:border-[#1F2937] bg-[#FAFAFF] dark:bg-[#0D1322]/50 flex items-center justify-between">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="w-9 h-9 rounded-full bg-[#4F46E5] text-white flex items-center justify-center font-bold text-sm ring-2 ring-[#EEF2FF] shrink-0 shadow-xs">
+            <div className="w-9 h-9 rounded-full bg-[#4F46E5] text-white flex items-center justify-center font-bold text-sm ring-2 ring-[#EEF2FF] shrink-0 shadow-sm">
               {(isProduction && user?.name ? user.name : currentUser.name)
                 .split(' ')
                 .map((n) => n[0])

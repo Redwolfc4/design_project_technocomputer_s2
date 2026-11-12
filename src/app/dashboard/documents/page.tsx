@@ -1,12 +1,11 @@
 'use client';
 
-import React, { useState, useEffect, useMemo, Suspense } from 'react';
-import Link from 'next/link';
+import React, { useState, useEffect, useMemo, useCallback, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Topbar } from '@/components/layout/Topbar';
 import { DocumentService } from '@/lib/modules/documents/document.service';
 import { DocumentRecord } from '@/types';
-import { formatCurrency, formatIDR, formatDate, getStatusBadgeInfo, getDocumentTypeLabel, parseCurrencyInput } from '@/lib/utils/formatters';
+import { formatCurrency, formatDate, getStatusBadgeInfo, getDocumentTypeLabel, parseCurrencyInput } from '@/lib/utils/formatters';
 import {
   ArrowRightIcon,
   FileTextIcon,
@@ -14,10 +13,8 @@ import {
   CopyIcon,
   CheckCircleIcon,
   XCircleIcon,
-  DownloadIcon,
   PencilIcon,
   TrashIcon,
-  XIcon,
   PlusIcon,
 } from '@/components/ui/icons';
 import {
@@ -37,6 +34,11 @@ import { PageHeader } from '@/components/shared/PageHeader';
 import { useAppRoutes } from '@/context/RouteContext';
 import { useAppScope } from '@/context/ScopeContext';
 import { useToast } from '@/context/ToastContext';
+import { Modal } from '@/components/ui/Modal';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { Button } from '@/components/ui/Button';
+import { SearchableSelect } from '@/components/ui/Select';
+import { isTimestampInDateRange } from '@/components/shared/data-table/date-picker/dateUtils';
 
 function DocumentRepositoryContent() {
   const router = useRouter();
@@ -199,11 +201,11 @@ function DocumentRepositoryContent() {
     return documents.filter((doc) => {
       // 0. Scope Filtering: Company & Department Isolation
       if (activeCompanyId !== 'all') {
-        const docCompanyId = (doc as any).companyId || 'comp-01';
+        const docCompanyId = doc.companyId || 'comp-01';
         if (docCompanyId !== activeCompanyId) return false;
       }
       if (activeDepartment && activeDepartment.id !== 'all') {
-        const docDept = (doc as any).department;
+        const docDept = doc.department;
         if (docDept && docDept.toLowerCase() !== activeDepartment.name.toLowerCase()) {
           return false;
         }
@@ -218,19 +220,7 @@ function DocumentRepositoryContent() {
       if (confidenceFilter === 'low' && doc.confidence >= 80) return false;
 
       // Filter Rentang Tanggal
-      if (dateRange && dateRange.preset !== 'all' && doc.uploadedAt) {
-        const docDate = new Date(doc.uploadedAt);
-        if (dateRange.from) {
-          const fromDate = new Date(dateRange.from);
-          fromDate.setHours(0, 0, 0, 0);
-          if (docDate < fromDate) return false;
-        }
-        if (dateRange.to) {
-          const toDate = new Date(dateRange.to);
-          toDate.setHours(23, 59, 59, 999);
-          if (docDate > toDate) return false;
-        }
-      }
+      if (!isTimestampInDateRange(doc.uploadedAt, dateRange)) return false;
 
       if (searchQuery) {
         const q = searchQuery.toLowerCase();
@@ -241,7 +231,7 @@ function DocumentRepositoryContent() {
       }
       return true;
     });
-  }, [documents, statusFilter, typeFilter, confidenceFilter, dateRange, searchQuery]);
+  }, [documents, statusFilter, typeFilter, confidenceFilter, dateRange, searchQuery, activeCompanyId, activeDepartment]);
 
   // Pagination slice
   const totalItems = filteredDocs.length;
@@ -274,6 +264,10 @@ function DocumentRepositoryContent() {
 
   // Export functions
   const handleExportCSV = () => {
+    if (filteredDocs.length === 0) {
+      toast.error('Tidak ada data dokumen untuk diekspor.', { title: 'Ekspor Gagal' });
+      return;
+    }
     const headers = ['Nomor Berkas', 'Nama Berkas', 'Kategori', 'Vendor', 'Tanggal Masuk', 'Total Nominal', 'Currency', 'Total Nominal Formatted', 'Akurasi', 'Status'];
     const rows = filteredDocs.map((d) => [
       `"${d.fileNumber}"`,
@@ -303,6 +297,10 @@ function DocumentRepositoryContent() {
   };
 
   const handleExportExcel = () => {
+    if (filteredDocs.length === 0) {
+      toast.error('Tidak ada data dokumen untuk diekspor.', { title: 'Ekspor Gagal' });
+      return;
+    }
     const tableHtml = `
       <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
       <head><meta charset="utf-8"/></head>
@@ -400,6 +398,7 @@ function DocumentRepositoryContent() {
       label: 'Status Verifikasi',
       type: 'select',
       placeholder: 'Semua Status',
+      searchable: true,
       options: [
         { label: 'Semua Status', value: 'all' },
         { label: 'Perlu Verifikasi', value: 'needs_review' },
@@ -440,6 +439,7 @@ function DocumentRepositoryContent() {
       label: 'Tingkat Akurasi AI',
       type: 'select',
       placeholder: 'Semua Skor',
+      searchable: true,
       options: [
         { label: 'Semua Skor Akurasi', value: 'all' },
         { label: 'Tinggi (≥ 90%)', value: 'high' },
@@ -551,10 +551,11 @@ function DocumentRepositoryContent() {
                 options={{
                   onExportCSV: handleExportCSV,
                   onExportExcel: handleExportExcel,
+                  disabled: filteredDocs.length === 0,
                 }}
               />
               <button
-                onClick={() => router.push(getRoute('/upload'))}
+                onClick={() => router.push(getRoute('/upload?action=upload'))}
                 className="inline-flex items-center gap-2 px-4 py-2 bg-[#4F46E5] hover:bg-[#4338CA] text-white text-xs font-semibold rounded-lg shadow-sm transition-colors cursor-pointer"
               >
                 <PlusIcon className="w-4 h-4" />
@@ -604,7 +605,7 @@ function DocumentRepositoryContent() {
                         onResetFilters={handleResetFilters}
                         action={{
                           label: "Unggah Dokumen Baru",
-                          onClick: () => router.push(getRoute('/upload')),
+                          onClick: () => router.push(getRoute('/upload?action=upload')),
                         }}
                       />
                     </td>
@@ -720,136 +721,127 @@ function DocumentRepositoryContent() {
 
       {/* Modal Edit Metadata */}
       {editDoc && (
-        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-xl border border-slate-200 max-w-md w-full p-6 space-y-4 animate-in fade-in zoom-in-95 duration-150">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h3 className="text-sm font-bold text-slate-900">Ubah Metadata Dokumen</h3>
-              <button onClick={() => setEditDoc(null)} className="p-1 text-slate-400 hover:text-slate-600 rounded-md">
-                <XIcon className="w-4 h-4" />
-              </button>
+        <Modal
+          isOpen={Boolean(editDoc)}
+          onClose={() => setEditDoc(null)}
+          title="Ubah Metadata Dokumen"
+          subtitle={`Koreksi rincian indeks berkas ${editDoc.fileNumber}`}
+          maxWidth="md"
+        >
+          <form onSubmit={handleEditSubmit} noValidate className="space-y-3.5">
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-slate-700">Nomor Berkas / Faktur</label>
+              <input
+                type="text"
+                value={editFormData.fileNumber}
+                onChange={(e) => setEditFormData({ ...editFormData, fileNumber: e.target.value })}
+                className="w-full text-xs px-3 py-2 rounded-md border border-slate-300"
+                required
+              />
             </div>
-            <form onSubmit={handleEditSubmit} noValidate className="space-y-3.5">
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-slate-700">Nama Rekanan / Vendor</label>
+              <input
+                type="text"
+                value={editFormData.vendorName}
+                onChange={(e) => setEditFormData({ ...editFormData, vendorName: e.target.value })}
+                className="w-full text-xs px-3 py-2 rounded-md border border-slate-300"
+                required
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-slate-700">NPWP Vendor</label>
+              <input
+                type="text"
+                value={editFormData.vendorTaxId}
+                onChange={(e) => setEditFormData({ ...editFormData, vendorTaxId: e.target.value })}
+                className="w-full text-xs px-3 py-2 rounded-md border border-slate-300"
+              />
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <SearchableSelect
+                  label="Mata Uang"
+                  size="sm"
+                  value={editFormData.currency}
+                  onChange={(val) => setEditFormData({ ...editFormData, currency: val })}
+                  searchPlaceholder="Cari mata uang..."
+                  options={[
+                    { value: 'IDR', label: 'IDR — Rupiah Indonesia', badge: 'Rp' },
+                    { value: 'USD', label: 'USD — US Dollar', badge: '$' },
+                    { value: 'EUR', label: 'EUR — Euro', badge: '€' },
+                    { value: 'SGD', label: 'SGD — Singapore Dollar', badge: 'S$' },
+                    { value: 'JPY', label: 'JPY — Japanese Yen', badge: '¥' },
+                  ]}
+                />
+              </div>
               <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-700">Nomor Berkas / Faktur</label>
+                <label className="text-xs font-bold text-slate-700">Total Nilai Transaksi</label>
                 <input
                   type="text"
-                  value={editFormData.fileNumber}
-                  onChange={(e) => setEditFormData({ ...editFormData, fileNumber: e.target.value })}
-                  className="w-full text-xs px-3 py-2 rounded-md border border-slate-300"
+                  value={editFormData.totalAmount}
+                  onChange={(e) => setEditFormData({ ...editFormData, totalAmount: e.target.value })}
+                  placeholder="Contoh: 38850000 atau 1,250.50"
+                  className="w-full text-xs px-3 py-2 rounded-md border border-slate-300 font-semibold"
                   required
                 />
               </div>
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-700">Nama Rekanan / Vendor</label>
-                <input
-                  type="text"
-                  value={editFormData.vendorName}
-                  onChange={(e) => setEditFormData({ ...editFormData, vendorName: e.target.value })}
-                  className="w-full text-xs px-3 py-2 rounded-md border border-slate-300"
-                  required
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-700">NPWP Vendor</label>
-                <input
-                  type="text"
-                  value={editFormData.vendorTaxId}
-                  onChange={(e) => setEditFormData({ ...editFormData, vendorTaxId: e.target.value })}
-                  className="w-full text-xs px-3 py-2 rounded-md border border-slate-300"
-                />
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-700">Mata Uang</label>
-                  <select
-                    value={editFormData.currency}
-                    onChange={(e) => setEditFormData({ ...editFormData, currency: e.target.value })}
-                    className="w-full text-xs px-3 py-2 rounded-md border border-slate-300 bg-white font-semibold text-slate-800"
-                  >
-                    <option value="IDR">IDR — Rupiah Indonesia</option>
-                    <option value="USD">USD — US Dollar</option>
-                    <option value="EUR">EUR — Euro</option>
-                    <option value="SGD">SGD — Singapore Dollar</option>
-                  </select>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-700">Total Nilai Transaksi</label>
-                  <input
-                    type="text"
-                    value={editFormData.totalAmount}
-                    onChange={(e) => setEditFormData({ ...editFormData, totalAmount: e.target.value })}
-                    placeholder="Contoh: 38850000 atau 1,250.50"
-                    className="w-full text-xs px-3 py-2 rounded-md border border-slate-300 font-semibold"
-                    required
-                  />
-                </div>
-              </div>
-              <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200 text-xs flex items-center justify-between">
-                <span className="text-slate-500 font-medium">Pratinjau Format:</span>
-                <span className="font-bold text-[#059669]">
-                  {formatCurrency(parseCurrencyInput(editFormData.totalAmount, editFormData.currency).amount, editFormData.currency)}
-                </span>
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-700">Catatan Perubahan</label>
-                <textarea
-                  rows={2}
-                  value={editFormData.notes}
-                  onChange={(e) => setEditFormData({ ...editFormData, notes: e.target.value })}
-                  placeholder="Tambahkan alasan koreksi metadata..."
-                  className="w-full text-xs px-3 py-2 rounded-md border border-slate-300"
-                />
-              </div>
-              <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => setEditDoc(null)}
-                  className="px-4 py-2 rounded-lg border border-slate-300 text-xs font-bold text-slate-700 hover:bg-slate-50 cursor-pointer"
-                >
-                  Batal
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 rounded-lg bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700 shadow-sm cursor-pointer"
-                >
-                  Simpan Perubahan
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+            </div>
+            <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200 text-xs flex items-center justify-between">
+              <span className="text-slate-500 font-medium">Pratinjau Format:</span>
+              <span className="font-bold text-[#059669]">
+                {formatCurrency(parseCurrencyInput(editFormData.totalAmount, editFormData.currency).amount, editFormData.currency)}
+              </span>
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-slate-700">Catatan Perubahan</label>
+              <textarea
+                rows={2}
+                value={editFormData.notes}
+                onChange={(e) => setEditFormData({ ...editFormData, notes: e.target.value })}
+                placeholder="Tambahkan alasan koreksi metadata..."
+                className="w-full text-xs px-3 py-2 rounded-md border border-slate-300"
+              />
+            </div>
+            <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={() => setEditDoc(null)}
+              >
+                Batal
+              </Button>
+              <Button
+                type="submit"
+                variant="primary"
+                size="sm"
+              >
+                Simpan Perubahan
+              </Button>
+            </div>
+          </form>
+        </Modal>
       )}
 
       {/* Modal Hapus Dokumen */}
-      {deleteDoc && (
-        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-xl border border-slate-200 max-w-sm w-full p-6 space-y-4 animate-in fade-in zoom-in-95 duration-150">
-            <h3 className="text-sm font-bold text-rose-600 flex items-center gap-2">
-              <TrashIcon className="w-4 h-4" />
-              <span>Hapus Dokumen?</span>
-            </h3>
-            <p className="text-xs text-slate-600 leading-relaxed">
-              Apakah Anda yakin ingin menghapus berkas <strong className="text-slate-900">{deleteDoc.fileNumber}</strong> ({deleteDoc.fileName}) dari repositori? Tindakan ini akan dicatat ke dalam audit trail.
-            </p>
-            <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
-              <button
-                type="button"
-                onClick={() => setDeleteDoc(null)}
-                className="px-4 py-2 rounded-lg border border-slate-300 text-xs font-bold text-slate-700 hover:bg-slate-50 cursor-pointer"
-              >
-                Batal
-              </button>
-              <button
-                type="button"
-                onClick={handleDeleteConfirm}
-                className="px-4 py-2 rounded-lg bg-rose-600 text-white text-xs font-bold hover:bg-rose-700 shadow-sm cursor-pointer"
-              >
-                Hapus Dokumen
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog
+        isOpen={Boolean(deleteDoc)}
+        onClose={() => setDeleteDoc(null)}
+        onConfirm={handleDeleteConfirm}
+        title="Hapus Dokumen?"
+        description={
+          deleteDoc ? (
+            <>
+              Apakah Anda yakin ingin menghapus berkas{' '}
+              <strong className="text-slate-900">{deleteDoc.fileNumber}</strong> ({deleteDoc.fileName}) dari repositori? Tindakan ini akan dicatat ke dalam audit trail.
+            </>
+          ) : null
+        }
+        confirmLabel="Hapus Dokumen"
+        cancelLabel="Batal"
+        variant="danger"
+      />
     </div>
   );
 }

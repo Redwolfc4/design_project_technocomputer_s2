@@ -3,8 +3,9 @@
 import React from 'react';
 import Link from 'next/link';
 import { DocumentRecord } from '@/types';
-import { formatCurrency, formatIDR, formatDate, getStatusBadgeInfo, getDocumentTypeLabel } from '@/lib/utils/formatters';
-import { XIcon, FileTextIcon, ArrowRightIcon, CopyIcon } from '@/components/ui/icons';
+import { formatCurrency, formatDate, getStatusBadgeInfo, getDocumentTypeLabel } from '@/lib/utils/formatters';
+import { FileTextIcon, ArrowRightIcon, CopyIcon } from '@/components/ui/icons';
+import { Modal } from '@/components/ui/Modal';
 import { useAppRoutes } from '@/context/RouteContext';
 
 export interface DocumentQuickDetailModalProps {
@@ -19,18 +20,6 @@ export function DocumentQuickDetailModal({
   onCopyText,
 }: DocumentQuickDetailModalProps) {
   const { getRoute } = useAppRoutes();
-  React.useEffect(() => {
-    if (!document) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [document, onClose]);
-
-  if (!document) return null;
-
-  const badge = getStatusBadgeInfo(document.status);
 
   const handleCopy = (text: string, label: string) => {
     if (onCopyText) {
@@ -40,30 +29,50 @@ export function DocumentQuickDetailModal({
     }
   };
 
+  const badge = document ? getStatusBadgeInfo(document.status) : null;
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4 animate-in fade-in duration-150">
-      <div className="bg-white rounded-2xl border border-[#CBD5E1] shadow-2xl max-w-lg w-full p-6 space-y-5 animate-in zoom-in-95 duration-150">
-        {/* Header */}
-        <div className="flex items-start justify-between pb-3 border-b border-[#E2E8F0]">
+    <Modal
+      isOpen={Boolean(document)}
+      onClose={onClose}
+      maxWidth="lg"
+      title={
+        document && (
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-indigo-50 text-[#4F46E5] flex items-center justify-center border border-indigo-200">
+            <div className="w-10 h-10 rounded-full bg-indigo-50 text-[#4F46E5] flex items-center justify-center border border-indigo-200 shrink-0">
               <FileTextIcon className="w-5 h-5" />
             </div>
-            <div>
-              <h3 className="font-bold text-base text-[#0F172A]">{document.fileNumber}</h3>
+            <div className="min-w-0">
+              <h3 className="font-bold text-base text-[#0F172A] truncate">{document.fileNumber}</h3>
               <p className="text-xs text-[#64748B] truncate max-w-xs">{document.fileName}</p>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition-colors"
-          >
-            <XIcon className="w-5 h-5" />
-          </button>
-        </div>
+        )
+      }
+      footer={
+        document && (
+          <div className="w-full flex items-center justify-between gap-3">
+            <button
+              type="button"
+              onClick={() => handleCopy(document.fileNumber, 'Nomor Berkas')}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-[#CBD5E1] bg-white hover:bg-slate-50 text-xs font-semibold text-[#0F172A] transition-colors cursor-pointer"
+            >
+              <CopyIcon className="w-3.5 h-3.5 text-[#64748B]" />
+              <span>Salin Nomor Berkas</span>
+            </button>
 
-        {/* Content Body */}
+            <Link
+              href={getRoute(`/verification?docId=${document.id}`)}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[#4F46E5] hover:bg-[#4338CA] text-white text-xs font-bold transition-all shadow-sm"
+            >
+              <span>Buka Workspace Verifikasi</span>
+              <ArrowRightIcon className="w-3.5 h-3.5" />
+            </Link>
+          </div>
+        )
+      }
+    >
+      {document && badge && (
         <div className="space-y-4 text-xs text-[#334155]">
           <div className="grid grid-cols-2 gap-3 bg-[#F8FAFC] p-3.5 rounded-xl border border-[#E2E8F0]">
             <div>
@@ -99,8 +108,8 @@ export function DocumentQuickDetailModal({
                   document.confidence >= 90
                     ? 'text-[#059669]'
                     : document.confidence >= 75
-                    ? 'text-[#F59E0B]'
-                    : 'text-[#E11D48]'
+                      ? 'text-[#F59E0B]'
+                      : 'text-[#E11D48]'
                 }`}
               >
                 {document.confidence}% Confidence
@@ -108,7 +117,7 @@ export function DocumentQuickDetailModal({
             </div>
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-2.5">
             <div>
               <p className="text-[10px] font-bold text-[#64748B] uppercase tracking-wider mb-0.5">Vendor / Lawan Transaksi</p>
               <p className="font-bold text-xs text-[#0F172A]">{document.vendorName}</p>
@@ -128,27 +137,7 @@ export function DocumentQuickDetailModal({
             </div>
           </div>
         </div>
-
-        {/* Footer */}
-        <div className="pt-3 border-t border-[#E2E8F0] flex items-center justify-between gap-3">
-          <button
-            type="button"
-            onClick={() => handleCopy(document.fileNumber, 'Nomor Berkas')}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-[#CBD5E1] hover:bg-slate-50 text-xs font-semibold text-[#0F172A] transition-colors"
-          >
-            <CopyIcon className="w-3.5 h-3.5 text-[#64748B]" />
-            <span>Salin Nomor Berkas</span>
-          </button>
-
-          <Link
-            href={getRoute(`/verification?docId=${document.id}`)}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[#4F46E5] hover:bg-[#4338CA] text-white text-xs font-bold transition-all shadow-xs"
-          >
-            <span>Buka Workspace Verifikasi</span>
-            <ArrowRightIcon className="w-3.5 h-3.5" />
-          </Link>
-        </div>
-      </div>
-    </div>
+      )}
+    </Modal>
   );
 }

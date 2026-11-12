@@ -29,7 +29,7 @@ export const DataTableToolbar: React.FC<DataTableToolbarProps> = ({
 
   return (
     <div
-      className={`rounded-xl border border-[#E2E8F0] bg-white shadow-xs ${
+      className={`rounded-xl border border-[#E2E8F0] bg-white shadow-sm ${
         compact ? 'p-3.5 sm:p-4 space-y-3' : 'p-5 space-y-4'
       } ${className}`}
     >

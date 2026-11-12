@@ -1,15 +1,12 @@
 'use client';
 
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Topbar } from '@/components/layout/Topbar';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { useAppScope } from '@/context/ScopeContext';
 import { useToast } from '@/context/ToastContext';
 import { RBACMember } from '@/types';
-import {
-  INITIAL_RBAC_USERS,
-  ALL_AVAILABLE_PERMISSIONS,
-} from '@/lib/mocks/rbacUsers';
+import { ALL_AVAILABLE_PERMISSIONS } from '@/lib/mocks/rbacUsers';
 import { MemberService } from '@/lib/modules/members/member.service';
 import { RBACActionMenu } from '@/components/shared/RBACActionMenu';
 import {
@@ -21,19 +18,15 @@ import {
   DataTableExport,
   FilterConfig,
 } from '@/components/shared/data-table';
+import { Modal } from '@/components/ui/Modal';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { Button } from '@/components/ui/Button';
+import { SearchableSelect } from '@/components/ui/Select';
 import {
   SearchIcon,
   XIcon,
   PlusIcon,
-  EyeIcon,
-  PencilIcon,
-  TrashIcon,
-  DownloadIcon,
-  ChevronDownIcon,
   ArrowUpDownIcon,
-  CheckIcon,
-  AlertTriangleIcon,
-  FilterIcon,
   MoreHorizontalIcon,
 } from '@/components/ui/icons';
 
@@ -43,7 +36,6 @@ export default function UsersManagementPage() {
     setActiveCompanyId,
     allowedCompanies,
     canChangeCompany,
-    activeDepartmentId,
     setActiveDepartmentId,
     allowedDepartments,
     canChangeDepartment,
@@ -60,17 +52,9 @@ export default function UsersManagementPage() {
   const [selectedStatus, setSelectedStatus] = useState('Semua');
   const [selectedPermissions, setSelectedPermissions] = useState<string[]>([]);
 
-  // Searchable filter dropdown popover toggles
-  const [isDeptOpen, setIsDeptOpen] = useState(false);
-  const [deptSearch, setDeptSearch] = useState('');
-  const [isRoleOpen, setIsRoleOpen] = useState(false);
-  const [roleSearch, setRoleSearch] = useState('');
-  const [isStatusOpen, setIsStatusOpen] = useState(false);
-  const [isPermOpen, setIsPermOpen] = useState(false);
-  const [permSearch, setPermSearch] = useState('');
-
-  // Export dropdown state
-  const [isExportOpen, setIsExportOpen] = useState(false);
+  // Modal Permission Search & Category Filter state
+  const [modalPermSearch, setModalPermSearch] = useState('');
+  const [modalPermCategory, setModalPermCategory] = useState('Semua');
 
   // Sorting state
   const [sortColumn, setSortColumn] = useState<'name' | 'department' | 'roleTitle' | 'status' | null>('name');
@@ -141,30 +125,32 @@ export default function UsersManagementPage() {
     return map;
   }, []);
 
-  // Filtered lists for searchable dropdowns
-  const filteredDeptOptions = useMemo(() => {
-    return uniqueDepartments.filter((d) => d.toLowerCase().includes(deptSearch.toLowerCase()));
-  }, [uniqueDepartments, deptSearch]);
+  const permissionCategories = useMemo(() => {
+    const cats = new Set<string>();
+    ALL_AVAILABLE_PERMISSIONS.forEach((p) => cats.add(p.category));
+    return ['Semua', ...Array.from(cats)];
+  }, []);
 
-  const filteredRoleOptions = useMemo(() => {
-    return uniqueRoles.filter((r) => r.toLowerCase().includes(roleSearch.toLowerCase()));
-  }, [uniqueRoles, roleSearch]);
-
-  const filteredPermOptions = useMemo(() => {
-    return ALL_AVAILABLE_PERMISSIONS.filter(
-      (p) =>
-        p.label.toLowerCase().includes(permSearch.toLowerCase()) ||
-        p.key.toLowerCase().includes(permSearch.toLowerCase()) ||
-        p.category.toLowerCase().includes(permSearch.toLowerCase())
-    );
-  }, [permSearch]);
+  const filteredModalPermissions = useMemo(() => {
+    const q = modalPermSearch.trim().toLowerCase();
+    return ALL_AVAILABLE_PERMISSIONS.filter((p) => {
+      if (modalPermCategory !== 'Semua' && p.category !== modalPermCategory) return false;
+      if (!q) return true;
+      return (
+        p.label.toLowerCase().includes(q) ||
+        p.key.toLowerCase().includes(q) ||
+        p.desc.toLowerCase().includes(q) ||
+        p.category.toLowerCase().includes(q)
+      );
+    });
+  }, [modalPermSearch, modalPermCategory]);
 
   // Filter & Search Logic
   const filteredUsers = useMemo(() => {
     return users.filter((user) => {
       // 0. Scope Isolation: Company & Department
       if (activeCompanyId !== 'all') {
-        const userComp = (user as any).companyId || 'comp-01';
+        const userComp = user.companyId || 'comp-01';
         if (userComp !== activeCompanyId) return false;
       }
       if (activeDepartment && activeDepartment.id !== 'all') {
@@ -208,7 +194,7 @@ export default function UsersManagementPage() {
 
       return true;
     });
-  }, [users, searchQuery, selectedDept, selectedRole, selectedStatus, selectedPermissions]);
+  }, [users, searchQuery, selectedDept, selectedRole, selectedStatus, selectedPermissions, activeCompanyId, activeDepartment]);
 
   // Sorting Logic
   const sortedUsers = useMemo(() => {
@@ -225,7 +211,6 @@ export default function UsersManagementPage() {
 
   // Pagination Logic
   const totalItems = sortedUsers.length;
-  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
   const paginatedUsers = useMemo(() => {
     const start = (currentPage - 1) * pageSize;
     return sortedUsers.slice(start, start + pageSize);
@@ -292,11 +277,13 @@ export default function UsersManagementPage() {
       name: '',
       email: '',
       department: uniqueDepartments[0] || 'Enterprise IT & Security',
-      roleTitle: '',
+      roleTitle: uniqueRoles[0] || '',
       status: 'Aktif',
       permissions: ['view_dashboard'],
     });
     setFormErrors({});
+    setModalPermSearch('');
+    setModalPermCategory('Semua');
     setIsAddOpen(true);
   };
 
@@ -312,6 +299,8 @@ export default function UsersManagementPage() {
       permissions: [...user.permissions],
     });
     setFormErrors({});
+    setModalPermSearch('');
+    setModalPermCategory('Semua');
   };
 
   // Submit Add
@@ -409,8 +398,11 @@ export default function UsersManagementPage() {
 
   // Export CSV
   const handleExportCSV = () => {
-    setIsExportOpen(false);
     const dataToExport = sortedUsers;
+    if (dataToExport.length === 0) {
+      toast.error('Tidak ada data anggota untuk diekspor.', { title: 'Ekspor Gagal' });
+      return;
+    }
     const headers = ['ID', 'Nama Lengkap', 'Email', 'Departemen', 'Peran Sistem', 'Status', 'Hak Akses', 'Tanggal Dibuat'];
     const rows = dataToExport.map((u) => [
       `"${u.id}"`,
@@ -440,8 +432,11 @@ export default function UsersManagementPage() {
 
   // Export Excel (.xls HTML table readable natively by Excel)
   const handleExportExcel = () => {
-    setIsExportOpen(false);
     const dataToExport = sortedUsers;
+    if (dataToExport.length === 0) {
+      toast.error('Tidak ada data anggota untuk diekspor.', { title: 'Ekspor Gagal' });
+      return;
+    }
     const tableHtml = `
       <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
       <head><meta charset="utf-8"/></head>
@@ -555,7 +550,7 @@ export default function UsersManagementPage() {
       ],
       selectedValue: selectedStatus,
       onChange: (val) => setSelectedStatus(val),
-      searchable: false,
+      searchable: true,
     },
     {
       id: 'permissions',
@@ -591,6 +586,7 @@ export default function UsersManagementPage() {
                 options={{
                   onExportCSV: handleExportCSV,
                   onExportExcel: handleExportExcel,
+                  disabled: sortedUsers.length === 0,
                 }}
               />
               <button
@@ -813,27 +809,23 @@ export default function UsersManagementPage() {
       {/* 1. VIEW MODAL (Detail Anggota) */}
       {/* ======================================================== */}
       {viewUser && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4">
-          <div className="bg-white rounded-2xl border border-[#CBD5E1] shadow-2xl max-w-lg w-full p-6 space-y-5 animate-in fade-in zoom-in-95 duration-150">
-            <div className="flex items-start justify-between pb-3 border-b border-[#E2E8F0]">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-[#4F46E5] text-white font-bold flex items-center justify-center text-sm shadow-sm">
-                  {viewUser.name.charAt(0)}
-                </div>
-                <div>
-                  <h3 className="font-bold text-base text-[#0F172A]">{viewUser.name}</h3>
-                  <p className="text-xs text-[#64748B]">{viewUser.email}</p>
-                </div>
+        <Modal
+          isOpen={Boolean(viewUser)}
+          onClose={() => setViewUser(null)}
+          title={
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-[#4F46E5] text-white font-bold flex items-center justify-center text-sm shadow-sm shrink-0">
+                {viewUser.name.charAt(0)}
               </div>
-              <button
-                type="button"
-                onClick={() => setViewUser(null)}
-                className="text-slate-400 hover:text-slate-600 p-1"
-              >
-                <XIcon className="w-5 h-5" />
-              </button>
+              <div>
+                <h3 className="font-bold text-base text-[#0F172A]">{viewUser.name}</h3>
+                <p className="text-xs text-[#64748B]">{viewUser.email}</p>
+              </div>
             </div>
-
+          }
+          maxWidth="lg"
+        >
+          <div className="space-y-5">
             <div className="grid grid-cols-2 gap-4 text-xs">
               <div className="p-3 rounded-lg bg-[#FAFAFF] border border-[#E2E8F0] space-y-1">
                 <span className="text-[10px] font-bold text-[#64748B] uppercase">Departemen</span>
@@ -883,41 +875,34 @@ export default function UsersManagementPage() {
             </div>
 
             <div className="pt-2 flex justify-end">
-              <button
+              <Button
                 type="button"
+                variant="secondary"
+                size="sm"
                 onClick={() => setViewUser(null)}
-                className="px-4 py-2 rounded-lg bg-slate-100 text-xs font-semibold text-slate-700 hover:bg-slate-200"
               >
                 Tutup
-              </button>
+              </Button>
             </div>
           </div>
-        </div>
+        </Modal>
       )}
 
       {/* ======================================================== */}
       {/* 2. ADD & EDIT MODAL (Formulir CRUD) */}
       {/* ======================================================== */}
       {(isAddOpen || editUser) && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4 overflow-y-auto">
-          <div className="bg-white rounded-2xl border border-[#CBD5E1] shadow-2xl max-w-xl w-full p-6 space-y-5 animate-in fade-in zoom-in-95 duration-150 my-8">
-            <div className="flex items-center justify-between pb-3 border-b border-[#E2E8F0]">
-              <h3 className="font-bold text-base text-[#0F172A]">
-                {editUser ? `Edit Data Anggota: ${editUser.name}` : '+ Tambah Anggota Tim Baru'}
-              </h3>
-              <button
-                type="button"
-                onClick={() => {
-                  setIsAddOpen(false);
-                  setEditUser(null);
-                }}
-                className="text-slate-400 hover:text-slate-600 p-1"
-              >
-                <XIcon className="w-5 h-5" />
-              </button>
-            </div>
-
-            <form onSubmit={editUser ? handleEditSubmit : handleAddSubmit} noValidate className="space-y-4">
+        <Modal
+          isOpen={Boolean(isAddOpen || editUser)}
+          onClose={() => {
+            setIsAddOpen(false);
+            setEditUser(null);
+          }}
+          title={editUser ? `Edit Data Anggota: ${editUser.name}` : '+ Tambah Anggota Tim Baru'}
+          subtitle="Konfigurasikan informasi akun, profil penugasan, dan hak akses operasional."
+          maxWidth="xl"
+        >
+          <form onSubmit={editUser ? handleEditSubmit : handleAddSubmit} noValidate className="space-y-4">
               {/* Field 1: Nama Lengkap */}
               <div className="space-y-1">
                 <label className="text-xs font-bold text-[#0F172A] block">
@@ -950,38 +935,53 @@ export default function UsersManagementPage() {
 
               {/* Field 3 & 4: Departemen & Peran Sistem */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-[#0F172A] block">
-                    Departemen <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="text"
+                <div>
+                  <SearchableSelect
+                    label="Departemen"
+                    required
+                    size="sm"
+                    allowCustom
+                    customOptionPrefix="Gunakan departemen baru:"
                     value={formData.department}
-                    onChange={(e) => setFormData({ ...formData, department: e.target.value })}
-                    placeholder="Contoh: Finance, AP & Tax"
-                    list="dept-datalist"
-                    className="w-full px-3 py-2 bg-[#FAFAFF] border border-[#CBD5E1] rounded-lg text-xs text-[#0F172A] focus:outline-none focus:border-[#4F46E5] focus:bg-white"
+                    onChange={(val) => setFormData({ ...formData, department: val })}
+                    placeholder="Pilih atau ketik departemen..."
+                    searchPlaceholder="Cari atau tambah departemen..."
+                    error={formErrors.department}
+                    options={Array.from(
+                      new Set([
+                        ...uniqueDepartments,
+                        ...allowedDepartments.map((d) => d.name),
+                        'Finance, AP & Tax',
+                        'Enterprise IT & Security',
+                        'Internal Audit & Compliance',
+                      ])
+                    ).map((dept) => ({ value: dept, label: dept }))}
                   />
-                  <datalist id="dept-datalist">
-                    {uniqueDepartments.map((d) => (
-                      <option key={d} value={d} />
-                    ))}
-                  </datalist>
-                  {formErrors.department && <p className="text-[11px] text-rose-500">{formErrors.department}</p>}
                 </div>
 
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-[#0F172A] block">
-                    Peran Sistem <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="text"
+                <div>
+                  <SearchableSelect
+                    label="Peran Sistem"
+                    required
+                    size="sm"
+                    allowCustom
+                    customOptionPrefix="Gunakan peran baru:"
                     value={formData.roleTitle}
-                    onChange={(e) => setFormData({ ...formData, roleTitle: e.target.value })}
-                    placeholder="Contoh: Senior AP Specialist"
-                    className="w-full px-3 py-2 bg-[#FAFAFF] border border-[#CBD5E1] rounded-lg text-xs text-[#0F172A] focus:outline-none focus:border-[#4F46E5] focus:bg-white"
+                    onChange={(val) => setFormData({ ...formData, roleTitle: val })}
+                    placeholder="Pilih atau ketik peran..."
+                    searchPlaceholder="Cari atau tambah peran..."
+                    error={formErrors.roleTitle}
+                    options={Array.from(
+                      new Set([
+                        ...uniqueRoles,
+                        'Finance & Tax Supervisor',
+                        'Document Specialist',
+                        'Compliance Auditor',
+                        'Super Admin / CISO',
+                        'Senior AP Specialist',
+                      ])
+                    ).map((role) => ({ value: role, label: role }))}
                   />
-                  {formErrors.roleTitle && <p className="text-[11px] text-rose-500">{formErrors.roleTitle}</p>}
                 </div>
               </div>
 
@@ -1014,8 +1014,8 @@ export default function UsersManagementPage() {
                 </div>
               </div>
 
-              {/* Field 6: Hak Akses (Multi-select) */}
-              <div className="space-y-1.5">
+              {/* Field 6: Hak Akses (Searchable + Category Filtered Multi-select) */}
+              <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <label className="text-xs font-bold text-[#0F172A] block">
                     Hak Akses Kunci <span className="text-rose-500">*</span> ({formData.permissions.length} dipilih)
@@ -1029,7 +1029,7 @@ export default function UsersManagementPage() {
                           permissions: ALL_AVAILABLE_PERMISSIONS.map((p) => p.key),
                         })
                       }
-                      className="text-[10px] text-[#4F46E5] font-semibold hover:underline"
+                      className="text-[10px] text-[#4F46E5] font-semibold hover:underline cursor-pointer"
                     >
                       Pilih Semua
                     </button>
@@ -1037,117 +1037,154 @@ export default function UsersManagementPage() {
                     <button
                       type="button"
                       onClick={() => setFormData({ ...formData, permissions: [] })}
-                      className="text-[10px] text-slate-500 font-semibold hover:underline"
+                      className="text-[10px] text-slate-500 font-semibold hover:underline cursor-pointer"
                     >
                       Kosongkan
                     </button>
                   </div>
                 </div>
 
-                <div className="max-h-48 overflow-y-auto p-3 rounded-xl border border-[#CBD5E1] bg-[#FAFAFF] grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {ALL_AVAILABLE_PERMISSIONS.map((perm) => {
-                    const checked = formData.permissions.includes(perm.key);
-                    return (
-                      <label
-                        key={perm.key}
-                        className={`flex items-start gap-2 p-2 rounded-lg border transition-colors cursor-pointer text-xs ${checked ? 'bg-[#EEF2FF] border-indigo-200 text-[#0F172A]' : 'bg-white border-[#E2E8F0] text-slate-600'
-                          }`}
+                {/* Search + Category Pills for Permissions */}
+                <div className="space-y-2">
+                  <div className="relative">
+                    <SearchIcon className="w-3.5 h-3.5 text-[#94A3B8] absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <input
+                      type="text"
+                      value={modalPermSearch}
+                      onChange={(e) => setModalPermSearch(e.target.value)}
+                      placeholder="Cari nama, kunci, atau deskripsi hak akses..."
+                      className="w-full pl-8 pr-7 py-1.5 text-xs bg-white border border-[#CBD5E1] rounded-lg focus:outline-none focus:border-[#4F46E5]"
+                    />
+                    {modalPermSearch && (
+                      <button
+                        type="button"
+                        onClick={() => setModalPermSearch('')}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                        aria-label="Hapus pencarian hak akses"
                       >
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setFormData({
-                                ...formData,
-                                permissions: [...formData.permissions, perm.key],
-                              });
-                            } else {
-                              setFormData({
-                                ...formData,
-                                permissions: formData.permissions.filter((k) => k !== perm.key),
-                              });
-                            }
-                          }}
-                          className="mt-0.5 rounded border-[#CBD5E1] text-[#4F46E5] focus:ring-[#4F46E5]"
-                        />
-                        <div className="flex flex-col min-w-0">
-                          <span className="font-semibold text-[11px] truncate">{perm.label}</span>
-                          <span className="text-[10px] text-[#64748B] line-clamp-1">{perm.desc}</span>
-                        </div>
-                      </label>
-                    );
-                  })}
+                        <XIcon className="w-3 h-3" />
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {permissionCategories.map((cat) => (
+                      <button
+                        key={cat}
+                        type="button"
+                        onClick={() => setModalPermCategory(cat)}
+                        className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border transition-colors cursor-pointer ${
+                          modalPermCategory === cat
+                            ? 'bg-[#EEF2FF] text-[#4F46E5] border-[#4F46E5]/40'
+                            : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                        }`}
+                      >
+                        {cat}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="max-h-48 overflow-y-auto p-3 rounded-xl border border-[#CBD5E1] bg-[#FAFAFF] grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {filteredModalPermissions.length === 0 ? (
+                    <div className="col-span-full py-4 text-center text-xs text-slate-400">
+                      Tidak ada hak akses yang cocok dengan pencarian Anda.
+                    </div>
+                  ) : (
+                    filteredModalPermissions.map((perm) => {
+                      const checked = formData.permissions.includes(perm.key);
+                      return (
+                        <label
+                          key={perm.key}
+                          className={`flex items-start gap-2 p-2 rounded-lg border transition-colors cursor-pointer text-xs ${
+                            checked
+                              ? 'bg-[#EEF2FF] border-indigo-200 text-[#0F172A]'
+                              : 'bg-white border-[#E2E8F0] text-slate-600'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setFormData({
+                                  ...formData,
+                                  permissions: [...formData.permissions, perm.key],
+                                });
+                              } else {
+                                setFormData({
+                                  ...formData,
+                                  permissions: formData.permissions.filter((k) => k !== perm.key),
+                                });
+                              }
+                            }}
+                            className="mt-0.5 rounded border-[#CBD5E1] text-[#4F46E5] focus:ring-[#4F46E5]"
+                          />
+                          <div className="flex flex-col min-w-0">
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-semibold text-[11px] truncate">{perm.label}</span>
+                            </div>
+                            <span className="text-[10px] text-[#64748B] line-clamp-1">{perm.desc}</span>
+                          </div>
+                        </label>
+                      );
+                    })
+                  )}
                 </div>
                 {formErrors.permissions && <p className="text-[11px] text-rose-500">{formErrors.permissions}</p>}
               </div>
 
               {/* Form Buttons */}
               <div className="pt-3 border-t border-[#E2E8F0] flex items-center justify-end gap-3">
-                <button
+                <Button
                   type="button"
+                  variant="secondary"
+                  size="md"
                   onClick={() => {
                     setIsAddOpen(false);
                     setEditUser(null);
                   }}
-                  className="px-4 py-2 rounded-lg border border-[#CBD5E1] bg-white text-xs font-semibold text-[#0F172A] hover:bg-[#FAFAFF]"
                 >
                   Batal
-                </button>
-                <button
+                </Button>
+                <Button
                   type="submit"
-                  className="px-5 py-2 rounded-lg bg-[#4F46E5] hover:bg-[#4338CA] text-white text-xs font-bold shadow-sm shadow-indigo-500/20"
+                  variant="primary"
+                  size="md"
                 >
                   {editUser ? 'Simpan Perubahan' : 'Tambahkan Anggota'}
-                </button>
+                </Button>
               </div>
             </form>
-          </div>
-        </div>
+        </Modal>
       )}
 
       {/* ======================================================== */}
       {/* 3. DELETE CONFIRMATION DIALOG */}
       {/* ======================================================== */}
-      {deleteUser && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4">
-          <div className="bg-white rounded-2xl border border-[#CBD5E1] shadow-2xl max-w-md w-full p-6 space-y-4 animate-in fade-in zoom-in-95 duration-150">
-            <div className="w-12 h-12 rounded-full bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-center mx-auto">
-              <TrashIcon className="w-6 h-6" />
-            </div>
-
-            <div className="text-center space-y-2">
-              <h3 className="font-bold text-base text-[#0F172A]">Hapus Akses Anggota Tim?</h3>
-              <p className="text-xs text-[#64748B] leading-relaxed">
+      <ConfirmDialog
+        isOpen={Boolean(deleteUser)}
+        onClose={() => setDeleteUser(null)}
+        onConfirm={handleDeleteConfirm}
+        title="Hapus Akses Anggota Tim?"
+        description={
+          deleteUser ? (
+            <div className="space-y-3">
+              <p>
                 Anda akan menghapus akun <strong className="text-rose-600">{deleteUser.name}</strong> ({deleteUser.email}).
-                Seluruh hak akses ke dashboard DokumenAI Enterprise akan segera dicabut. Tindakan ini hanya memodifikasi memori frontend demo.
+                Seluruh hak akses ke dashboard DokumenAI Enterprise akan segera dicabut.
               </p>
+              <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-600 space-y-0.5">
+                <div><strong>Departemen:</strong> {deleteUser.department}</div>
+                <div><strong>Peran:</strong> {deleteUser.roleTitle}</div>
+              </div>
             </div>
-
-            <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-600 space-y-1">
-              <div><strong>Departemen:</strong> {deleteUser.department}</div>
-              <div><strong>Peran:</strong> {deleteUser.roleTitle}</div>
-            </div>
-
-            <div className="pt-2 flex items-center justify-end gap-3">
-              <button
-                type="button"
-                onClick={() => setDeleteUser(null)}
-                className="w-1/2 px-4 py-2 rounded-lg border border-[#CBD5E1] bg-white text-xs font-semibold text-[#0F172A] hover:bg-[#FAFAFF]"
-              >
-                Batal
-              </button>
-              <button
-                type="button"
-                onClick={handleDeleteConfirm}
-                className="w-1/2 px-4 py-2 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-sm shadow-rose-500/20"
-              >
-                Ya, Hapus Anggota
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+          ) : null
+        }
+        confirmLabel="Ya, Hapus Anggota"
+        cancelLabel="Batal"
+        variant="danger"
+      />
 
       {/* Shared Action Menu (Triggered by 3-dot button hover/click or right-click context menu) */}
       {activeMenu && (
