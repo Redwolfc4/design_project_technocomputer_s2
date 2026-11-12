@@ -24,7 +24,13 @@ import {
   XIcon,
   EyeIcon,
   EyeOffIcon,
+  MoreHorizontalIcon,
 } from '@/components/ui/icons';
+import {
+  DataTableActionMenu,
+  useDataTableInteractions,
+  RowAction,
+} from '@/components/shared/data-table';
 
 export default function ExportIntegrationsPage() {
   const [documents, setDocuments] = useState<DocumentRecord[]>([]);
@@ -62,6 +68,15 @@ export default function ExportIntegrationsPage() {
     status: 'active',
   });
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+
+  // 3-dot Floating Action Menu Interactions
+  const {
+    activeMenu,
+    openDropdownMenu,
+    closeMenu,
+    scheduleCloseMenu,
+    cancelScheduledClose,
+  } = useDataTableInteractions<IntegrationEndpoint>();
 
   useEffect(() => {
     setDocuments(DocumentService.getDocuments());
@@ -233,6 +248,22 @@ export default function ExportIntegrationsPage() {
       showToast(`Konektor ${item.name} berhasil dihapus.`);
     }
   };
+
+  const integrationActions: RowAction<IntegrationEndpoint>[] = [
+    {
+      id: 'edit-connector',
+      label: 'Edit Konfigurasi',
+      icon: <PencilIcon className="w-4 h-4 text-slate-600" />,
+      onSelect: (item) => handleOpenEdit(item),
+    },
+    {
+      id: 'delete-connector',
+      label: 'Hapus Konektor',
+      icon: <TrashIcon className="w-4 h-4 text-[#E11D48]" />,
+      destructive: true,
+      onSelect: (item) => handleDeleteIntegration(item),
+    },
+  ];
 
   const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -443,20 +474,14 @@ export default function ExportIntegrationsPage() {
                           {item.status === 'active' ? 'Aktif' : 'Nonaktif'}
                         </span>
                       </td>
-                      <td className="py-3.5 px-4 text-right space-x-2">
+                      <td className="py-3.5 px-4 text-right">
                         <button
-                          onClick={() => handleOpenEdit(item)}
-                          className="p-1.5 hover:bg-slate-100 text-slate-600 rounded-md transition-colors"
-                          title="Edit Konektor"
+                          type="button"
+                          onClick={(e) => openDropdownMenu(item, e, 'Aksi Konektor ERP')}
+                          className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                          title="Menu Aksi Konektor"
                         >
-                          <PencilIcon className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteIntegration(item)}
-                          className="p-1.5 hover:bg-rose-50 text-rose-600 rounded-md transition-colors"
-                          title="Hapus Konektor"
-                        >
-                          <TrashIcon className="w-3.5 h-3.5" />
+                          <MoreHorizontalIcon className="w-4 h-4" />
                         </button>
                       </td>
                     </tr>
@@ -744,6 +769,21 @@ export default function ExportIntegrationsPage() {
             </form>
           </div>
         </div>
+      )}
+
+      {/* Floating Action Menu (3-dot popover) */}
+      {activeMenu && (
+        <DataTableActionMenu
+          isOpen={Boolean(activeMenu)}
+          position={activeMenu.position}
+          row={activeMenu.row}
+          title={activeMenu.title || 'Aksi Konektor ERP'}
+          subtitle={(item) => item.name}
+          actions={integrationActions}
+          onClose={closeMenu}
+          onMouseEnter={cancelScheduledClose}
+          onMouseLeave={() => scheduleCloseMenu(250)}
+        />
       )}
     </div>
   );

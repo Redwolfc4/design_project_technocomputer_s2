@@ -25,7 +25,7 @@ export const INITIAL_BATCH_ITEMS: BatchItemDraft[] = [
     fileNumber: '010.002-26.99410123',
     nominal: 35000000,
     currency: 'IDR',
-    status: 'draft',
+    status: 'ready',
     createdAt: new Date().toISOString(),
   },
   {

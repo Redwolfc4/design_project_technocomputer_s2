@@ -1,12 +1,12 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { Topbar } from '@/components/layout/Topbar';
 import { DocumentService } from '@/lib/modules/documents/document.service';
 import { BatchService, BatchItemDraft, INITIAL_BATCH_ITEMS } from '@/lib/modules/batches/batch.service';
 import { DocumentRecord, DocumentType } from '@/types';
-import { formatIDR, getDocumentTypeLabel } from '@/lib/utils/formatters';
+import { formatIDR, getDocumentTypeLabel, getStatusBadgeInfo } from '@/lib/utils/formatters';
 import {
   UploadCloudIcon,
   CheckCircleIcon,
@@ -16,10 +16,17 @@ import {
   TrashIcon,
   PlusIcon,
   PencilIcon,
+  MoreHorizontalIcon,
+  SparklesIcon,
 } from '@/components/ui/icons';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { SectionHeader } from '@/components/shared/SectionHeader';
-import { DataTableExport } from '@/components/shared/data-table';
+import {
+  DataTableExport,
+  DataTableActionMenu,
+  useDataTableInteractions,
+  RowAction,
+} from '@/components/shared/data-table';
 import { useAppRoutes } from '@/context/RouteContext';
 
 const DEFAULT_FORM_VALUES: {
@@ -27,11 +34,13 @@ const DEFAULT_FORM_VALUES: {
   vendorName: string;
   fileNumber: string;
   nominal: string;
+  status: 'draft' | 'ready';
 } = {
   selectedType: 'tax_invoice',
   vendorName: 'PT Telkom Prima Nusantara',
   fileNumber: '010.002-26.99410123',
   nominal: '35000000',
+  status: 'ready',
 };
 
 function createDocumentFromBatchDraft(item: BatchItemDraft): DocumentRecord {
@@ -138,6 +147,7 @@ export default function DocumentUploadPage() {
   const [vendorName, setVendorName] = useState(DEFAULT_FORM_VALUES.vendorName);
   const [fileNumber, setFileNumber] = useState(DEFAULT_FORM_VALUES.fileNumber);
   const [nominal, setNominal] = useState(DEFAULT_FORM_VALUES.nominal);
+  const [draftStatus, setDraftStatus] = useState<'draft' | 'ready'>(DEFAULT_FORM_VALUES.status);
   const [isProcessing, setIsProcessing] = useState(false);
   const [progressStage, setProgressStage] = useState('');
 
@@ -147,8 +157,38 @@ export default function DocumentUploadPage() {
 
   // Batch Drafts State
   const [batchDrafts, setBatchDrafts] = useState<BatchItemDraft[]>(INITIAL_BATCH_ITEMS);
+  const [statusFilter, setStatusFilter] = useState<'all' | 'non_draft' | 'draft'>('all');
   const [editingDraft, setEditingDraft] = useState<BatchItemDraft | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' | 'error' } | null>(null);
+
+  // 3-dot Floating Action Menu Interactions
+  const {
+    activeMenu,
+    openDropdownMenu,
+    closeMenu,
+    scheduleCloseMenu,
+    cancelScheduledClose,
+  } = useDataTableInteractions<BatchItemDraft>();
+
+  const draftCount = useMemo(
+    () => batchDrafts.filter((b) => b.status === 'draft').length,
+    [batchDrafts]
+  );
+
+  const nonDraftCount = useMemo(
+    () => batchDrafts.filter((b) => b.status !== 'draft').length,
+    [batchDrafts]
+  );
+
+  const filteredDrafts = useMemo(() => {
+    if (statusFilter === 'draft') {
+      return batchDrafts.filter((b) => b.status === 'draft');
+    }
+    if (statusFilter === 'non_draft') {
+      return batchDrafts.filter((b) => b.status !== 'draft');
+    }
+    return batchDrafts;
+  }, [batchDrafts, statusFilter]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -184,6 +224,7 @@ export default function DocumentUploadPage() {
     setVendorName(DEFAULT_FORM_VALUES.vendorName);
     setFileNumber(DEFAULT_FORM_VALUES.fileNumber);
     setNominal(DEFAULT_FORM_VALUES.nominal);
+    setDraftStatus(DEFAULT_FORM_VALUES.status);
     setUploadedFile(null);
     setIsDragging(false);
     setProgressStage('');
@@ -196,6 +237,7 @@ export default function DocumentUploadPage() {
     setVendorName(item.vendorName);
     setFileNumber(item.fileNumber);
     setNominal(String(item.nominal));
+    setDraftStatus(item.status === 'draft' ? 'draft' : 'ready');
     setUploadedFile(null);
     setIsDragging(false);
     setProgressStage('');
@@ -257,6 +299,7 @@ export default function DocumentUploadPage() {
         vendorName: vendorName || 'Vendor Rekanan',
         fileNumber: fileNumber || editingDraft.fileNumber,
         nominal: num,
+        status: draftStatus,
       });
 
       if (res.success) {
@@ -264,52 +307,61 @@ export default function DocumentUploadPage() {
         setUploadedFile(null);
         setIsUploadModalOpen(false);
         setEditingDraft(null);
-        showToast(`Draf "${fileNumber}" berhasil diperbarui!`);
+        showToast(
+          draftStatus === 'draft'
+            ? `Berkas "${fileNumber}" disimpan sebagai Draft!`
+            : `Berkas "${fileNumber}" diperbarui dengan status Siap Proses!`
+        );
       } else {
-        showToast(res.error || 'Gagal memperbarui draf batch.', 'error');
+        showToast(res.error || 'Gagal memperbarui berkas antrean.', 'error');
       }
       return;
     }
 
+    const prefix = draftStatus === 'draft' ? 'Draf' : 'Berkas';
     const res = BatchService.addBatchDraft({
-      fileName: uploadedFile ? uploadedFile.name : `Draf_${fileNumber}.pdf`,
+      fileName: uploadedFile ? uploadedFile.name : `${prefix}_${fileNumber}.pdf`,
       fileSize: uploadedFile ? uploadedFile.size : 1500000,
       documentType: selectedType,
       vendorName: vendorName || 'Vendor Rekanan',
       fileNumber: fileNumber || `DRAFT-${Date.now().toString().slice(-4)}`,
       nominal: num,
-      status: 'ready',
+      status: draftStatus,
     });
 
     if (res.success) {
       setBatchDrafts(BatchService.getBatches());
       setUploadedFile(null);
       setIsUploadModalOpen(false);
-      showToast('Berkas dimasukkan ke Antrean Draf Batch!');
+      showToast(
+        draftStatus === 'draft'
+          ? 'Berkas disimpan sebagai Draft di Antrean Batch!'
+          : 'Berkas Siap Proses dimasukkan ke Antrean Batch!'
+      );
     }
   };
 
   const handleDeleteBatchDraft = (id: string) => {
     BatchService.deleteBatchDraft(id);
     setBatchDrafts(BatchService.getBatches());
-    showToast('Draf berkas berhasil dihapus dari antrean.');
+    showToast('Berkas berhasil dihapus dari antrean.');
   };
 
   const handleExportBatchCSV = () => {
-    if (batchDrafts.length === 0) {
-      showToast('Antrean draf batch kosong untuk diekspor.', 'error');
+    if (filteredDrafts.length === 0) {
+      showToast('Antrean batch kosong untuk diekspor.', 'error');
       return;
     }
 
     const headers = ['Nama Berkas', 'Nomor Seri', 'Jenis Dokumen', 'Vendor', 'Nominal DPP', 'Mata Uang', 'Status'];
-    const rows = batchDrafts.map((b) => [
+    const rows = filteredDrafts.map((b) => [
       `"${b.fileName}"`,
       `"${b.fileNumber}"`,
       `"${getDocumentTypeLabel(b.documentType)}"`,
       `"${b.vendorName}"`,
       b.nominal,
       `"${b.currency || 'IDR'}"`,
-      `"${b.status}"`,
+      `"${getStatusBadgeInfo(b.status).label}"`,
     ]);
     const csvContent = '\uFEFF' + [headers.join(','), ...rows.map((r) => r.join(','))].join('\r\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -321,12 +373,12 @@ export default function DocumentUploadPage() {
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
-    showToast(`Berhasil mengekspor ${batchDrafts.length} draf batch ke CSV!`, 'success');
+    showToast(`Berhasil mengekspor ${filteredDrafts.length} berkas antrean ke CSV!`, 'success');
   };
 
   const handleExportBatchExcel = () => {
-    if (batchDrafts.length === 0) {
-      showToast('Antrean draf batch kosong untuk diekspor.', 'error');
+    if (filteredDrafts.length === 0) {
+      showToast('Antrean batch kosong untuk diekspor.', 'error');
       return;
     }
 
@@ -346,20 +398,20 @@ export default function DocumentUploadPage() {
             </tr>
           </thead>
           <tbody>
-            ${batchDrafts
-              .map(
-                (b) => `
+            ${filteredDrafts
+        .map(
+          (b) => `
               <tr>
                 <td>${b.fileName}</td>
                 <td>${b.fileNumber}</td>
                 <td>${getDocumentTypeLabel(b.documentType)}</td>
                 <td>${b.vendorName}</td>
                 <td style="text-align: right;">${b.nominal}</td>
-                <td>${b.status}</td>
+                <td>${getStatusBadgeInfo(b.status).label}</td>
               </tr>
             `
-              )
-              .join('')}
+        )
+        .join('')}
           </tbody>
         </table>
       </body>
@@ -374,7 +426,7 @@ export default function DocumentUploadPage() {
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
-    showToast(`Berhasil mengekspor ${batchDrafts.length} draf batch ke Excel (.xls)!`, 'success');
+    showToast(`Berhasil mengekspor ${filteredDrafts.length} berkas antrean ke Excel (.xls)!`, 'success');
   };
 
   const handleProcessBatchItem = (item: BatchItemDraft) => {
@@ -388,6 +440,33 @@ export default function DocumentUploadPage() {
       router.push(getRoute(`/verification?docId=${newDoc.id}`));
     }, 800);
   };
+
+  const batchActions: RowAction<BatchItemDraft>[] = useMemo(
+    () => [
+      {
+        id: 'extract-ai',
+        label: 'Ekstrak AI Sekarang',
+        icon: <SparklesIcon className="w-4 h-4 text-[#4F46E5]" />,
+        onSelect: (item) => handleProcessBatchItem(item),
+      },
+      {
+        id: 'edit-draft',
+        label: 'Edit Draf Berkas',
+        icon: <PencilIcon className="w-4 h-4 text-slate-600" />,
+        onSelect: (item) => handleOpenEditDraft(item),
+      },
+      {
+        id: 'delete-draft',
+        label: 'Hapus dari Antrean',
+        icon: <TrashIcon className="w-4 h-4 text-[#E11D48]" />,
+        destructive: true,
+        dividerAfter: false,
+        onSelect: (item) => handleDeleteBatchDraft(item.id),
+      },
+    ],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [router]
+  );
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -416,14 +495,14 @@ export default function DocumentUploadPage() {
       const resolvedFileName = uploadedFile
         ? uploadedFile.name
         : draftBeingProcessed
-        ? draftBeingProcessed.fileName
-        : `Scan_${fileNumber.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
+          ? draftBeingProcessed.fileName
+          : `Scan_${fileNumber.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
 
       const resolvedTitle = uploadedFile
         ? uploadedFile.name
         : draftBeingProcessed
-        ? draftBeingProcessed.fileName
-        : `Unggahan Baru - ${fileNumber}`;
+          ? draftBeingProcessed.fileName
+          : `Unggahan Baru - ${fileNumber}`;
 
       const newDoc: DocumentRecord = {
         id: `doc-${Date.now()}`,
@@ -530,11 +609,10 @@ export default function DocumentUploadPage() {
       {/* Toast Notification */}
       {toast && (
         <div
-          className={`fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-3 rounded-xl shadow-2xl text-xs border animate-in fade-in slide-in-from-bottom-3 duration-200 ${
-            toast.type === 'error'
-              ? 'bg-rose-950 text-white border-rose-800'
-              : 'bg-[#0F172A] text-white border-slate-700'
-          }`}
+          className={`fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-3 rounded-xl shadow-2xl text-xs border animate-in fade-in slide-in-from-bottom-3 duration-200 ${toast.type === 'error'
+            ? 'bg-rose-950 text-white border-rose-800'
+            : 'bg-[#0F172A] text-white border-slate-700'
+            }`}
         >
           <CheckCircleIcon
             className={`w-4 h-4 shrink-0 ${toast.type === 'error' ? 'text-rose-400' : 'text-emerald-400'}`}
@@ -552,14 +630,17 @@ export default function DocumentUploadPage() {
         <PageHeader
           title="Unggah Dokumen & Batch Processing"
           subtitle="Ekstraksi data faktur pajak, PO, dan invoice secara otomatis dengan AI model e-Faktur Indonesia."
-          badge={{ label: `${batchDrafts.length} Draf Siap`, variant: 'info' }}
+          badge={{
+            label: batchDrafts.length > 0 ? `${nonDraftCount} Siap · ${draftCount} Draft` : '0 Antrean',
+            variant: 'info',
+          }}
           actions={
             <div className="flex items-center gap-3">
               <DataTableExport
                 options={{
                   onExportCSV: handleExportBatchCSV,
                   onExportExcel: handleExportBatchExcel,
-                  disabled: batchDrafts.length === 0,
+                  disabled: filteredDrafts.length === 0,
                 }}
               />
               <button
@@ -575,11 +656,50 @@ export default function DocumentUploadPage() {
         />
 
         {/* Section Riwayat Antrean Draf Batch (CRUD Modul Upload) */}
-        <div className="p-6 sm:p-8 rounded-xl border border-[#E2E8F0] bg-white shadow-sm space-y-6">
-          <SectionHeader
-            title="Antrean Draf Batch Siap Proses"
-            description="Daftar berkas yang telah dikelompokkan sebelum dieksekusi secara serentak ke mesin AI."
-          />
+        <div className="p-6 sm:p-8 rounded-xl border border-[#E2E8F0] bg-white shadow-sm space-y-5">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <SectionHeader
+              title="Antrean Draf Batch Siap Proses"
+              description="Daftar berkas berstatus Draft maupun Siap Proses sebelum dieksekusi ke mesin AI."
+            />
+
+            {/* Status Filter Pills: Draft vs Bukan Draft */}
+            <div className="inline-flex items-center p-1 rounded-lg bg-[#F8FAFC] border border-[#E2E8F0] self-start md:self-auto shrink-0">
+              <button
+                type="button"
+                onClick={() => setStatusFilter('all')}
+                className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors cursor-pointer ${
+                  statusFilter === 'all'
+                    ? 'bg-white text-[#0F172A] shadow-sm border border-[#E2E8F0]'
+                    : 'text-[#64748B] hover:text-[#0F172A]'
+                }`}
+              >
+                Semua ({batchDrafts.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setStatusFilter('non_draft')}
+                className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors cursor-pointer ${
+                  statusFilter === 'non_draft'
+                    ? 'bg-white text-emerald-700 shadow-sm border border-emerald-200'
+                    : 'text-[#64748B] hover:text-[#0F172A]'
+                }`}
+              >
+                Siap Proses ({nonDraftCount})
+              </button>
+              <button
+                type="button"
+                onClick={() => setStatusFilter('draft')}
+                className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors cursor-pointer ${
+                  statusFilter === 'draft'
+                    ? 'bg-white text-[#0F172A] shadow-sm border border-slate-300'
+                    : 'text-[#64748B] hover:text-[#0F172A]'
+                }`}
+              >
+                Draft ({draftCount})
+              </button>
+            </div>
+          </div>
 
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
@@ -589,67 +709,79 @@ export default function DocumentUploadPage() {
                   <th className="py-3 px-4">Jenis</th>
                   <th className="py-3 px-4">Vendor</th>
                   <th className="py-3 px-4">Nominal</th>
-                  <th className="py-3 px-4 text-right">Aksi Draf</th>
+                  <th className="py-3 px-4">Status</th>
+                  <th className="py-3 px-4 text-right">Aksi</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#E2E8F0] text-xs font-medium text-[#0F172A]">
-                {batchDrafts.length === 0 ? (
+                {filteredDrafts.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="py-10 text-center space-y-3">
-                      <p className="text-slate-400">
-                        Antrean draf batch kosong. Klik tombol <strong className="text-slate-600">+ Unggah Dokumen</strong> di kanan atas untuk memilih berkas baru.
-                      </p>
-                      <button
-                        type="button"
-                        onClick={handleOpenUploadModal}
-                        className="inline-flex items-center gap-2 px-4 py-2 bg-[#4F46E5] hover:bg-[#4338CA] text-white text-xs font-semibold rounded-lg shadow-sm transition-colors cursor-pointer"
-                      >
-                        <PlusIcon className="w-4 h-4" />
-                        <span>Unggah Dokumen</span>
-                      </button>
+                    <td colSpan={6} className="py-10 text-center space-y-3">
+                      {batchDrafts.length === 0 ? (
+                        <>
+                          <p className="text-slate-400">
+                            Antrean draf batch kosong. Klik tombol <strong className="text-slate-600">+ Unggah Dokumen</strong> di kanan atas untuk memilih berkas baru.
+                          </p>
+                          <button
+                            type="button"
+                            onClick={handleOpenUploadModal}
+                            className="inline-flex items-center gap-2 px-4 py-2 bg-[#4F46E5] hover:bg-[#4338CA] text-white text-xs font-semibold rounded-lg shadow-sm transition-colors cursor-pointer"
+                          >
+                            <PlusIcon className="w-4 h-4" />
+                            <span>Unggah Dokumen</span>
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <p className="text-slate-400">
+                            Tidak ada berkas dengan status <strong className="text-slate-600">{statusFilter === 'draft' ? 'Draft' : 'Siap Proses (Bukan Draft)'}</strong> saat ini.
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => setStatusFilter('all')}
+                            className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-[#CBD5E1] text-xs font-semibold rounded-lg transition-colors cursor-pointer"
+                          >
+                            Tampilkan Semua ({batchDrafts.length})
+                          </button>
+                        </>
+                      )}
                     </td>
                   </tr>
                 ) : (
-                  batchDrafts.map((b) => (
-                    <tr key={b.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="py-3.5 px-4 font-bold">
-                        <div className="flex items-center gap-2">
-                          <FileTextIcon className="w-4 h-4 text-indigo-600 shrink-0" />
-                          <span className="truncate max-w-[220px]">{b.fileName}</span>
-                        </div>
-                      </td>
-                      <td className="py-3.5 px-4 text-[#475569]">{getDocumentTypeLabel(b.documentType)}</td>
-                      <td className="py-3.5 px-4 text-[#0F172A]">{b.vendorName}</td>
-                      <td className="py-3.5 px-4 font-semibold text-emerald-600">{formatIDR(b.nominal)}</td>
-                      <td className="py-3.5 px-4 text-right">
-                        <div className="inline-flex items-center justify-end gap-1.5">
+                  filteredDrafts.map((b) => {
+                    const badge = getStatusBadgeInfo(b.status);
+                    return (
+                      <tr key={b.id} className="hover:bg-slate-50 transition-colors">
+                        <td className="py-3.5 px-4 font-bold">
+                          <div className="flex items-center gap-2">
+                            <FileTextIcon className="w-4 h-4 text-indigo-600 shrink-0" />
+                            <span className="truncate max-w-[220px]">{b.fileName}</span>
+                          </div>
+                        </td>
+                        <td className="py-3.5 px-4 text-[#475569]">{getDocumentTypeLabel(b.documentType)}</td>
+                        <td className="py-3.5 px-4 text-[#0F172A]">{b.vendorName}</td>
+                        <td className="py-3.5 px-4 font-semibold text-emerald-600">{formatIDR(b.nominal)}</td>
+                        <td className="py-3.5 px-4">
+                          <span
+                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border whitespace-nowrap ${badge.bg}`}
+                          >
+                            <span className={`w-1.5 h-1.5 rounded-full ${badge.dot}`} />
+                            <span>{badge.label}</span>
+                          </span>
+                        </td>
+                        <td className="py-3.5 px-4 text-right">
                           <button
                             type="button"
-                            onClick={() => handleProcessBatchItem(b)}
-                            className="px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-[11px] font-bold rounded-md transition-colors cursor-pointer"
+                            onClick={(e) => openDropdownMenu(b, e, 'Aksi Draf Berkas')}
+                            className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                            title="Menu Aksi Draf"
                           >
-                            Ekstrak AI
+                            <MoreHorizontalIcon className="w-4 h-4" />
                           </button>
-                          <button
-                            type="button"
-                            onClick={() => handleOpenEditDraft(b)}
-                            className="p-1.5 hover:bg-slate-100 text-slate-600 rounded-md transition-colors cursor-pointer"
-                            title="Edit Draf"
-                          >
-                            <PencilIcon className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteBatchDraft(b.id)}
-                            className="p-1.5 hover:bg-rose-50 text-rose-600 rounded-md transition-colors cursor-pointer"
-                            title="Hapus Draf"
-                          >
-                            <TrashIcon className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
@@ -670,7 +802,7 @@ export default function DocumentUploadPage() {
             <div className="flex items-start justify-between gap-4 border-b border-slate-100 pb-4">
               <div className="space-y-1">
                 <h3 className="text-sm sm:text-base font-bold text-[#0F172A]">
-                  {editingDraft ? 'Edit Draf Berkas Faktur / Tagihan' : 'Pilih Berkas Faktur / Tagihan'}
+                  {editingDraft ? 'Edit Berkas Faktur / Tagihan' : 'Pilih Berkas Faktur / Tagihan'}
                 </h3>
                 <p className="text-xs text-[#64748B]">
                   Format yang didukung: PDF, PNG, JPG, TIFF hingga ukuran maksimal 25MB per berkas.
@@ -702,13 +834,12 @@ export default function DocumentUploadPage() {
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
                 onDrop={handleDrop}
-                className={`border-2 border-dashed rounded-xl p-6 sm:p-7 text-center cursor-pointer transition-all space-y-2.5 ${
-                  isDragging
-                    ? 'border-[#4F46E5] bg-[#EEF2FF]'
-                    : uploadedFile
+                className={`border-2 border-dashed rounded-xl p-6 sm:p-7 text-center cursor-pointer transition-all space-y-2.5 ${isDragging
+                  ? 'border-[#4F46E5] bg-[#EEF2FF]'
+                  : uploadedFile
                     ? 'border-[#059669] bg-[#ECFDF5]'
                     : 'border-[#CBD5E1] bg-[#FAFAFF] hover:border-[#4F46E5] hover:bg-[#EEF2FF]/40'
-                }`}
+                  }`}
               >
                 {uploadedFile ? (
                   <div className="flex flex-col items-center gap-2">
@@ -800,6 +931,44 @@ export default function DocumentUploadPage() {
                     required
                   />
                 </div>
+
+                <div className="space-y-1.5 md:col-span-2">
+                  <label className="text-xs font-bold text-[#475569]">Status Berkas</label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    <button
+                      type="button"
+                      onClick={() => setDraftStatus('ready')}
+                      className={`flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg border text-xs font-semibold transition-all cursor-pointer ${
+                        draftStatus === 'ready'
+                          ? 'border-emerald-500 bg-emerald-50 text-emerald-700 shadow-sm'
+                          : 'border-[#CBD5E1] bg-white text-[#64748B] hover:bg-slate-50'
+                      }`}
+                    >
+                      <span
+                        className={`w-2 h-2 rounded-full ${
+                          draftStatus === 'ready' ? 'bg-emerald-500' : 'bg-slate-300'
+                        }`}
+                      />
+                      <span>Siap Proses (Bukan Draft)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDraftStatus('draft')}
+                      className={`flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg border text-xs font-semibold transition-all cursor-pointer ${
+                        draftStatus === 'draft'
+                          ? 'border-slate-500 bg-slate-100 text-slate-800 shadow-sm'
+                          : 'border-[#CBD5E1] bg-white text-[#64748B] hover:bg-slate-50'
+                      }`}
+                    >
+                      <span
+                        className={`w-2 h-2 rounded-full ${
+                          draftStatus === 'draft' ? 'bg-slate-500' : 'bg-slate-300'
+                        }`}
+                      />
+                      <span>Draft (Masih Disusun)</span>
+                    </button>
+                  </div>
+                </div>
               </div>
 
               {isProcessing && (
@@ -820,7 +989,13 @@ export default function DocumentUploadPage() {
                   className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-[#CBD5E1] hover:bg-slate-50 text-slate-700 text-xs font-bold transition-all disabled:opacity-50 cursor-pointer"
                 >
                   {!editingDraft && <PlusIcon className="w-4 h-4 text-indigo-600" />}
-                  <span>{editingDraft ? 'Simpan Perubahan Draf' : 'Simpan ke Antrean Draf Batch'}</span>
+                  <span>
+                    {editingDraft
+                      ? 'Simpan Perubahan'
+                      : draftStatus === 'draft'
+                      ? 'Simpan sebagai Draft'
+                      : 'Simpan ke Antrean Siap Proses'}
+                  </span>
                 </button>
                 <button
                   type="submit"
@@ -834,6 +1009,21 @@ export default function DocumentUploadPage() {
             </form>
           </div>
         </div>
+      )}
+
+      {/* Floating Action Menu (3-dot popover) */}
+      {activeMenu && (
+        <DataTableActionMenu
+          isOpen={Boolean(activeMenu)}
+          position={activeMenu.position}
+          row={activeMenu.row}
+          title={activeMenu.title || 'Aksi Draf Berkas'}
+          subtitle={(b) => b.fileNumber}
+          actions={batchActions}
+          onClose={closeMenu}
+          onMouseEnter={cancelScheduledClose}
+          onMouseLeave={() => scheduleCloseMenu(250)}
+        />
       )}
     </div>
   );
