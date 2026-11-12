@@ -27,7 +27,7 @@ export const DataTableSearch: React.FC<DataTableSearchProps> = ({
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         autoFocus={autoFocus}
-        className="w-full pl-10 pr-10 py-2.5 bg-[#FAFAFF] border border-[#CBD5E1] rounded-lg text-xs text-[#0F172A] placeholder-[#94A3B8] focus:outline-none focus:border-[#4F46E5] focus:bg-white transition-all shadow-xs"
+        className="w-full pl-10 pr-10 py-2.5 bg-[#FAFAFF] border border-[#CBD5E1] rounded-lg text-xs text-[#0F172A] placeholder-[#94A3B8] focus:outline-none focus:border-[#4F46E5] focus:bg-white transition-all shadow-sm"
       />
       {value && (
         <button

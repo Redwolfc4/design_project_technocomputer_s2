@@ -141,6 +141,7 @@ export interface DataTableToolbarProps {
   exportOptions?: DataTableExportOptions;
   primaryAction?: DataTablePrimaryAction;
   extraActions?: React.ReactNode;
+  compact?: boolean;
   className?: string;
 }
 

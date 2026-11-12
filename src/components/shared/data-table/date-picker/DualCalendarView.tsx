@@ -103,7 +103,7 @@ const SingleLightMonthCalendar: React.FC<SingleLightMonthCalendarProps> = ({
           } else if (isStart || isEnd || isHoverEnd) {
             // Selected rounded button with theme Indigo #4F46E5
             cellStyle =
-              'bg-[#4F46E5] text-white font-bold shadow-xs hover:bg-[#4338CA] z-10';
+              'bg-[#4F46E5] text-white font-bold shadow-sm hover:bg-[#4338CA] z-10';
           } else if (isInRange) {
             // Soft theme purple/indigo range highlight
             cellStyle = 'bg-[#EEF2FF] text-[#4338CA] font-medium';

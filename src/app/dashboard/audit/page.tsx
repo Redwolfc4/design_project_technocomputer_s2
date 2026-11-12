@@ -1,17 +1,15 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Topbar } from '@/components/layout/Topbar';
 import { AuditService } from '@/lib/modules/audit/audit.service';
 import { AuditLogEntry } from '@/types';
-import { formatDateTime, formatActionLabel } from '@/lib/utils/formatters';
+import { formatDateTime, formatActionLabel, formatRoleLabel } from '@/lib/utils/formatters';
 import {
-  ShieldCheckIcon,
   EyeIcon,
   CopyIcon,
   CodeIcon,
   MoreHorizontalIcon,
-  CheckCircleIcon,
 } from '@/components/ui/icons';
 import {
   DataTableRow,
@@ -23,17 +21,34 @@ import {
   DataTableEmptyState,
   DataTableExport,
   FilterConfig,
+  DateRangeValue,
 } from '@/components/shared/data-table';
 import { AuditLogDetailModal } from '@/components/dashboard/audit/AuditLogDetailModal';
 import { PageHeader } from '@/components/shared/PageHeader';
+import { useAppScope } from '@/context/ScopeContext';
+import { useToast } from '@/context/ToastContext';
+import { isTimestampInDateRange } from '@/components/shared/data-table/date-picker/dateUtils';
 
 export default function AuditTrailPage() {
+  const {
+    activeCompanyId,
+    setActiveCompanyId,
+    allowedCompanies,
+    canChangeCompany,
+    activeDepartmentId,
+    setActiveDepartmentId,
+    allowedDepartments,
+    canChangeDepartment,
+    activeDepartment,
+  } = useAppScope();
+  const toast = useToast();
   const [logs, setLogs] = useState<AuditLogEntry[]>(() => AuditService.getLogs());
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [filterAction, setFilterAction] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [filterRole, setFilterRole] = useState<string>('all');
+  const [dateRange, setDateRange] = useState<DateRangeValue>({ preset: 'all' });
   const [selectedLog, setSelectedLog] = useState<AuditLogEntry | null>(null);
-  const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' } | null>(null);
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -51,32 +66,40 @@ export default function AuditTrailPage() {
   } = useDataTableInteractions<AuditLogEntry>();
 
   useEffect(() => {
-    // Listen to localStorage storage events or refresh
-    setLogs(AuditService.getLogs());
+    const timer = setTimeout(() => {
+      setLogs(AuditService.getLogs());
+    }, 0);
+    return () => clearTimeout(timer);
   }, []);
 
-  useEffect(() => {
-    if (toast) {
-      const timer = setTimeout(() => setToast(null), 3000);
-      return () => clearTimeout(timer);
+  const handleCopyText = useCallback((text: string, label: string) => {
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(text);
+      toast.success(`${label} berhasil disalin ke clipboard!`, { title: 'Disalin' });
     }
   }, [toast]);
 
-  const showToast = (message: string, type: 'success' | 'info' = 'success') => {
-    setToast({ message, type });
-  };
-
-  const handleCopyText = (text: string, label: string) => {
-    if (navigator.clipboard) {
-      navigator.clipboard.writeText(text);
-      showToast(`${label} berhasil disalin ke clipboard!`);
-    }
-  };
-
   const filteredLogs = useMemo(() => {
     return logs.filter((log) => {
+      // 0. Scope Filtering
+      if (activeCompanyId !== 'all') {
+        const logComp = log.companyId || 'comp-01';
+        if (logComp !== activeCompanyId) return false;
+      }
+      if (activeDepartment && activeDepartment.id !== 'all') {
+        const logDept = log.department;
+        if (logDept && logDept.toLowerCase() !== activeDepartment.name.toLowerCase()) {
+          return false;
+        }
+      }
+
       if (filterAction !== 'all' && !log.action.toLowerCase().includes(filterAction.toLowerCase())) return false;
       if (filterStatus !== 'all' && log.status !== filterStatus) return false;
+      if (filterRole !== 'all' && log.actorRole !== filterRole) return false;
+
+      // Filter Rentang Waktu Kejadian
+      if (!isTimestampInDateRange(log.timestamp, dateRange)) return false;
+
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase().trim();
         const matchActor = log.actor.toLowerCase().includes(q);
@@ -87,7 +110,7 @@ export default function AuditTrailPage() {
       }
       return true;
     });
-  }, [logs, filterAction, filterStatus, searchQuery]);
+  }, [logs, filterAction, filterStatus, filterRole, dateRange, searchQuery, activeCompanyId, activeDepartment]);
 
   // Pagination slice
   const totalItems = filteredLogs.length;
@@ -98,29 +121,41 @@ export default function AuditTrailPage() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, filterAction, filterStatus, pageSize]);
+  }, [searchQuery, filterAction, filterStatus, filterRole, dateRange, activeCompanyId, activeDepartment, pageSize]);
 
-  const isFilterActive = searchQuery.trim() !== '' || filterAction !== 'all' || filterStatus !== 'all';
+  const isFilterActive =
+    searchQuery.trim() !== '' ||
+    filterAction !== 'all' ||
+    filterStatus !== 'all' ||
+    filterRole !== 'all' ||
+    Boolean(dateRange && dateRange.preset !== 'all');
 
   const handleResetFilters = () => {
     setSearchQuery('');
     setFilterAction('all');
     setFilterStatus('all');
+    setFilterRole('all');
+    setDateRange({ preset: 'all' });
     setCurrentPage(1);
-    showToast('Filter jejak audit forensik berhasil direset', 'info');
+    toast.info('Filter jejak audit forensik berhasil direset.', { title: 'Filter Direset' });
   };
 
   const handleExportCSV = () => {
+    if (filteredLogs.length === 0) {
+      toast.error('Tidak ada data log forensik untuk diekspor.', { title: 'Ekspor Gagal' });
+      return;
+    }
+
     const headers = ['Waktu', 'Aktor', 'Peran', 'Aksi Tindakan', 'Sumber Daya', 'Rincian', 'Nilai Sebelum', 'Nilai Sesudah', 'Status'];
     const rows = filteredLogs.map((l) => [
       `"${formatDateTime(l.timestamp)}"`,
-      `"${l.actor}"`,
-      `"${l.actorRole}"`,
-      `"${l.action}"`,
-      `"${l.resourceName}"`,
+      `"${l.actor.replace(/"/g, '""')}"`,
+      `"${formatRoleLabel(l.actorRole)}"`,
+      `"${formatActionLabel(l.action)}"`,
+      `"${l.resourceName.replace(/"/g, '""')}"`,
       `"${l.details.replace(/"/g, '""')}"`,
-      `"${l.previousValue || ''}"`,
-      `"${l.newValue || ''}"`,
+      `"${(l.previousValue || '').replace(/"/g, '""')}"`,
+      `"${(l.newValue || '').replace(/"/g, '""')}"`,
       `"${l.status}"`,
     ]);
     const csvContent = '\uFEFF' + [headers.join(','), ...rows.map((r) => r.join(','))].join('\r\n');
@@ -133,21 +168,131 @@ export default function AuditTrailPage() {
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
-    showToast(`Berhasil mengekspor ${filteredLogs.length} rekam log ke CSV!`, 'success');
+    toast.success(`Berhasil mengekspor ${filteredLogs.length} rekam log ke CSV!`, {
+      title: 'Ekspor CSV Selesai',
+    });
+  };
+
+  const handleExportExcel = () => {
+    if (filteredLogs.length === 0) {
+      toast.error('Tidak ada data log forensik untuk diekspor.', { title: 'Ekspor Gagal' });
+      return;
+    }
+
+    const escapeHtml = (val: string) =>
+      val
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+
+    const tableHtml = `
+      <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+      <head><meta charset="utf-8"/></head>
+      <body>
+        <table border="1">
+          <thead>
+            <tr style="background-color: #4F46E5; color: #FFFFFF; font-weight: bold;">
+              <th>Waktu</th>
+              <th>Aktor</th>
+              <th>Peran</th>
+              <th>Aksi Tindakan</th>
+              <th>Sumber Daya</th>
+              <th>Rincian</th>
+              <th>Nilai Sebelum</th>
+              <th>Nilai Sesudah</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${filteredLogs
+              .map(
+                (l) => `
+              <tr>
+                <td>${escapeHtml(formatDateTime(l.timestamp))}</td>
+                <td>${escapeHtml(l.actor)}</td>
+                <td>${escapeHtml(formatRoleLabel(l.actorRole))}</td>
+                <td>${escapeHtml(formatActionLabel(l.action))}</td>
+                <td>${escapeHtml(l.resourceName)}</td>
+                <td>${escapeHtml(l.details)}</td>
+                <td>${escapeHtml(l.previousValue || '')}</td>
+                <td>${escapeHtml(l.newValue || '')}</td>
+                <td>${escapeHtml(l.status.toUpperCase())}</td>
+              </tr>
+            `
+              )
+              .join('')}
+          </tbody>
+        </table>
+      </body>
+      </html>
+    `;
+
+    const blob = new Blob([tableHtml], { type: 'application/vnd.ms-excel;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `dokumenai_audit_trail_${new Date().toISOString().slice(0, 10)}.xls`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    toast.success(`Berhasil mengekspor ${filteredLogs.length} rekam log ke Excel (.xls)!`, {
+      title: 'Ekspor Excel Selesai',
+    });
   };
 
   const filterConfigs: FilterConfig[] = [
+    ...(canChangeCompany
+      ? [
+          {
+            id: 'companyScope',
+            label: 'Perusahaan (Scope)',
+            type: 'select' as const,
+            placeholder: 'Semua Perusahaan',
+            options: [
+              { label: 'Semua Perusahaan', value: 'all' },
+              ...allowedCompanies.map((c) => ({ label: `${c.code} · ${c.name}`, value: c.id })),
+            ],
+            selectedValue: activeCompanyId,
+            onChange: (val: string | string[]) => setActiveCompanyId(val as string),
+            searchable: true,
+          },
+        ]
+      : []),
+    ...(canChangeDepartment
+      ? [
+          {
+            id: 'departmentScope',
+            label: 'Departemen (Scope)',
+            type: 'select' as const,
+            placeholder: 'Semua Departemen',
+            options: [
+              { label: 'Semua Departemen', value: 'all' },
+              ...allowedDepartments.map((d) => ({ label: `${d.code} - ${d.name}`, value: d.id })),
+            ],
+            selectedValue: activeDepartmentId,
+            onChange: (val: string | string[]) => setActiveDepartmentId(val as string),
+            searchable: true,
+          },
+        ]
+      : []),
     {
       id: 'action',
       label: 'Tipe Tindakan',
       type: 'select',
       placeholder: 'Semua Tindakan',
+      searchable: true,
       options: [
         { label: 'Semua Tindakan', value: 'all' },
-        { label: 'Persetujuan / Approval', value: 'approved' },
-        { label: 'Verifikasi / Koreksi', value: 'verify' },
         { label: 'Unggah / Upload', value: 'upload' },
+        { label: 'Persetujuan / Approval', value: 'approve' },
+        { label: 'Penolakan / Reject', value: 'reject' },
+        { label: 'Verifikasi / Koreksi', value: 'verify' },
+        { label: 'Pembaruan / Update', value: 'update' },
+        { label: 'Hapus / Delete', value: 'delete' },
         { label: 'Ekspor / Export', value: 'export' },
+        { label: 'Antrean Batch', value: 'batch' },
       ],
       selectedValue: filterAction,
       onChange: (val) => setFilterAction(val),
@@ -157,13 +302,40 @@ export default function AuditTrailPage() {
       label: 'Status Kepatuhan',
       type: 'select',
       placeholder: 'Semua Status',
+      searchable: true,
       options: [
         { label: 'Semua Status', value: 'all' },
         { label: 'Success / Berhasil', value: 'success' },
+        { label: 'Warning / Peringatan', value: 'warning' },
         { label: 'Failure / Gagal', value: 'failure' },
       ],
       selectedValue: filterStatus,
       onChange: (val) => setFilterStatus(val),
+    },
+    {
+      id: 'role',
+      label: 'Peran Aktor (Role)',
+      type: 'select',
+      placeholder: 'Semua Peran',
+      options: [
+        { label: 'Semua Peran Aktor', value: 'all' },
+        { label: 'Super Admin / CISO', value: 'super_admin' },
+        { label: 'Finance & Tax Supervisor', value: 'finance_supervisor' },
+        { label: 'Document Reviewer (HITL)', value: 'document_reviewer' },
+        { label: 'Auditor Eksternal', value: 'auditor' },
+        { label: 'System AI Engine', value: 'system' },
+      ],
+      selectedValue: filterRole,
+      onChange: (val) => setFilterRole(val),
+      searchable: true,
+    },
+    {
+      id: 'dateRange',
+      label: 'Rentang Waktu Audit',
+      type: 'date-range',
+      placeholder: 'Semua Waktu',
+      selectedValue: dateRange,
+      onChange: (val) => setDateRange(val as DateRangeValue),
     },
   ];
 
@@ -188,19 +360,11 @@ export default function AuditTrailPage() {
         onSelect: (log) => handleCopyText(log.id, 'Log ID'),
       },
     ],
-    []
+    [handleCopyText]
   );
 
   return (
     <div className="flex-1 flex flex-col relative">
-      {/* Toast Notification */}
-      {toast && (
-        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2 bg-[#0F172A] text-white px-4 py-3 rounded-xl shadow-2xl text-xs border border-slate-700 animate-in fade-in slide-in-from-bottom-3 duration-200">
-          <CheckCircleIcon className="w-4 h-4 text-emerald-400 shrink-0" />
-          <span className="font-medium">{toast.message}</span>
-        </div>
-      )}
-
       <Topbar
         title="Audit Trail Forensik & Rekam Jejak Kepatuhan"
         subtitle="Log aktivitas kepatuhan tidak dapat dimodifikasi untuk setiap tindakan persetujuan dan pengunggahan"
@@ -216,24 +380,13 @@ export default function AuditTrailPage() {
               <DataTableExport
                 options={{
                   onExportCSV: handleExportCSV,
+                  onExportExcel: handleExportExcel,
+                  disabled: filteredLogs.length === 0,
                 }}
               />
             </div>
           }
         />
-
-        {/* Banner */}
-        <div className="p-4 rounded-xl border border-emerald-200 bg-emerald-50/60 flex items-center justify-between text-xs text-emerald-800 shadow-xs">
-          <div className="flex items-center gap-2.5">
-            <ShieldCheckIcon className="w-5 h-5 text-emerald-600 shrink-0" />
-            <span>
-              <strong>Jalur Forensik Aktif:</strong> Seluruh aktivitas human-in-the-loop direkam dengan stempel waktu ISO, peran pengguna, dan alamat IP.
-            </span>
-          </div>
-          <span className="font-bold text-[11px] bg-white px-2 py-1 rounded border border-emerald-200">
-            {logs.length} Rekam Log
-          </span>
-        </div>
 
         {/* Reusable Global DataTableToolbar */}
         <DataTableToolbar
@@ -288,7 +441,7 @@ export default function AuditTrailPage() {
                       </td>
                       <td className="py-3.5 px-5">
                         <div className="font-bold text-[#0F172A]">{log.actor}</div>
-                        <div className="text-[10px] text-[#64748B]">{log.actorRole}</div>
+                        <div className="text-[10px] text-[#64748B]">{formatRoleLabel(log.actorRole)}</div>
                       </td>
                       <td className="py-3.5 px-5 font-semibold text-[#4F46E5]">
                         {formatActionLabel(log.action)}
@@ -300,7 +453,8 @@ export default function AuditTrailPage() {
                         {log.details}
                         {log.previousValue && (
                           <div className="text-[10px] text-[#64748B] mt-0.5">
-                            {log.previousValue} → <strong className="text-[#059669]">{log.newValue}</strong>
+                            {log.previousValue.replace(/_/g, ' ')} →{' '}
+                            <strong className="text-[#059669]">{log.newValue?.replace(/_/g, ' ')}</strong>
                           </div>
                         )}
                       </td>

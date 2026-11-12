@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { ToastProvider } from '@/context/ToastContext';
 import './compiled.css';
 
 export const metadata: Metadata = {
@@ -26,7 +27,7 @@ export default function RootLayout({
   return (
     <html lang="id">
       <body className="antialiased min-h-screen bg-[#FAFAFF] text-[#0F172A]">
-        {children}
+        <ToastProvider>{children}</ToastProvider>
       </body>
     </html>
   );

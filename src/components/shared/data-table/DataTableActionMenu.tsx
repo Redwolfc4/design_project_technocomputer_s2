@@ -26,7 +26,7 @@ export function DataTableActionMenu<T>({
 
     if (typeof window !== 'undefined') {
       const el = menuRef.current;
-      const width = el?.offsetWidth || 220;
+      const width = el?.offsetWidth || 256;
       const height = el?.offsetHeight || 220;
 
       const maxX = window.innerWidth - width - 12;
@@ -101,7 +101,7 @@ export function DataTableActionMenu<T>({
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
       onContextMenu={(e) => e.preventDefault()}
-      className="fixed z-50 w-56 bg-white rounded-xl border border-[#CBD5E1] shadow-2xl p-1.5 text-xs text-[#0F172A] animate-in fade-in zoom-in-95 duration-100 select-none"
+      className="fixed z-50 w-64 bg-white rounded-xl border border-[#CBD5E1] shadow-2xl p-1.5 text-xs text-[#0F172A] animate-in select-none"
     >
       {/* Header Info */}
       {(title || resolvedSubtitle) && (

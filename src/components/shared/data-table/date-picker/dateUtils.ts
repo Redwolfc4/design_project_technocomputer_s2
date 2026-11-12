@@ -103,3 +103,116 @@ export function getDaysDifference(start: string, end: string): number {
   return Math.round((t2 - t1) / oneDay) + 1;
 }
 
+/**
+ * Parse 'YYYY-MM-DD' into local Date at start or end of day
+ */
+export function parseLocalISODate(isoString: string, endOfDay = false): Date | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(isoString.trim());
+  if (!match) return null;
+  const year = parseInt(match[1], 10);
+  const monthIndex = parseInt(match[2], 10) - 1;
+  const day = parseInt(match[3], 10);
+  if (endOfDay) {
+    return new Date(year, monthIndex, day, 23, 59, 59, 999);
+  }
+  return new Date(year, monthIndex, day, 0, 0, 0, 0);
+}
+
+/**
+ * Convert a Date object into local 'YYYY-MM-DD'
+ */
+export function dateToLocalISO(date: Date): string {
+  return toISODateString(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+/**
+ * Compute dynamic start/end ISO strings for quick date presets relative to referenceDate (defaults to today)
+ */
+export function getPresetDateRange(
+  presetKey: string,
+  referenceDate: Date = new Date()
+): { from?: string; to?: string } {
+  const base = new Date(
+    referenceDate.getFullYear(),
+    referenceDate.getMonth(),
+    referenceDate.getDate()
+  );
+
+  if (presetKey === 'today') {
+    const iso = dateToLocalISO(base);
+    return { from: iso, to: iso };
+  }
+
+  if (presetKey === 'this_week') {
+    const dayOfWeek = base.getDay(); // 0 = Sun, 1 = Mon...
+    const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+    const start = new Date(base);
+    start.setDate(base.getDate() + diffToMonday);
+    const end = new Date(start);
+    end.setDate(start.getDate() + 6);
+    return { from: dateToLocalISO(start), to: dateToLocalISO(end) };
+  }
+
+  if (presetKey === 'last_week') {
+    const dayOfWeek = base.getDay();
+    const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+    const thisMonday = new Date(base);
+    thisMonday.setDate(base.getDate() + diffToMonday);
+    const start = new Date(thisMonday);
+    start.setDate(thisMonday.getDate() - 7);
+    const end = new Date(start);
+    end.setDate(start.getDate() + 6);
+    return { from: dateToLocalISO(start), to: dateToLocalISO(end) };
+  }
+
+  if (presetKey === 'last_7_days' || presetKey === '7days') {
+    const start = new Date(base);
+    start.setDate(base.getDate() - 6);
+    return { from: dateToLocalISO(start), to: dateToLocalISO(base) };
+  }
+
+  if (presetKey === 'current_month' || presetKey === 'month') {
+    const year = base.getFullYear();
+    const month = base.getMonth();
+    const days = getDaysInMonth(year, month);
+    return {
+      from: toISODateString(year, month, 1),
+      to: toISODateString(year, month, days),
+    };
+  }
+
+  return { from: undefined, to: undefined };
+}
+
+/**
+ * Check if a timestamp/ISO date falls within a DateRangeValue
+ */
+export function isTimestampInDateRange(
+  timestamp: string | undefined,
+  range?: { preset?: string; from?: string; to?: string }
+): boolean {
+  if (!range || !range.preset || range.preset === 'all') return true;
+  if (!timestamp) return false;
+
+  const targetTime = new Date(timestamp).getTime();
+  if (Number.isNaN(targetTime)) return false;
+
+  // Prefer explicit from/to if available; fall back to preset bounds if only preset was passed
+  const effectiveBounds =
+    range.from || range.to
+      ? { from: range.from, to: range.to }
+      : getPresetDateRange(range.preset);
+
+  if (effectiveBounds.from) {
+    const fromDate = parseLocalISODate(effectiveBounds.from, false);
+    if (fromDate && targetTime < fromDate.getTime()) return false;
+  }
+
+  if (effectiveBounds.to) {
+    const toDate = parseLocalISODate(effectiveBounds.to, true);
+    if (toDate && targetTime > toDate.getTime()) return false;
+  }
+
+  return true;
+}
+

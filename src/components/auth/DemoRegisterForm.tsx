@@ -1,12 +1,19 @@
 'use client';
 
 import React, { useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { BrandLogo } from '@/components/shared/BrandLogo';
 import { ArrowRightIcon } from '@/components/ui/icons';
+import { Select } from '@/components/ui/Select';
 import { MockDocumentService } from '@/lib/mocks/storage';
 import { MockAuthService } from '@/lib/services/mockAuth';
+import { useToast } from '@/context/ToastContext';
 import { UserPersona, UserRole } from '@/types';
+
+function createCustomDemoPersonaId(): string {
+  return `custom-${Date.now()}`;
+}
 
 interface DemoRegisterFormProps {
   onSwitchToLogin: () => void;
@@ -14,6 +21,7 @@ interface DemoRegisterFormProps {
 
 export const DemoRegisterForm: React.FC<DemoRegisterFormProps> = ({ onSwitchToLogin }) => {
   const router = useRouter();
+  const toast = useToast();
   const [name, setName] = useState('');
   const [role, setRole] = useState<UserRole>('document_reviewer');
   const [department, setDepartment] = useState('Financial Audit Operations');
@@ -22,16 +30,36 @@ export const DemoRegisterForm: React.FC<DemoRegisterFormProps> = ({ onSwitchToLo
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) {
-      setErrorMsg('Nama lengkap peserta demo wajib diisi.');
+    setErrorMsg('');
+
+    const trimmedName = name.trim();
+    const trimmedDepartment = department.trim();
+
+    if (!trimmedName || trimmedName.length < 2) {
+      const msg = 'Nama lengkap peserta demo wajib diisi (minimal 2 karakter).';
+      setErrorMsg(msg);
+      toast.error(msg, {
+        title: 'Profil Demo Tidak Lengkap',
+        badge: 'Demo Sandbox',
+      });
+      return;
+    }
+
+    if (!trimmedDepartment) {
+      const msg = 'Departemen / divisi peserta demo wajib diisi.';
+      setErrorMsg(msg);
+      toast.error(msg, {
+        title: 'Profil Demo Tidak Lengkap',
+        badge: 'Demo Sandbox',
+      });
       return;
     }
 
     setIsLoading(true);
     const newPersona: UserPersona = {
-      id: `custom-${Date.now()}`,
-      name,
-      email: `${name.toLowerCase().replace(/[^a-z0-9]/g, '.')}@demo-company.co.id`,
+      id: createCustomDemoPersonaId(),
+      name: trimmedName,
+      email: `${trimmedName.toLowerCase().replace(/[^a-z0-9]/g, '.')}@demo-company.co.id`,
       role,
       roleTitle:
         role === 'super_admin'
@@ -41,7 +69,7 @@ export const DemoRegisterForm: React.FC<DemoRegisterFormProps> = ({ onSwitchToLo
           : role === 'auditor'
           ? 'Auditor Eksternal (Simulasi)'
           : 'Document Specialist (Simulasi)',
-      department,
+      department: trimmedDepartment,
       avatar: '/demo-documents/avatar.png',
       permissions: ['read', 'write', 'verify'],
     };
@@ -49,12 +77,16 @@ export const DemoRegisterForm: React.FC<DemoRegisterFormProps> = ({ onSwitchToLo
     setTimeout(() => {
       MockDocumentService.setCurrentUser(newPersona);
       MockAuthService.loginDemo(newPersona);
+      toast.success(`Profil simulasi ${trimmedName} (${newPersona.roleTitle}) aktif di sandbox!`, {
+        title: 'Sesi Demo Siap',
+        badge: 'Demo Sandbox',
+      });
       router.push('/demo/dashboard');
     }, 600);
   };
 
   return (
-    <div className="w-full max-w-md mx-auto p-6 sm:p-8 flex flex-col justify-between h-full">
+    <div className="w-full max-w-md mx-auto p-6 sm:p-8 flex flex-col justify-between gap-6">
       <div className="space-y-6">
         {/* Brand Header */}
         <div className="space-y-2">
@@ -74,7 +106,7 @@ export const DemoRegisterForm: React.FC<DemoRegisterFormProps> = ({ onSwitchToLo
         )}
 
         {/* Demo Register Form */}
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} noValidate className="space-y-4">
           <div className="space-y-1.5">
             <label className="text-xs font-bold text-[#475569]">Nama Peserta Demo</label>
             <input
@@ -89,16 +121,37 @@ export const DemoRegisterForm: React.FC<DemoRegisterFormProps> = ({ onSwitchToLo
 
           <div className="space-y-1.5">
             <label className="text-xs font-bold text-[#475569]">Pilih Level Hak Akses Simulasi</label>
-            <select
+            <Select<UserRole>
               value={role}
-              onChange={(e) => setRole(e.target.value as UserRole)}
-              className="w-full text-xs font-semibold px-3.5 py-2.5 rounded-xl border border-[#CBD5E1] bg-white text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#4F46E5]/20 focus:border-[#4F46E5] transition-all cursor-pointer"
-            >
-              <option value="document_reviewer">Document Specialist (Reviewer Verifikasi)</option>
-              <option value="finance_supervisor">Finance & Tax Supervisor (Persetujuan Keuangan)</option>
-              <option value="auditor">Compliance Auditor (Inspeksi Forensik)</option>
-              <option value="super_admin">Super Admin / CISO (Akses Penuh)</option>
-            </select>
+              onChange={(val) => setRole(val)}
+              options={[
+                {
+                  value: 'document_reviewer',
+                  label: 'Document Specialist',
+                  description: 'Reviewer Verifikasi HITL',
+                  badge: 'HITL',
+                },
+                {
+                  value: 'finance_supervisor',
+                  label: 'Finance & Tax Supervisor',
+                  description: 'Persetujuan Keuangan & Pajak',
+                  badge: 'Approval',
+                },
+                {
+                  value: 'auditor',
+                  label: 'Compliance Auditor',
+                  description: 'Inspeksi Forensik & Audit Trail',
+                  badge: 'Read/Audit',
+                },
+                {
+                  value: 'super_admin',
+                  label: 'Super Admin / CISO',
+                  description: 'Akses Penuh Tenant & Konfigurasi',
+                  badge: 'Full',
+                },
+              ]}
+              aria-label="Pilih Level Hak Akses Simulasi"
+            />
           </div>
 
           <div className="space-y-1.5">
@@ -146,9 +199,9 @@ export const DemoRegisterForm: React.FC<DemoRegisterFormProps> = ({ onSwitchToLo
         </p>
 
         <div>
-          <a href="/" className="text-[11px] text-[#94A3B8] hover:text-[#475569] font-medium transition-colors">
+          <Link href="/" className="text-[11px] text-[#94A3B8] hover:text-[#475569] font-medium transition-colors">
             ← Kembali ke Beranda DokumenAI
-          </a>
+          </Link>
         </div>
       </div>
     </div>

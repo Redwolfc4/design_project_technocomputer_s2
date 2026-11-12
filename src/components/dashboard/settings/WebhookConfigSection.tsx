@@ -21,6 +21,8 @@ import {
   PlayIcon,
   CodeIcon,
 } from '@/components/ui/icons';
+import { useToast } from '@/context/ToastContext';
+import { Select } from '@/components/ui/Select';
 
 interface WebhookConfigSectionProps {
   initialUrl?: string;
@@ -48,6 +50,7 @@ const DEFAULT_PARAMS: WebhookParamItem[] = [
 ];
 
 export function WebhookConfigSection({ initialUrl, onChange }: WebhookConfigSectionProps) {
+  const toast = useToast();
   // Main Webhook Configuration State
   const [url, setUrl] = useState(initialUrl || 'https://api.nusantara-tech.co.id/webhooks/dokumenai');
   const [method, setMethod] = useState<WebhookHttpMethod>('POST');
@@ -223,8 +226,11 @@ export function WebhookConfigSection({ initialUrl, onChange }: WebhookConfigSect
       const parsed = JSON.parse(rawBody);
       setRawBody(JSON.stringify(parsed, null, 2));
       setJsonError(null);
-    } catch (err: any) {
-      setJsonError(err.message || 'JSON tidak valid untuk diformat');
+      toast.success('Payload JSON berhasil dirapikan.', { title: 'Prettify JSON' });
+    } catch (err: unknown) {
+      const errMsg = err instanceof Error ? err.message : 'JSON tidak valid untuk diformat';
+      setJsonError(errMsg);
+      toast.error(`Format JSON tidak valid: ${errMsg}`, { title: 'Prettify JSON Gagal' });
     }
   };
 
@@ -247,12 +253,21 @@ export function WebhookConfigSection({ initialUrl, onChange }: WebhookConfigSect
     };
     setRawBody(JSON.stringify(defaultData, null, 2));
     setJsonError(null);
+    toast.info('Payload JSON dikembalikan ke template default DokumenAI.', { title: 'Payload Direset' });
   };
 
   // Copy helper
   const handleCopy = (text: string, key: string) => {
-    navigator.clipboard.writeText(text);
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(text);
+    }
     setCopiedKey(key);
+    const labelMap: Record<string, string> = {
+      body_copy: 'Payload JSON',
+      raw_copy: 'Raw HTTP Request',
+      curl_copy: 'Perintah cURL',
+    };
+    toast.success(`${labelMap[key] || 'Konten webhook'} berhasil disalin ke clipboard.`);
     setTimeout(() => setCopiedKey(null), 2000);
   };
 
@@ -344,11 +359,15 @@ export function WebhookConfigSection({ initialUrl, onChange }: WebhookConfigSect
   // Run Simulated Webhook Test
   const handleTestWebhook = () => {
     if (!isUrlValid) {
-      alert('Harap masukkan URL endpoint webhook yang valid terlebih dahulu.');
+      toast.error('Harap masukkan URL endpoint webhook yang valid (awalan http:// atau https://).', {
+        title: 'URL Webhook Tidak Valid',
+      });
       return;
     }
     if (method === 'POST' && jsonError) {
-      alert(`Validasi JSON Gagal: ${jsonError}`);
+      toast.error(`Validasi JSON Gagal: ${jsonError}`, {
+        title: 'Payload JSON Tidak Valid',
+      });
       return;
     }
 
@@ -443,6 +462,18 @@ export function WebhookConfigSection({ initialUrl, onChange }: WebhookConfigSect
         },
         ...prev.slice(0, 9),
       ]);
+
+      if (isSuccess) {
+        toast.success(
+          `Simulasi ${method} webhook merespons ${simulatedStatusCode} ${result.statusText} (${duration}ms).`,
+          { title: 'Uji Webhook Berhasil' }
+        );
+      } else {
+        toast.error(
+          `Simulasi ${method} webhook mengembalikan ${simulatedStatusCode} ${result.statusText}. Periksa detail pada Test Response & Logs.`,
+          { title: 'Uji Webhook Gagal' }
+        );
+      }
     }, 400);
   };
 
@@ -470,24 +501,27 @@ export function WebhookConfigSection({ initialUrl, onChange }: WebhookConfigSect
         </label>
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
           {/* Method Select */}
-          <select
-            value={method}
-            onChange={(e) => {
-              const newMethod = e.target.value as WebhookHttpMethod;
-              setMethod(newMethod);
-              if (newMethod === 'GET') {
-                setActiveConfigTab('params');
+          <div className="sm:w-52 shrink-0">
+            <Select<WebhookHttpMethod>
+              value={method}
+              onChange={(newMethod) => {
+                setMethod(newMethod);
+                if (newMethod === 'GET') {
+                  setActiveConfigTab('params');
+                }
+              }}
+              aria-label="HTTP Method Webhook"
+              options={[
+                { value: 'POST', label: 'POST', badge: 'Event Payload' },
+                { value: 'GET', label: 'GET', badge: 'Query Callback' },
+              ]}
+              triggerClassName={
+                method === 'POST'
+                  ? 'bg-emerald-50 text-emerald-700 border-emerald-300 font-black'
+                  : 'bg-blue-50 text-blue-700 border-blue-300 font-black'
               }
-            }}
-            className={`text-xs font-bold px-3 py-2.5 rounded-lg border focus:outline-none transition-colors ${
-              method === 'POST'
-                ? 'bg-emerald-50 text-emerald-700 border-emerald-300 font-black'
-                : 'bg-blue-50 text-blue-700 border-blue-300 font-black'
-            }`}
-          >
-            <option value="POST">POST (Event Payload)</option>
-            <option value="GET">GET (Query Callback)</option>
-          </select>
+            />
+          </div>
 
           {/* URL Input */}
           <div className="relative flex-1">
@@ -924,19 +958,20 @@ export function WebhookConfigSection({ initialUrl, onChange }: WebhookConfigSect
           {/* ======================================================= */}
           {activeConfigTab === 'auth' && (
             <div className="space-y-4">
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-700 block">Tipe Autentikasi Webhook</label>
-                <select
+              <div className="sm:w-72">
+                <Select<WebhookAuthType>
+                  label="Tipe Autentikasi Webhook"
+                  size="sm"
                   value={authType}
-                  onChange={(e) => setAuthType(e.target.value as WebhookAuthType)}
-                  className="w-full sm:w-64 text-xs font-semibold px-3 py-2 border border-[#CBD5E1] rounded-lg bg-white focus:outline-none focus:border-[#4F46E5]"
-                >
-                  <option value="none">None (Tanpa Autentikasi)</option>
-                  <option value="bearer">Bearer Token</option>
-                  <option value="api_key">API Key</option>
-                  <option value="basic">Basic Auth</option>
-                  <option value="hmac">HMAC Signature (Simulasi SHA-256)</option>
-                </select>
+                  onChange={(val) => setAuthType(val)}
+                  options={[
+                    { value: 'none', label: 'None (Tanpa Autentikasi)' },
+                    { value: 'bearer', label: 'Bearer Token', badge: 'Header' },
+                    { value: 'api_key', label: 'API Key', badge: 'Flexible' },
+                    { value: 'basic', label: 'Basic Auth', badge: 'Base64' },
+                    { value: 'hmac', label: 'HMAC Signature', badge: 'SHA-256' },
+                  ]}
+                />
               </div>
 
               {/* Dynamic Auth Fields */}
@@ -997,16 +1032,17 @@ export function WebhookConfigSection({ initialUrl, onChange }: WebhookConfigSect
                         </button>
                       </div>
                     </div>
-                    <div className="space-y-1">
-                      <label className="text-xs font-bold text-slate-700 block">Penempatan</label>
-                      <select
+                    <div>
+                      <Select<'header' | 'query'>
+                        label="Penempatan"
+                        size="sm"
                         value={apiKeyPlacement}
-                        onChange={(e) => setApiKeyPlacement(e.target.value as 'header' | 'query')}
-                        className="w-full px-3 py-2 text-xs border border-[#CBD5E1] rounded-lg bg-white font-semibold"
-                      >
-                        <option value="header">Request Header</option>
-                        <option value="query">Query Parameter</option>
-                      </select>
+                        onChange={(val) => setApiKeyPlacement(val)}
+                        options={[
+                          { value: 'header', label: 'Request Header' },
+                          { value: 'query', label: 'Query Parameter' },
+                        ]}
+                      />
                     </div>
                   </div>
                 </div>
@@ -1156,19 +1192,22 @@ export function WebhookConfigSection({ initialUrl, onChange }: WebhookConfigSect
           </div>
 
           <div className="flex items-center gap-2">
-            <select
-              value={simulatedStatusCode}
-              onChange={(e) => setSimulatedStatusCode(Number(e.target.value))}
-              className="text-xs font-bold bg-white border border-[#CBD5E1] rounded-lg px-2 py-1 text-slate-700"
-              title="Pilih status respons untuk simulasi pengujian"
-            >
-              <option value={200}>Simulasi: 200 OK</option>
-              <option value={201}>Simulasi: 201 Created</option>
-              <option value={400}>Simulasi: 400 Bad Request</option>
-              <option value={401}>Simulasi: 401 Unauthorized</option>
-              <option value={404}>Simulasi: 404 Not Found</option>
-              <option value={500}>Simulasi: 500 Server Error</option>
-            </select>
+            <div className="w-48">
+              <Select<number>
+                size="xs"
+                value={simulatedStatusCode}
+                onChange={(val) => setSimulatedStatusCode(val)}
+                aria-label="Pilih status respons untuk simulasi pengujian"
+                options={[
+                  { value: 200, label: 'Simulasi: 200 OK', badge: 'Success' },
+                  { value: 201, label: 'Simulasi: 201 Created', badge: 'Success' },
+                  { value: 400, label: 'Simulasi: 400 Bad Request', badge: 'Client' },
+                  { value: 401, label: 'Simulasi: 401 Unauthorized', badge: 'Auth' },
+                  { value: 404, label: 'Simulasi: 404 Not Found', badge: 'Client' },
+                  { value: 500, label: 'Simulasi: 500 Server Error', badge: 'Server' },
+                ]}
+              />
+            </div>
 
             <button
               type="button"

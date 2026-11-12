@@ -1,10 +1,12 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { BrandLogo } from '@/components/shared/BrandLogo';
 import { EyeIcon, ArrowRightIcon } from '@/components/ui/icons';
 import { MockAuthService } from '@/lib/services/mockAuth';
+import { useToast } from '@/context/ToastContext';
 
 interface RegisterFormProps {
   onSwitchToLogin: () => void;
@@ -13,6 +15,7 @@ interface RegisterFormProps {
 
 export const RegisterForm: React.FC<RegisterFormProps> = ({ onSwitchToLogin, isDemo = false }) => {
   const router = useRouter();
+  const toast = useToast();
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -48,41 +51,59 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({ onSwitchToLogin, isD
     e.preventDefault();
     setErrorMsg('');
 
-    if (!fullName.trim() || fullName.trim().length < 2) {
-      setErrorMsg('Nama lengkap minimal harus 2 karakter.');
+    const badgeLabel = isDemo ? 'Demo Sandbox' : 'Akun Enterprise';
+    const trimmedName = fullName.trim();
+    const trimmedEmail = email.trim();
+
+    if (!trimmedName || trimmedName.length < 2) {
+      const msg = 'Nama lengkap minimal harus 2 karakter.';
+      setErrorMsg(msg);
+      toast.error(msg, { title: 'Pendaftaran Gagal', badge: badgeLabel });
       return;
     }
 
-    if (!email.trim() || !email.includes('@')) {
-      setErrorMsg('Harap masukkan alamat email perusahaan yang valid.');
+    if (!trimmedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      const msg = 'Harap masukkan alamat email perusahaan yang valid.';
+      setErrorMsg(msg);
+      toast.error(msg, { title: 'Pendaftaran Gagal', badge: badgeLabel });
       return;
     }
 
     if (!password || password.length < 6) {
-      setErrorMsg('Kata sandi harus terdiri dari minimal 6 karakter.');
+      const msg = 'Kata sandi harus terdiri dari minimal 6 karakter.';
+      setErrorMsg(msg);
+      toast.error(msg, { title: 'Pendaftaran Gagal', badge: badgeLabel });
       return;
     }
 
     if (password !== confirmPassword) {
-      setErrorMsg('Konfirmasi kata sandi tidak cocok.');
+      const msg = 'Konfirmasi kata sandi tidak cocok.';
+      setErrorMsg(msg);
+      toast.error(msg, { title: 'Pendaftaran Gagal', badge: badgeLabel });
       return;
     }
 
     if (!agreeTerms) {
-      setErrorMsg('Anda harus menyetujui syarat & ketentuan simulasi enterprise.');
+      const msg = 'Anda harus menyetujui syarat & ketentuan simulasi enterprise.';
+      setErrorMsg(msg);
+      toast.error(msg, { title: 'Pendaftaran Gagal', badge: badgeLabel });
       return;
     }
 
     setIsLoading(true);
 
     setTimeout(() => {
-      MockAuthService.registerAccount(fullName, email);
+      MockAuthService.registerAccount(trimmedName, trimmedEmail);
+      toast.success(`Akun enterprise untuk ${trimmedName} berhasil dibuat dan langsung aktif.`, {
+        title: 'Registrasi Berhasil',
+        badge: badgeLabel,
+      });
       router.push('/dashboard');
     }, 600);
   };
 
   return (
-    <div className="w-full max-w-md mx-auto p-6 sm:p-8 flex flex-col justify-between h-full">
+    <div className="w-full max-w-md mx-auto p-6 sm:p-8 flex flex-col justify-between gap-6">
       <div className="space-y-6">
         {/* Brand Header */}
         <div className="space-y-2">
@@ -103,7 +124,7 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({ onSwitchToLogin, isD
         )}
 
         {/* Register Form */}
-        <form onSubmit={handleSubmit} className="space-y-3.5">
+        <form onSubmit={handleSubmit} noValidate className="space-y-3.5">
           <div className="space-y-1">
             <label className="text-xs font-bold text-[#475569]">Full Name</label>
             <input
@@ -186,7 +207,15 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({ onSwitchToLogin, isD
                 className="rounded border-[#CBD5E1] text-[#4F46E5] focus:ring-[#4F46E5] h-3.5 w-3.5 mt-0.5"
               />
               <span className="text-xs text-[#64748B] leading-tight">
-                Saya menyetujui Ketentuan Layanan & Kebijakan Privasi DokumenAI Enterprise
+                Saya menyetujui{' '}
+                <Link href="/terms" className="text-[#4F46E5] hover:underline" target="_blank">
+                  Ketentuan Layanan
+                </Link>{' '}
+                &{' '}
+                <Link href="/privacy" className="text-[#4F46E5] hover:underline" target="_blank">
+                  Kebijakan Privasi
+                </Link>{' '}
+                DokumenAI Enterprise
               </span>
             </label>
           </div>
@@ -225,9 +254,9 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({ onSwitchToLogin, isD
         </p>
 
         <div>
-          <a href="/" className="text-[11px] text-[#94A3B8] hover:text-[#475569] font-medium transition-colors">
+          <Link href="/" className="text-[11px] text-[#94A3B8] hover:text-[#475569] font-medium transition-colors">
             ← Kembali ke Beranda DokumenAI
-          </a>
+          </Link>
         </div>
       </div>
     </div>

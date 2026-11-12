@@ -193,6 +193,18 @@ export const formatDateTime = (dateString: string): string => {
 
 export const getStatusBadgeInfo = (status: string) => {
   switch (status) {
+    case 'ready':
+      return {
+        label: 'Siap Proses',
+        bg: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-400 dark:border-emerald-800',
+        dot: 'bg-emerald-500',
+      };
+    case 'draft':
+      return {
+        label: 'Draft',
+        bg: 'bg-slate-100 text-slate-700 border-slate-300 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700',
+        dot: 'bg-slate-500',
+      };
     case 'approved':
       return {
         label: 'Terverifikasi',
@@ -217,6 +229,19 @@ export const getStatusBadgeInfo = (status: string) => {
         bg: 'bg-slate-50 text-slate-700 border-slate-200 dark:bg-slate-900/50 dark:text-slate-400 dark:border-slate-800',
         dot: 'bg-slate-400',
       };
+    case 'draft':
+      return {
+        label: 'Draft',
+        bg: 'bg-slate-100 text-slate-700 border-slate-300 dark:bg-slate-800/70 dark:text-slate-300 dark:border-slate-700',
+        dot: 'bg-slate-400',
+      };
+    case 'ready':
+      return {
+        label: 'Siap Proses',
+        bg: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-400 dark:border-emerald-800',
+        dot: 'bg-emerald-500',
+      };
+    case 'processing':
     case 'preprocessing':
     case 'ocr_processing':
     case 'field_extraction':
@@ -225,6 +250,12 @@ export const getStatusBadgeInfo = (status: string) => {
         label: 'Memproses AI...',
         bg: 'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/50 dark:text-indigo-400 dark:border-indigo-800',
         dot: 'bg-indigo-500 animate-pulse',
+      };
+    case 'completed':
+      return {
+        label: 'Selesai',
+        bg: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/50 dark:text-blue-400 dark:border-blue-800',
+        dot: 'bg-blue-500',
       };
     case 'failed':
       return {
@@ -265,6 +296,18 @@ export const getDocumentTypeLabel = (type: string): string => {
 export const formatActionLabel = (action: string): string => {
   if (!action) return '';
   return action.replace(/_/g, ' ');
+};
+
+export const formatRoleLabel = (role: string): string => {
+  if (!role) return '';
+  return role
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+};
+
+export const formatSystemTypeLabel = (systemType: string): string => {
+  if (!systemType) return '';
+  return systemType.replace(/_/g, ' ');
 };
 
 

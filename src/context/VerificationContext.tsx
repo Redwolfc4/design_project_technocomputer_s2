@@ -1,8 +1,9 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { DocumentRecord, ExtractedField, DocumentStatus } from '@/types';
+import { DocumentRecord, ExtractedField } from '@/types';
 import { MockDocumentService } from '@/lib/mocks/storage';
+import { useToast } from '@/context/ToastContext';
 
 export interface DocumentDraft {
   fields: ExtractedField[];
@@ -18,7 +19,6 @@ export interface VerificationContextType {
   activeDraft: DocumentDraft | null;
   drafts: Record<string, DocumentDraft>;
   selectedFieldId: string | null;
-  notification: { message: string; type: 'success' | 'error' } | null;
   isEditMode: boolean;
 
   // Actions
@@ -32,7 +32,6 @@ export interface VerificationContextType {
   updateNoteDraft: (documentId: string, note: string) => void;
   approveDocument: (documentId: string) => { success: boolean; message: string };
   rejectDocument: (documentId: string, reason?: string) => { success: boolean; message: string };
-  clearNotification: () => void;
 }
 
 const VerificationContext = createContext<VerificationContextType | undefined>(undefined);
@@ -44,11 +43,11 @@ export function VerificationProvider({
   children: React.ReactNode;
   initialDocId?: string | null;
 }) {
+  const toast = useToast();
   const [documents, setDocuments] = useState<DocumentRecord[]>([]);
   const [activeDocId, setActiveDocId] = useState<string | null>(null);
   const [drafts, setDrafts] = useState<Record<string, DocumentDraft>>({});
   const [selectedFieldId, setSelectedFieldId] = useState<string | null>(null);
-  const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [isEditMode, setIsEditMode] = useState<boolean>(false);
 
   // Snapshot of fields when entering edit mode, to restore on cancel
@@ -59,41 +58,48 @@ export function VerificationProvider({
 
   // Load initial documents from MockDocumentService (localStorage persistence)
   useEffect(() => {
-    const loadedDocs = MockDocumentService.getDocuments();
-    setDocuments(loadedDocs);
+    const timer = setTimeout(() => {
+      const loadedDocs = MockDocumentService.getDocuments();
+      setDocuments(loadedDocs);
 
-    // Initialize drafts dictionary per documentId
-    const initialDrafts: Record<string, DocumentDraft> = {};
-    loadedDocs.forEach((doc) => {
-      const latestNote = doc.notes.length > 0 ? doc.notes[doc.notes.length - 1].message : '';
-      initialDrafts[doc.id] = {
-        fields: JSON.parse(JSON.stringify(doc.fields)),
-        reviewerNote: latestNote,
-        isSaving: false,
-        lastSavedAt: new Date(),
-      };
-    });
-    setDrafts(initialDrafts);
+      // Initialize drafts dictionary per documentId
+      const initialDrafts: Record<string, DocumentDraft> = {};
+      loadedDocs.forEach((doc) => {
+        const latestNote = doc.notes.length > 0 ? doc.notes[doc.notes.length - 1].message : '';
+        initialDrafts[doc.id] = {
+          fields: JSON.parse(JSON.stringify(doc.fields)),
+          reviewerNote: latestNote,
+          isSaving: false,
+          lastSavedAt: new Date(),
+        };
+      });
+      setDrafts(initialDrafts);
 
-    // Determine initial active document
-    let targetDocId: string | null = null;
-    if (initialDocId) {
-      const found = loadedDocs.find((d) => d.id === initialDocId);
-      if (found) targetDocId = found.id;
-    }
-
-    if (!targetDocId) {
-      const firstPending = loadedDocs.find((d) => d.status === 'needs_review') || loadedDocs[0];
-      if (firstPending) targetDocId = firstPending.id;
-    }
-
-    if (targetDocId) {
-      setActiveDocId(targetDocId);
-      const targetDoc = loadedDocs.find((d) => d.id === targetDocId);
-      if (targetDoc && targetDoc.fields.length > 0) {
-        setSelectedFieldId(targetDoc.fields[0].id);
+      // Determine initial active document
+      let targetDocId: string | null = null;
+      if (initialDocId) {
+        const found = loadedDocs.find((d) => d.id === initialDocId);
+        if (found) targetDocId = found.id;
       }
-    }
+
+      if (!targetDocId) {
+        const firstPending = loadedDocs.find((d) => d.status === 'needs_review') || loadedDocs[0];
+        if (firstPending) targetDocId = firstPending.id;
+      }
+
+      if (targetDocId) {
+        setActiveDocId(targetDocId);
+        const targetDoc = loadedDocs.find((d) => d.id === targetDocId);
+        const isFinal = targetDoc?.status === 'approved' || targetDoc?.status === 'rejected';
+        if (targetDoc && !isFinal && targetDoc.fields.length > 0) {
+          setSelectedFieldId(targetDoc.fields[0].id);
+        } else {
+          setSelectedFieldId(null);
+        }
+      }
+    }, 0);
+
+    return () => clearTimeout(timer);
   }, [initialDocId]);
 
   // Derived active document
@@ -107,18 +113,6 @@ export function VerificationProvider({
     if (!activeDocId || !drafts[activeDocId]) return null;
     return drafts[activeDocId];
   }, [drafts, activeDocId]);
-
-  // Auto-dismiss notification after 4s
-  useEffect(() => {
-    if (notification) {
-      const timer = setTimeout(() => setNotification(null), 4000);
-      return () => clearTimeout(timer);
-    }
-  }, [notification]);
-
-  const clearNotification = useCallback(() => {
-    setNotification(null);
-  }, []);
 
   // Function to perform actual persist to storage & state
   const commitSave = useCallback((documentId: string, currentDraft: DocumentDraft) => {
@@ -208,60 +202,88 @@ export function VerificationProvider({
     }, 400);
   }, [commitSave]);
 
+  // Guard field highlight selection when active document is locked in final status
+  const handleSelectField = useCallback(
+    (id: string | null) => {
+      if (activeDoc && (activeDoc.status === 'approved' || activeDoc.status === 'rejected')) {
+        setSelectedFieldId(null);
+        return;
+      }
+      setSelectedFieldId(id);
+    },
+    [activeDoc]
+  );
+
   // Update a single field in draft with immediate debounced auto-save
-  const updateFieldDraft = useCallback((documentId: string, fieldId: string, value: string) => {
-    setDrafts((prev) => {
-      const currentDraft = prev[documentId];
-      if (!currentDraft) return prev;
+  const updateFieldDraft = useCallback(
+    (documentId: string, fieldId: string, value: string) => {
+      const targetDoc = documents.find((d) => d.id === documentId);
+      if (targetDoc && (targetDoc.status === 'approved' || targetDoc.status === 'rejected')) {
+        return;
+      }
 
-      const updatedFields = currentDraft.fields.map((f) => {
-        if (f.id === fieldId) {
-          return {
-            ...f,
-            value,
-            isEdited: true,
-            validationStatus: 'valid' as const,
-            validationMessage: undefined,
-          };
-        }
-        return f;
+      setDrafts((prev) => {
+        const currentDraft = prev[documentId];
+        if (!currentDraft) return prev;
+
+        const updatedFields = currentDraft.fields.map((f) => {
+          if (f.id === fieldId) {
+            return {
+              ...f,
+              value,
+              isEdited: true,
+              validationStatus: 'valid' as const,
+              validationMessage: undefined,
+            };
+          }
+          return f;
+        });
+
+        const nextDraft: DocumentDraft = {
+          ...currentDraft,
+          fields: updatedFields,
+          isSaving: true,
+        };
+
+        triggerDebouncedAutoSave(documentId, nextDraft);
+
+        return {
+          ...prev,
+          [documentId]: nextDraft,
+        };
       });
-
-      const nextDraft: DocumentDraft = {
-        ...currentDraft,
-        fields: updatedFields,
-        isSaving: true,
-      };
-
-      triggerDebouncedAutoSave(documentId, nextDraft);
-
-      return {
-        ...prev,
-        [documentId]: nextDraft,
-      };
-    });
-  }, [triggerDebouncedAutoSave]);
+    },
+    [documents, triggerDebouncedAutoSave]
+  );
 
   // Update note in draft with immediate debounced auto-save
-  const updateNoteDraft = useCallback((documentId: string, note: string) => {
-    setDrafts((prev) => {
-      const currentDraft = prev[documentId];
-      if (!currentDraft) return prev;
+  const updateNoteDraft = useCallback(
+    (documentId: string, note: string) => {
+      const targetDoc = documents.find((d) => d.id === documentId);
+      if (targetDoc && (targetDoc.status === 'approved' || targetDoc.status === 'rejected')) {
+        return;
+      }
 
-      const nextDraft: DocumentDraft = {
-        ...currentDraft,
-        reviewerNote: note,
-        isSaving: true,
-      };
+      setDrafts((prev) => {
+        const currentDraft = prev[documentId];
+        if (!currentDraft) return prev;
 
-      triggerDebouncedAutoSave(documentId, nextDraft);
+        const nextDraft: DocumentDraft = {
+          ...currentDraft,
+          reviewerNote: note,
+          isSaving: true,
+        };
 
-      return {
-        ...prev,
-        [documentId]: nextDraft,
-      };
-    });
-  }, [triggerDebouncedAutoSave]);
+        triggerDebouncedAutoSave(documentId, nextDraft);
+
+        return {
+          ...prev,
+          [documentId]: nextDraft,
+        };
+      });
+    },
+    [documents, triggerDebouncedAutoSave]
+  );
 
   // Select document seamlessly (flush any pending debounce on previous document)
   const selectDocument = useCallback((id: string) => {
@@ -279,7 +301,8 @@ export function VerificationProvider({
 
     setActiveDocId(id);
     const targetDoc = documents.find((d) => d.id === id);
-    if (targetDoc && targetDoc.fields.length > 0) {
+    const isFinal = targetDoc?.status === 'approved' || targetDoc?.status === 'rejected';
+    if (targetDoc && !isFinal && targetDoc.fields.length > 0) {
       setSelectedFieldId(targetDoc.fields[0].id);
     } else {
       setSelectedFieldId(null);
@@ -290,10 +313,10 @@ export function VerificationProvider({
   const toggleEditMode = useCallback(() => {
     if (!activeDoc) return;
     if (activeDoc.status === 'approved' || activeDoc.status === 'rejected') {
-      setNotification({
-        message: 'Dokumen berstatus final (' + (activeDoc.status === 'approved' ? 'Terverifikasi' : 'Ditolak') + ') terkunci dan tidak dapat diedit.',
-        type: 'error',
-      });
+      toast.error(
+        `Dokumen berstatus final (${activeDoc.status === 'approved' ? 'Terverifikasi' : 'Ditolak'}) terkunci dan tidak dapat diedit.`,
+        { title: 'Dokumen Terkunci' }
+      );
       return;
     }
 
@@ -306,7 +329,7 @@ export function VerificationProvider({
     } else {
       setIsEditMode(false);
     }
-  }, [activeDoc, isEditMode, activeDraft]);
+  }, [activeDoc, isEditMode, activeDraft, toast]);
 
   // Cancel Edit Mode: Restore fields to snapshot and return to Read-Only
   const cancelEdit = useCallback(() => {
@@ -322,39 +345,50 @@ export function VerificationProvider({
       });
     }
     setIsEditMode(false);
-    setNotification({
-      message: 'Perubahan dibatalkan. Kembali ke Mode Read-Only.',
-      type: 'success',
+    toast.info('Perubahan dibatalkan. Kembali ke Mode Read-Only.', {
+      title: 'Edit Dibatalkan',
     });
-  }, [activeDoc, commitSave]);
+  }, [activeDoc, commitSave, toast]);
 
   // Save Edit Mode: Validate, commit save, and return to Read-Only
   const saveEdit = useCallback(() => {
     if (!activeDoc) return { success: false, message: 'Tidak ada dokumen aktif' };
     if (activeDoc.status === 'approved' || activeDoc.status === 'rejected') {
-      setNotification({
-        message: 'Dokumen berstatus final tidak dapat diubah.',
-        type: 'error',
-      });
+      toast.error('Dokumen berstatus final tidak dapat diubah.', { title: 'Dokumen Terkunci' });
       return { success: false, message: 'Status final terkunci' };
     }
 
     if (activeDraft) {
+      const missingRequiredField = activeDraft.fields.find(
+        (field) => field.isRequired && String(field.value ?? '').trim() === ''
+      );
+      if (missingRequiredField) {
+        toast.error(`Bidang wajib "${missingRequiredField.label}" tidak boleh kosong.`, {
+          title: 'Validasi Bidang Gagal',
+        });
+        return { success: false, message: `Bidang ${missingRequiredField.label} wajib diisi` };
+      }
+
       commitSave(activeDoc.id, activeDraft);
       // Update snapshot to current saved state
       editSnapshot.current[activeDoc.id] = JSON.parse(JSON.stringify(activeDraft.fields));
     }
 
     setIsEditMode(false);
-    setNotification({
-      message: 'Perubahan bidang dokumen berhasil disimpan.',
-      type: 'success',
+    toast.success(`Perubahan bidang dokumen ${activeDoc.fileNumber} berhasil disimpan.`, {
+      title: 'Bidang Dokumen Tersimpan',
     });
     return { success: true, message: 'Tersimpan' };
-  }, [activeDoc, activeDraft, commitSave]);
+  }, [activeDoc, activeDraft, commitSave, toast]);
 
   // Approve document
   const approveDocument = useCallback((documentId: string) => {
+    const targetDoc = documents.find((d) => d.id === documentId);
+    if (targetDoc && (targetDoc.status === 'approved' || targetDoc.status === 'rejected')) {
+      toast.error('Dokumen berstatus final tidak dapat diproses ulang.', { title: 'Aksi Ditolak' });
+      return { success: false, message: 'Status final terkunci' };
+    }
+
     // Flush any pending debounce for this document immediately
     if (debounceTimers.current[documentId]) {
       clearTimeout(debounceTimers.current[documentId]);
@@ -377,18 +411,27 @@ export function VerificationProvider({
 
     if (updated) {
       setDocuments((prev) => prev.map((d) => (d.id === documentId ? updated : d)));
-      setNotification({
-        message: `Dokumen ${updated.fileNumber} berhasil disetujui dan disinkronkan ke seluruh sistem!`,
-        type: 'success',
-      });
+      setIsEditMode(false);
+      setSelectedFieldId(null);
+      toast.success(
+        `Dokumen ${updated.fileNumber} berhasil disetujui dan disinkronkan ke seluruh sistem!`,
+        { title: 'Dokumen Disetujui' }
+      );
       return { success: true, message: 'Disetujui' };
     }
 
+    toast.error('Gagal memperbarui status dokumen.', { title: 'Proses Gagal' });
     return { success: false, message: 'Gagal memperbarui status dokumen.' };
-  }, [drafts, commitSave]);
+  }, [documents, drafts, commitSave, toast]);
 
   // Reject document
   const rejectDocument = useCallback((documentId: string, reason?: string) => {
+    const targetDoc = documents.find((d) => d.id === documentId);
+    if (targetDoc && (targetDoc.status === 'approved' || targetDoc.status === 'rejected')) {
+      toast.error('Dokumen berstatus final tidak dapat ditolak ulang.', { title: 'Aksi Ditolak' });
+      return { success: false, message: 'Status final terkunci' };
+    }
+
     // Flush any pending debounce for this document immediately
     if (debounceTimers.current[documentId]) {
       clearTimeout(debounceTimers.current[documentId]);
@@ -400,12 +443,11 @@ export function VerificationProvider({
       commitSave(documentId, draft);
     }
 
-    const finalReason = reason || draft?.reviewerNote;
+    const finalReason = (reason ?? draft?.reviewerNote ?? '').trim();
 
     if (!finalReason) {
-      setNotification({
-        message: 'Harap masukkan catatan/alasan penolakan terlebih dahulu pada editor!',
-        type: 'error',
+      toast.error('Harap masukkan catatan/alasan penolakan terlebih dahulu pada kolom Catatan Verifikator!', {
+        title: 'Alasan Penolakan Wajib Diisi',
       });
       return { success: false, message: 'Alasan penolakan wajib diisi.' };
     }
@@ -420,15 +462,17 @@ export function VerificationProvider({
 
     if (updated) {
       setDocuments((prev) => prev.map((d) => (d.id === documentId ? updated : d)));
-      setNotification({
-        message: `Dokumen ${updated.fileNumber} ditolak dan status tersinkronisasi.`,
-        type: 'error',
+      setIsEditMode(false);
+      setSelectedFieldId(null);
+      toast.error(`Dokumen ${updated.fileNumber} telah ditolak dan status tersinkronisasi.`, {
+        title: 'Dokumen Ditolak',
       });
       return { success: true, message: 'Ditolak' };
     }
 
+    toast.error('Gagal menolak dokumen.', { title: 'Proses Gagal' });
     return { success: false, message: 'Gagal menolak dokumen.' };
-  }, [drafts, commitSave]);
+  }, [documents, drafts, commitSave, toast]);
 
   const contextValue = useMemo(
     () => ({
@@ -438,10 +482,9 @@ export function VerificationProvider({
       activeDraft,
       drafts,
       selectedFieldId,
-      notification,
       isEditMode,
       selectDocument,
-      setSelectedFieldId,
+      setSelectedFieldId: handleSelectField,
       setIsEditMode,
       toggleEditMode,
       cancelEdit,
@@ -450,7 +493,6 @@ export function VerificationProvider({
       updateNoteDraft,
       approveDocument,
       rejectDocument,
-      clearNotification,
     }),
     [
       documents,
@@ -459,9 +501,9 @@ export function VerificationProvider({
       activeDraft,
       drafts,
       selectedFieldId,
-      notification,
       isEditMode,
       selectDocument,
+      handleSelectField,
       toggleEditMode,
       cancelEdit,
       saveEdit,
@@ -469,7 +511,6 @@ export function VerificationProvider({
       updateNoteDraft,
       approveDocument,
       rejectDocument,
-      clearNotification,
     ]
   );
 

@@ -1,27 +1,22 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Topbar } from '@/components/layout/Topbar';
 import { DocumentService } from '@/lib/modules/documents/document.service';
 import { DocumentRecord } from '@/types';
-import { formatIDR, formatDate, getStatusBadgeInfo, getDocumentTypeLabel } from '@/lib/utils/formatters';
+import { formatIDR, getStatusBadgeInfo, getDocumentTypeLabel } from '@/lib/utils/formatters';
 import {
   FileTextIcon,
   CheckCircleIcon,
   AlertTriangleIcon,
-  UploadCloudIcon,
   ArrowRightIcon,
   LayersIcon,
   MoreHorizontalIcon,
   CopyIcon,
-  ClockIcon,
-  ShieldCheckIcon,
   ArrowUpRightIcon,
-  FilterIcon,
   RotateCcwIcon,
-  XIcon,
 } from '@/components/ui/icons';
 import {
   DataTableRow,
@@ -29,14 +24,17 @@ import {
   useDataTableInteractions,
   RowAction,
   DataTableFilters,
-  DataTableResultCount,
+  DataTableEmptyState,
   FilterConfig,
 } from '@/components/shared/data-table';
+import { isTimestampInDateRange } from '@/components/shared/data-table/date-picker/dateUtils';
 import { DocumentQuickDetailModal } from '@/components/dashboard/documents/DocumentQuickDetailModal';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { SectionHeader } from '@/components/shared/SectionHeader';
 import { useAppMode } from '@/context/ModeContext';
 import { useAppRoutes } from '@/context/RouteContext';
+import { useAppScope } from '@/context/ScopeContext';
+import { useToast } from '@/context/ToastContext';
 import { StatusDonutChart, StatusDonutItem } from '@/components/dashboard/analytics/charts/StatusDonutChart';
 import { DocumentTypeBarChart, DocumentTypeItem } from '@/components/dashboard/analytics/charts/DocumentTypeBarChart';
 import { DocumentTrendAreaChart } from '@/components/dashboard/analytics/charts/DocumentTrendAreaChart';
@@ -47,9 +45,20 @@ export default function DashboardOverviewPage() {
   const router = useRouter();
   const { isDemo, isProduction, tenantName } = useAppMode();
   const { getRoute } = useAppRoutes();
+  const {
+    activeCompanyId,
+    setActiveCompanyId,
+    allowedCompanies,
+    canChangeCompany,
+    activeDepartmentId,
+    setActiveDepartmentId,
+    allowedDepartments,
+    canChangeDepartment,
+    activeDepartment,
+  } = useAppScope();
+  const toast = useToast();
   const [documents, setDocuments] = useState<DocumentRecord[]>(() => DocumentService.getDocuments());
   const [previewDoc, setPreviewDoc] = useState<DocumentRecord | null>(null);
-  const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' } | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeStatusFilter, setActiveStatusFilter] = useState<DocumentStatus | null>(null);
   const [activeTypeFilter, setActiveTypeFilter] = useState<string | null>(null);
@@ -69,78 +78,63 @@ export default function DashboardOverviewPage() {
   } = useDataTableInteractions<DocumentRecord>();
 
   useEffect(() => {
-    setDocuments(DocumentService.getDocuments());
+    const timer = setTimeout(() => {
+      setDocuments(DocumentService.getDocuments());
+    }, 0);
+    return () => clearTimeout(timer);
   }, []);
 
-  useEffect(() => {
-    if (toast) {
-      const timer = setTimeout(() => setToast(null), 3000);
-      return () => clearTimeout(timer);
-    }
-  }, [toast]);
-
-  const showToast = (message: string, type: 'success' | 'info' = 'success') => {
-    setToast({ message, type });
-  };
-
-  const handleCopyText = (text: string, label: string) => {
+  const handleCopyText = useCallback((text: string, label: string) => {
     if (navigator.clipboard) {
       navigator.clipboard.writeText(text);
-      showToast(`${label} berhasil disalin ke clipboard!`);
+      toast.success(`${label} berhasil disalin ke clipboard!`, { title: 'Disalin' });
     }
-  };
+  }, [toast]);
 
   // Filtered documents for KPIs and analytics
   const filteredDocuments = useMemo(() => {
     return documents.filter((d) => {
+      if (activeCompanyId !== 'all' && d.companyId && d.companyId !== activeCompanyId) {
+        return false;
+      }
+      if (activeDepartment && activeDepartment.id !== 'all' && d.department) {
+        if (d.department.toLowerCase() !== activeDepartment.name.toLowerCase()) {
+          return false;
+        }
+      }
       if (activeStatusFilter && d.status !== activeStatusFilter) {
         return false;
       }
       if (activeTypeFilter && d.documentType !== activeTypeFilter) {
         return false;
       }
-      if (activeDateRange.preset !== 'all') {
-        const docDate = new Date(d.uploadedAt || Date.now()).getTime();
-        const now = new Date('2026-03-05T00:00:00Z').getTime(); // Anchored to mock data period (March 2026)
-        const oneDay = 24 * 60 * 60 * 1000;
-
-        if (activeDateRange.preset === 'today') {
-          // Within last 24-48 hours of mock latest date
-          if (now - docDate > 2 * oneDay) return false;
-        } else if (activeDateRange.preset === '7days') {
-          if (now - docDate > 7 * oneDay) return false;
-        } else if (activeDateRange.preset === 'month') {
-          if (now - docDate > 31 * oneDay) return false;
-        } else if (activeDateRange.preset === 'custom') {
-          if (activeDateRange.from) {
-            const fromTime = new Date(activeDateRange.from).getTime();
-            if (docDate < fromTime) return false;
-          }
-          if (activeDateRange.to) {
-            const toTime = new Date(activeDateRange.to).getTime() + oneDay; // End of selected day
-            if (docDate > toTime) return false;
-          }
-        }
+      if (!isTimestampInDateRange(d.uploadedAt, activeDateRange)) {
+        return false;
       }
       return true;
     });
-  }, [documents, activeStatusFilter, activeTypeFilter, activeDateRange]);
+  }, [documents, activeCompanyId, activeDepartment, activeStatusFilter, activeTypeFilter, activeDateRange]);
 
   // Is any filter active
   const isAnyFilterActive =
     activeStatusFilter !== null ||
     activeTypeFilter !== null ||
-    activeDateRange.preset !== 'all';
+    activeDateRange.preset !== 'all' ||
+    (canChangeCompany && activeCompanyId !== 'all') ||
+    (canChangeDepartment && activeDepartmentId !== 'all');
 
   const handleResetFilters = () => {
     setActiveStatusFilter(null);
     setActiveTypeFilter(null);
     setActiveDateRange({ preset: 'all' });
+    setSearchQuery('');
+    if (canChangeCompany) setActiveCompanyId('all');
+    if (canChangeDepartment) setActiveDepartmentId('all');
   };
 
   // Filter configurations for standard enterprise DataTableFilterSelect & DataTableDateRangePicker
-  const dashboardFilterConfigs: FilterConfig[] = useMemo(
-    () => [
+  const dashboardFilterConfigs: FilterConfig[] = useMemo(() => {
+    const configs: FilterConfig[] = [
       {
         id: 'dateRange',
         label: 'Periode',
@@ -154,6 +148,7 @@ export default function DashboardOverviewPage() {
         label: 'Status Verifikasi',
         type: 'select',
         placeholder: 'Semua Status',
+        searchable: true,
         options: [
           { label: 'Semua Status', value: 'all' },
           { label: 'Perlu Verifikasi (HITL)', value: 'needs_review' },
@@ -168,22 +163,75 @@ export default function DashboardOverviewPage() {
         label: 'Jenis Dokumen',
         type: 'select',
         placeholder: 'Semua Tipe',
+        searchable: true,
         options: [
           { label: 'Semua Tipe', value: 'all' },
-          { label: 'Faktur Pajak Standar', value: 'tax_invoice' },
-          { label: 'Invoice Komersial', value: 'commercial_invoice' },
-          { label: 'Purchase Order (PO)', value: 'purchase_order' },
-          { label: 'Perjanjian Kontrak', value: 'contract' },
-          { label: 'Bukti Potong PPh', value: 'withholding_tax' },
-          { label: 'Kuitansi / Receipt', value: 'receipt' },
+          { label: 'Faktur Pajak Standar', value: 'tax_invoice', category: 'Perpajakan' },
+          { label: 'Invoice Komersial', value: 'commercial_invoice', category: 'AP / Tagihan' },
+          { label: 'Purchase Order (PO)', value: 'purchase_order', category: 'Pengadaan' },
+          { label: 'Perjanjian Kontrak', value: 'contract', category: 'Legal' },
+          { label: 'Bukti Potong PPh', value: 'withholding_tax', category: 'Perpajakan' },
+          { label: 'Kuitansi / Receipt', value: 'receipt', category: 'Pengeluaran' },
         ],
         selectedValue: activeTypeFilter || 'all',
         onChange: (val) => setActiveTypeFilter(val === 'all' ? null : val),
-        searchable: true,
       },
-    ],
-    [activeDateRange, activeStatusFilter, activeTypeFilter]
-  );
+    ];
+
+    if (canChangeCompany && allowedCompanies.length > 0) {
+      configs.push({
+        id: 'company',
+        label: 'Entitas Perusahaan',
+        type: 'select',
+        placeholder: 'Semua Entitas',
+        searchable: true,
+        options: [
+          { label: 'Semua Entitas', value: 'all' },
+          ...allowedCompanies.map((c) => ({
+            label: c.name,
+            value: c.id,
+            badge: c.code,
+          })),
+        ],
+        selectedValue: activeCompanyId,
+        onChange: (val) => setActiveCompanyId(val || 'all'),
+      });
+    }
+
+    if (canChangeDepartment && allowedDepartments.length > 0) {
+      configs.push({
+        id: 'department',
+        label: 'Departemen',
+        type: 'select',
+        placeholder: 'Semua Departemen',
+        searchable: true,
+        options: [
+          { label: 'Semua Departemen', value: 'all' },
+          ...allowedDepartments.map((dep) => ({
+            label: dep.name,
+            value: dep.id,
+            badge: dep.code,
+          })),
+        ],
+        selectedValue: activeDepartmentId,
+        onChange: (val) => setActiveDepartmentId(val || 'all'),
+      });
+    }
+
+    return configs;
+  }, [
+    activeDateRange,
+    activeStatusFilter,
+    activeTypeFilter,
+    canChangeCompany,
+    allowedCompanies,
+    activeCompanyId,
+    setActiveCompanyId,
+    canChangeDepartment,
+    allowedDepartments,
+    activeDepartmentId,
+    setActiveDepartmentId,
+  ]);
 
   // Metrics based on filteredDocuments
   const totalDocs = filteredDocuments.length || 1;
@@ -196,12 +244,6 @@ export default function DashboardOverviewPage() {
     : 0;
 
   const totalValue = filteredDocuments
-    .filter((d) => d.status === 'approved')
-    .reduce((acc, d) => acc + d.totalAmount, 0);
-
-  // Unfiltered count for reference
-  const pendingDocsUnfiltered = documents.filter((d) => d.status === 'needs_review').length;
-  const approvedValueUnfiltered = documents
     .filter((d) => d.status === 'approved')
     .reduce((acc, d) => acc + d.totalAmount, 0);
 
@@ -280,19 +322,11 @@ export default function DashboardOverviewPage() {
         onSelect: (doc) => handleCopyText(doc.fileNumber, 'Nomor Faktur'),
       },
     ],
-    [router, getRoute]
+    [router, getRoute, handleCopyText]
   );
 
   return (
     <div className="flex-1 flex flex-col relative w-full min-w-0">
-      {/* Toast Notification */}
-      {toast && (
-        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2 bg-[#0F172A] text-white px-4 py-3 rounded-xl shadow-2xl text-xs border border-slate-700 animate-in fade-in slide-in-from-bottom-3 duration-200">
-          <CheckCircleIcon className="w-4 h-4 text-emerald-400 shrink-0" />
-          <span className="font-medium">{toast.message}</span>
-        </div>
-      )}
-
       {/* Topbar Navigation Header */}
       <Topbar
         title="Ringkasan Utama"
@@ -301,24 +335,6 @@ export default function DashboardOverviewPage() {
       />
 
       <main className="flex-1 w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 py-6 sm:py-8 space-y-8 min-w-0">
-        {/* Banner Peringatan Lingkungan Demo */}
-        {isDemo && (
-          <div className="p-3.5 sm:p-4 rounded-xl border border-amber-300 bg-amber-50/80 text-amber-900 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
-            <div className="flex items-center gap-2.5">
-              <span className="text-base">⚠️</span>
-              <div>
-                <strong>Lingkungan Simulasi & Evaluasi Produk:</strong> Data dan integrasi di halaman ini adalah simulasi lokal (sandbox) dan tidak memengaruhi pembukuan produksi riil.
-              </div>
-            </div>
-            <Link
-              href="/login"
-              className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg shrink-0 text-center transition-colors shadow-2xs"
-            >
-              Masuk Akun Live
-            </Link>
-          </div>
-        )}
-
         {/* Page Identity Header */}
         <PageHeader
           title="Ringkasan Utama & Analisis Operasional"
@@ -334,47 +350,18 @@ export default function DashboardOverviewPage() {
           }
         />
 
-        {/* 1. Intelligent Processing Overview & Quick Actions Banner (Dipindah ke Atas Card Counter) */}
-        <div className="p-6 sm:p-7 rounded-2xl border border-indigo-100 bg-gradient-to-r from-indigo-50/70 via-white to-indigo-50/30 shadow-xs flex flex-col lg:flex-row items-start lg:items-center justify-between gap-5 min-w-0">
-          <div className="space-y-1.5 min-w-0 flex-1">
-            <div className="inline-flex items-center gap-2 text-[11px] uppercase font-extrabold tracking-wider text-[#4F46E5]">
-              <span className="w-2 h-2 rounded-full bg-[#4F46E5] animate-pulse" />
-              <span>{isProduction ? 'Antrean Verifikasi Dokumen Masuk' : 'Simulasi Intelligent Processing'}</span>
-            </div>
-            <h3 className="text-base sm:text-lg font-bold text-[#0F172A] leading-snug">
-              Ada {pendingDocsUnfiltered} dokumen menunggu review mata manusia sebelum ekspor ke SAP ERP
-            </h3>
-            <p className="text-xs sm:text-[13px] text-[#64748B]">
-              Total nominal transaksi yang telah tervalidasi dan siap dibayar:{' '}
-              <strong className="text-[#059669] font-bold">{formatIDR(approvedValueUnfiltered)}</strong>
-            </p>
-          </div>
-          <div className="flex flex-wrap sm:flex-nowrap items-center gap-3 shrink-0 w-full sm:w-auto">
-            <Link
-              href={getRoute('/upload')}
-              className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-[#CBD5E1] hover:bg-[#F8FAFC] text-xs font-bold text-[#0F172A] shadow-2xs hover:border-[#94A3B8] transition-all"
-            >
-              <UploadCloudIcon className="w-4 h-4 text-[#4F46E5]" />
-              <span className="whitespace-nowrap">Unggah Faktur Baru</span>
-            </Link>
-            <Link
-              href={getRoute('/verification')}
-              className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[#4F46E5] hover:bg-[#4338CA] text-xs font-bold text-white shadow-xs transition-all"
-            >
-              <CheckCircleIcon className="w-4 h-4" />
-              <span className="whitespace-nowrap">Buka Reviewer Workspace</span>
-            </Link>
-          </div>
-        </div>
-
-        {/* 2. Baris Filter Reaktif Standard Enterprise (DataTableFilters) */}
-        <div className="rounded-xl border border-[#E2E8F0] bg-white p-5 shadow-xs space-y-4 min-w-0">
+        {/* Baris Filter Reaktif Standard Enterprise (DataTableFilters) */}
+        <div className="rounded-xl border border-[#E2E8F0] bg-white p-5 shadow-sm space-y-4 min-w-0">
           {/* Dropdown Filters Row */}
           <DataTableFilters filters={dashboardFilterConfigs} />
 
-          {/* Action Bar (Hanya tampil saat filter aktif untuk Reset) */}
-          {isAnyFilterActive && (
-            <div className="flex items-center justify-end pt-3 border-t border-[#F1F5F9]">
+          {/* Action Bar (Hanya tampil saat filter aktif untuk Reset + Jumlah Hasil) */}
+          {(isAnyFilterActive || Boolean(searchQuery.trim())) && (
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-[#F1F5F9]">
+              <span className="text-xs text-[#64748B]">
+                Menampilkan <strong className="text-[#0F172A]">{filteredRecentDocs.length}</strong> dari{' '}
+                <strong className="text-[#0F172A]">{documents.length}</strong> dokumen
+              </span>
               <button
                 type="button"
                 onClick={handleResetFilters}
@@ -393,7 +380,7 @@ export default function DashboardOverviewPage() {
           {/* Total Documents -> /dashboard/documents */}
           <Link
             href={getRoute('/documents')}
-            className="group p-5 sm:p-6 rounded-xl border border-[#E2E8F0] bg-white shadow-xs space-y-3 min-w-0 flex flex-col justify-between hover:border-[#4F46E5] hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-pointer"
+            className="group p-5 sm:p-6 rounded-xl border border-[#E2E8F0] bg-white shadow-sm space-y-3 min-w-0 flex flex-col justify-between hover:border-[#4F46E5] hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-pointer"
           >
             <div className="flex items-center justify-between text-xs font-semibold text-[#64748B] group-hover:text-[#4F46E5] transition-colors">
               <span className="truncate flex items-center gap-1">
@@ -416,7 +403,7 @@ export default function DashboardOverviewPage() {
           {/* Menunggu Review (HITL) -> /dashboard/verification */}
           <Link
             href={getRoute('/verification')}
-            className="group p-5 sm:p-6 rounded-xl border border-[#E2E8F0] bg-white shadow-xs space-y-3 min-w-0 flex flex-col justify-between hover:border-[#F59E0B] hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-pointer"
+            className="group p-5 sm:p-6 rounded-xl border border-[#E2E8F0] bg-white shadow-sm space-y-3 min-w-0 flex flex-col justify-between hover:border-[#F59E0B] hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-pointer"
           >
             <div className="flex items-center justify-between text-xs font-semibold text-[#64748B] group-hover:text-[#F59E0B] transition-colors">
               <span className="truncate flex items-center gap-1">
@@ -438,7 +425,7 @@ export default function DashboardOverviewPage() {
           {/* Disetujui & Valid -> /dashboard/export */}
           <Link
             href={getRoute('/export')}
-            className="group p-5 sm:p-6 rounded-xl border border-[#E2E8F0] bg-white shadow-xs space-y-3 min-w-0 flex flex-col justify-between hover:border-[#059669] hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-pointer"
+            className="group p-5 sm:p-6 rounded-xl border border-[#E2E8F0] bg-white shadow-sm space-y-3 min-w-0 flex flex-col justify-between hover:border-[#059669] hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-pointer"
           >
             <div className="flex items-center justify-between text-xs font-semibold text-[#64748B] group-hover:text-[#059669] transition-colors">
               <span className="truncate flex items-center gap-1">
@@ -460,7 +447,7 @@ export default function DashboardOverviewPage() {
           {/* Akurasi Model AI -> /dashboard/settings */}
           <Link
             href={getRoute('/settings')}
-            className="group p-5 sm:p-6 rounded-xl border border-[#E2E8F0] bg-white shadow-xs space-y-3 min-w-0 flex flex-col justify-between hover:border-[#4F46E5] hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-pointer"
+            className="group p-5 sm:p-6 rounded-xl border border-[#E2E8F0] bg-white shadow-sm space-y-3 min-w-0 flex flex-col justify-between hover:border-[#4F46E5] hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-pointer"
           >
             <div className="flex items-center justify-between text-xs font-semibold text-[#64748B] group-hover:text-[#4F46E5] transition-colors">
               <span className="truncate flex items-center gap-1">
@@ -492,7 +479,7 @@ export default function DashboardOverviewPage() {
             {/* Tingkat Persetujuan Pertama -> /dashboard/documents?status=approved */}
             <Link
               href={getRoute('/documents?status=approved')}
-              className="group p-5 sm:p-6 rounded-xl border border-[#E2E8F0] bg-white shadow-xs space-y-2 min-w-0 hover:border-[#059669] hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-pointer block"
+              className="group p-5 sm:p-6 rounded-xl border border-[#E2E8F0] bg-white shadow-sm space-y-2 min-w-0 hover:border-[#059669] hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-pointer block"
             >
               <div className="flex items-center justify-between text-xs font-semibold text-[#64748B] group-hover:text-[#059669] transition-colors">
                 <span className="truncate">Tingkat Persetujuan Pertama</span>
@@ -505,7 +492,7 @@ export default function DashboardOverviewPage() {
             </Link>
 
             {/* Rerata Waktu Pemrosesan AI */}
-            <div className="p-5 sm:p-6 rounded-xl border border-[#E2E8F0] bg-white shadow-xs space-y-2 min-w-0">
+            <div className="p-5 sm:p-6 rounded-xl border border-[#E2E8F0] bg-white shadow-sm space-y-2 min-w-0">
               <span className="text-xs font-semibold text-[#64748B] block truncate">Rerata Waktu Pemrosesan AI</span>
               <div className="text-2xl sm:text-3xl font-black text-[#4F46E5] tracking-tight">1.4 Detik</div>
               <p className="text-[11px] text-[#64748B] leading-relaxed">Dari upload scan hingga ekstraksi bidang JSON</p>
@@ -514,7 +501,7 @@ export default function DashboardOverviewPage() {
             {/* Estimasi Jam Kerja Hemat -> /dashboard/audit */}
             <Link
               href={getRoute('/audit')}
-              className="group p-5 sm:p-6 rounded-xl border border-[#E2E8F0] bg-white shadow-xs space-y-2 min-w-0 hover:border-[#4F46E5] hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-pointer block"
+              className="group p-5 sm:p-6 rounded-xl border border-[#E2E8F0] bg-white shadow-sm space-y-2 min-w-0 hover:border-[#4F46E5] hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-pointer block"
             >
               <div className="flex items-center justify-between text-xs font-semibold text-[#64748B] group-hover:text-[#4F46E5] transition-colors">
                 <span className="truncate">Estimasi Jam Kerja Hemat</span>
@@ -587,7 +574,7 @@ export default function DashboardOverviewPage() {
             }
           />
 
-          <div className="rounded-xl border border-[#E2E8F0] bg-white shadow-xs overflow-hidden w-full">
+          <div className="rounded-xl border border-[#E2E8F0] bg-white shadow-sm overflow-hidden w-full">
             <div className="overflow-x-auto w-full">
               <table className="w-full text-left border-collapse min-w-[680px]">
                 <thead>
@@ -665,8 +652,17 @@ export default function DashboardOverviewPage() {
                     })
                   ) : (
                     <tr>
-                      <td colSpan={7} className="py-8 text-center text-xs text-[#64748B]">
-                        Tidak ada dokumen yang sesuai dengan pencarian &quot;{searchQuery}&quot;.
+                      <td colSpan={7} className="p-0">
+                        <DataTableEmptyState
+                          title="Tidak ada dokumen ditemukan"
+                          description={
+                            searchQuery.trim()
+                              ? `Tidak ada dokumen yang sesuai dengan pencarian "${searchQuery}".`
+                              : 'Tidak ada dokumen yang cocok dengan kombinasi filter periode, status, atau tipe saat ini.'
+                          }
+                          isFilterActive={isAnyFilterActive || Boolean(searchQuery.trim())}
+                          onResetFilters={handleResetFilters}
+                        />
                       </td>
                     </tr>
                   )}
